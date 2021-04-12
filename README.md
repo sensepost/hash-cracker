@@ -63,6 +63,10 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Made light and heavy rules separate job
 * Added fordyv1.rule
 
+### v1.0 - Release fully working state
+
+* Fully working state
+
 ## License
 
-MIT
+GNU GPLv3
