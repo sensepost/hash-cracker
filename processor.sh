@@ -150,15 +150,16 @@ function substring_processing () {
 
 function show_info () {
     echo -e "\nInformation about the modules"
-    echo "1. Default: A wordlist + a set of rules is ran agains the hashlist"
-    echo "2. Brute force: A commonly known set of brute force tasks"
-    echo "3. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
-    echo "4. Plain: Just a plain wordlist agains the hashlist, no specials here"
-    echo "5. Hybrid: Wordlist + bruteforce random combined"
-    echo "6. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
-    echo "7. Combinator: Will combine two input wordlists to create new passwords"
-    echo "8. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
-    echo "9. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
+    echo "1. Default light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
+    echo "2. Default heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
+    echo "3. Brute force: A commonly known set of brute force tasks"
+    echo "4. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
+    echo "5. Plain: Just a plain wordlist agains the hashlist, no specials here"
+    echo "6. Hybrid: Wordlist + bruteforce random combined"
+    echo "7. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
+    echo "8. Combinator: Will combine two input wordlists to create new passwords"
+    echo "9. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
+    echo "10. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
     main
 }
 
