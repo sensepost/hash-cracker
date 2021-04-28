@@ -12,14 +12,15 @@ fordyv1="rules/fordyv1.rule" # Credits to Fordy
 generated2="rules/generated2.rule"
 hob064="rules/hob064.rule"
 leetspeak="rules/leetspeak.rule"
+OUTD="rules/OptimizedUpToDate.rule"
 ORTRTA="rules/OneRuleToRuleThemAll.rule"
 pantag="rules/pantagrule.popular.rule"
-williamsuper="rules/williamsuper.rule"
 toggles1="rules/toggles1.rule"
 toggles2="rules/toggles2.rule"
-RULELIST_LIGHT=($ORTRTA $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+williamsuper="rules/williamsuper.rule"
+RULELIST_LIGHT=($ORTRTA $OUTD $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
 RULELIST_HEAVY=($fordyv1 $pantag $williamsuper $digits3 $dive)
-RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak)
+RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak $OUTD)
 
 function requirement_checker () {
     if ! [ -x "$(command -v $HASHCAT)" ]; then
@@ -171,7 +172,7 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.0 by crypt0rr\n"
+    echo -e "Hash-cracker v1.1 by crypt0rr\n"
     echo "Checking if requirements are met:"
     requirement_checker
     
