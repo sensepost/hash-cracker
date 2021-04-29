@@ -109,15 +109,10 @@ function iterate_processing () {
     echo -e "\n\e[32mIteration processing done\e[0m\n"; main
 }
 
-function plain_processing () {
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST
-    echo -e "\n\e[32mPlain processing done\e[0m\n"; main
-}
-
 function hybrid_processing () {
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?s?d?d?d?d' -i
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?d?d?d?d?s' -i
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?a?a' -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?s?d?d?d?d' --increment
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?d?d?d?d?s' --increment
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?a?a' --increment
     echo -e "\n\e[32mHybrid processing done\e[0m\n"; main
 }
 
@@ -155,12 +150,11 @@ function show_info () {
     echo "2. Default heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
     echo "3. Brute force: A commonly known set of brute force tasks"
     echo "4. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
-    echo "5. Plain: Just a plain wordlist agains the hashlist, no specials here"
-    echo "6. Hybrid: Wordlist + bruteforce random combined"
-    echo "7. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
-    echo "8. Combinator: Will combine two input wordlists to create new passwords"
-    echo "9. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
-    echo "10. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
+    echo "5. Hybrid: Wordlist + bruteforce random combined"
+    echo "6. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
+    echo "7. Combinator: Will combine two input wordlists to create new passwords"
+    echo "8. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
+    echo "9. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
     main
 }
 
@@ -172,7 +166,7 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.1 by crypt0rr\n"
+    echo -e "Hash-cracker v1.2 by crypt0rr\n"
     echo "Checking if requirements are met:"
     requirement_checker
     
@@ -181,12 +175,11 @@ function main () {
     echo "2. Default heavy rules"
     echo "3. Brute force"
     echo "4. Iterate results"
-    echo "5. Plain"
-    echo "6. Hybrid"
-    echo "7. Toggle-case"
-    echo "8. Combinator"
-    echo "9. Prefix suffix (advise: first run steps above)"
-    echo "10. Common substring (advise: first run steps above)"
+    echo "5. Hybrid"
+    echo "6. Toggle-case"
+    echo "7. Combinator"
+    echo "8. Prefix suffix (advise: first run steps above)"
+    echo "9. Common substring (advise: first run steps above)"
     echo "99. Show info about modules"
     echo "100. Show results in usable format"
     read -p "Please enter number: " START
@@ -201,16 +194,14 @@ function main () {
     elif [[ $START = '4' ]]; then
         selector_hashtype; selector_hashlist; iterate_processing
     elif [[ $START = '5' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; plain_processing
-    elif [[ $START = '6' ]]; then
         selector_hashtype; selector_hashlist; selector_wordlist; hybrid_processing
-    elif [[ $START = '7' ]]; then
+    elif [[ $START = '6' ]]; then
         selector_hashtype; selector_hashlist; selector_wordlist; toggle_processing
-    elif [[ $START = '8' ]]; then
+    elif [[ $START = '7' ]]; then
         selector_hashtype; selector_hashlist; selector_wordlist; combinator_processing
-    elif [[ $START = '9' ]]; then
+    elif [[ $START = '8' ]]; then
         selector_hashtype; selector_hashlist; prefixsuffix_processing
-    elif [[ $START = '10' ]]; then
+    elif [[ $START = '9' ]]; then
         selector_hashtype; selector_hashlist; substring_processing
     elif [[ $START = '99' ]]; then
         show_info    
