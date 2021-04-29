@@ -72,6 +72,12 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Added new rule - OptimizedUpToDate.rule
 * Small changes in list and rulelists
 
+### v1.2 - Optimizing
+
+* Removed 'plain processing'
+* Removed plain hashes from MD5 example
+* Changed -i to --increment hybrid
+
 ## License
 
 GNU GPLv3
