@@ -78,6 +78,11 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Removed plain hashes from MD5 example
 * Changed -i to --increment hybrid
 
+### v1.3 - Lets enter something yourself
+
+* Added function to enter a specific word as input and randomize it
+* Extended hybrid processing with non-caps jobs
+
 ## License
 
 GNU GPLv3
