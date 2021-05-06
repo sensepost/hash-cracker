@@ -211,11 +211,11 @@ function main () {
         selector_hashtype; selector_hashlist; word_processing
     elif [[ $START = '6' ]]; then
         selector_hashtype; selector_hashlist; selector_wordlist; hybrid_processing
-    elif [[ $START = '6' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; toggle_processing
     elif [[ $START = '7' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; combinator_processing
+        selector_hashtype; selector_hashlist; selector_wordlist; toggle_processing
     elif [[ $START = '8' ]]; then
+        selector_hashtype; selector_hashlist; selector_wordlist; combinator_processing
+    elif [[ $START = '9' ]]; then
         selector_hashtype; selector_hashlist; prefixsuffix_processing
     elif [[ $START = '10' ]]; then
         selector_hashtype; selector_hashlist; substring_processing
