@@ -63,7 +63,7 @@ function selector_wordlist () {
     else
         echo -e "\e[31mFile does not exist, try again\e[0m"; selector_wordlist
     fi
-    if [[ $START = '7' ]]; then
+    if [[ $START = '8' ]]; then
         read -e -p "Enter full path to second wordlist: " WORDLIST2
         if [ -f "$WORDLIST" ]; then
         echo "Wordlist" $WORDLIST "selected."
