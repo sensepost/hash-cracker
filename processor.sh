@@ -116,6 +116,7 @@ function word_processing () {
         $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST tmp_word -r $RULE --loopback
     done
     rm tmp_word
+    echo -e "\n\e[32mWord processing done\e[0m\n"; main
 }
 
 function hybrid_processing () {
