@@ -83,6 +83,11 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Added function to enter a specific word as input and randomize it
 * Extended hybrid processing with non-caps jobs
 
+### v1.4 - Lets enter something yourself v2
+
+* Added function to enter a specific word as input and brute force in front and after it
+* Menu rearrange
+
 ## License
 
 GNU GPLv3
