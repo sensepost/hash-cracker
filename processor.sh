@@ -19,7 +19,7 @@ toggles1="rules/toggles1.rule"
 toggles2="rules/toggles2.rule"
 williamsuper="rules/williamsuper.rule"
 RULELIST_LIGHT=($ORTRTA $OUTD $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
-RULELIST_HEAVY=($fordyv1 $pantag $williamsuper $digits3 $dive)
+RULELIST_HEAVY=($fordyv1 $pantag $OUTD $williamsuper $digits3 $dive)
 RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak $OUTD)
 
 function requirement_checker () {
@@ -63,7 +63,7 @@ function selector_wordlist () {
     else
         echo -e "\e[31mFile does not exist, try again\e[0m"; selector_wordlist
     fi
-    if [[ $START = '8' ]]; then
+    if [[ $START = '9' ]]; then
         read -e -p "Enter full path to second wordlist: " WORDLIST2
         if [ -f "$WORDLIST" ]; then
         echo "Wordlist" $WORDLIST "selected."
@@ -119,6 +119,19 @@ function word_processing () {
     echo -e "\n\e[32mWord processing done\e[0m\n"; main
 }
 
+function word_bruteforce () {
+    read -p "Enter a word (e.g. company name): " WORD
+    echo $WORD > tmp_word
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 tmp_word '?d?d?d?d?d?d?d?d' -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 tmp_word '?l?l?l?l?l?l' -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a7 '?d?d?d?d?d?d?d?d' tmp_word -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a7 '?l?l?l?l?l?l' tmp_word -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 tmp_word '?a?a?a?a' -i
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a7 '?a?a?a?a' tmp_word -i
+    rm tmp_word
+    echo -e "\n\e[32mWord processing done\e[0m\n"; main
+}
+
 function hybrid_processing () {
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?s?d?d?d?d' --increment
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a6 $WORDLIST -j c '?d?d?d?d?s' --increment
@@ -164,11 +177,12 @@ function show_info () {
     echo "3. Brute force: A commonly known set of brute force tasks"
     echo "4. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
     echo "5. Enter your own word, for example a company name to change around with rules"
-    echo "6. Hybrid: Wordlist + bruteforce random combined"
-    echo "7. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
-    echo "8. Combinator: Will combine two input wordlists to create new passwords"
-    echo "9. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
-    echo "10. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
+    echo "6. Enter your own word, for example a company name to brute force before and after"
+    echo "7. Hybrid: Wordlist + bruteforce random combined"
+    echo "8. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
+    echo "9. Combinator: Will combine two input wordlists to create new passwords"
+    echo "10. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
+    echo "11. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
     main
 }
 
@@ -180,7 +194,7 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.3 by crypt0rr\n"
+    echo -e "Hash-cracker v1.4 by crypt0rr\n"
     echo "Checking if requirements are met:"
     requirement_checker
     
@@ -190,11 +204,12 @@ function main () {
     echo "3. Brute force"
     echo "4. Iterate results"
     echo "5. Enter specific word/name"
-    echo "6. Hybrid"
-    echo "7. Toggle-case"
-    echo "8. Combinator"
-    echo "9. Prefix suffix (advise: first run steps above)"
-    echo "10. Common substring (advise: first run steps above)"
+    echo "6. Enter specific word/name (bruteforce)"
+    echo "7. Hybrid"
+    echo "8. Toggle-case"
+    echo "9. Combinator"
+    echo "10. Prefix suffix (advise: first run steps above)"
+    echo "11. Common substring (advise: first run steps above)"
     echo "99. Show info about modules"
     echo "100. Show results in usable format"
     read -p "Please enter number: " START
@@ -211,14 +226,16 @@ function main () {
     elif [[ $START = '5' ]]; then
         selector_hashtype; selector_hashlist; word_processing
     elif [[ $START = '6' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; hybrid_processing
+        selector_hashtype; selector_hashlist; word_bruteforce
     elif [[ $START = '7' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; toggle_processing
+        selector_hashtype; selector_hashlist; selector_wordlist; hybrid_processing
     elif [[ $START = '8' ]]; then
-        selector_hashtype; selector_hashlist; selector_wordlist; combinator_processing
+        selector_hashtype; selector_hashlist; selector_wordlist; toggle_processing
     elif [[ $START = '9' ]]; then
-        selector_hashtype; selector_hashlist; prefixsuffix_processing
+        selector_hashtype; selector_hashlist; selector_wordlist; combinator_processing
     elif [[ $START = '10' ]]; then
+        selector_hashtype; selector_hashlist; prefixsuffix_processing
+    elif [[ $START = '11' ]]; then
         selector_hashtype; selector_hashlist; substring_processing
     elif [[ $START = '99' ]]; then
         show_info    
