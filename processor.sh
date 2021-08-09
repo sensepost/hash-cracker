@@ -194,8 +194,8 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.4 by crypt0rr\n"
-    echo "Checking if requirements are met:"
+    echo -e "Hash-cracker v1.4 by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "Checking if requirements are met:"
     requirement_checker
     
     echo -e "\n0. Exit"
