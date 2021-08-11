@@ -220,10 +220,9 @@ function main () {
     echo "10. Prefix suffix (advise: first run steps above)"
     echo "11. Common substring (advise: first run steps above)"
     echo "99. Show info about modules"
-    echo "100. Show results in usable format"
-    echo -e "\nOr type 'search' to find hashtypes\n"
-    
-    read -p "Please enter number: " START
+    echo -e "100. Show results in usable format\n"
+
+    read -p "Please enter number OR type 'search' to find hashtypes: " START
     if [[ $START = '0' ]]; then
         echo "Bye..."; exit 1
     elif [[ $START = '1' ]]; then
