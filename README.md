@@ -20,7 +20,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Requirements checker
 * Iterations of results put into a separate function
 * Added function for result processing / output
-* Results to final.txt removed, must now use option to show results
+* Results to `final.txt` removed, must now use option to show results
 
 ### v0.3 - Added plain processing
 
@@ -35,7 +35,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 
 ### v0.5 - Added Toggle-Case attack
 
-* Adjusted default bitmap-max size to 24
+* Adjusted default `bitmap-max` size to 24
 * Added two bruteforce defaults
 * Added the following rules (leetspeak, toggles1, toggles2)
 * Added new rules to default processing job
@@ -48,7 +48,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 
 ### v0.7 - Loop the loop
 
-* Added '--loopback' to rule based cracking
+* Added `--loopback` to rule based cracking
 * Extended brute force digits from 8 to 10
 
 ### v0.8 - Combinator
@@ -60,7 +60,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ### v0.9 - Light and heavy lifting
 
 * Made light and heavy rules separate job
-* Added fordyv1.rule
+* Added `fordyv1.rule`
 
 ### v1.0 - Release fully working state
 
@@ -68,14 +68,14 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 
 ### v1.1 - Added rule
 
-* Added new rule - OptimizedUpToDate.rule
+* Added new rule - `OptimizedUpToDate.rule`
 * Small changes in list and rulelists
 
 ### v1.2 - Optimizing
 
-* Removed 'plain processing'
+* Removed `plain processing`
 * Removed plain hashes from MD5 example
-* Changed -i to --increment hybrid
+* Changed `-i` to `--increment` hybrid
 
 ### v1.3 - Lets enter something yourself
 
