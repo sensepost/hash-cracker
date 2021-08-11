@@ -1,0 +1,383 @@
+    900 | MD4
+      0 | MD5
+    100 | SHA1
+   1300 | SHA2-224
+   1400 | SHA2-256
+  10800 | SHA2-384
+   1700 | SHA2-512
+  17300 | SHA3-224
+  17400 | SHA3-256
+  17500 | SHA3-384
+  17600 | SHA3-512
+   6000 | RIPEMD-160
+    600 | BLAKE2b-512
+  11700 | GOST R 34.11-2012 (Streebog) 256-bit, big-endian
+  11800 | GOST R 34.11-2012 (Streebog) 512-bit, big-endian
+   6900 | GOST R 34.11-94
+   5100 | Half MD5
+  17700 | Keccak-224
+  17800 | Keccak-256
+  17900 | Keccak-384
+  18000 | Keccak-512
+   6100 | Whirlpool
+  10100 | SipHash
+     70 | md5(utf16le($pass))
+    170 | sha1(utf16le($pass))
+   1470 | sha256(utf16le($pass))
+  10870 | sha384(utf16le($pass))
+   1770 | sha512(utf16le($pass))
+     10 | md5($pass.$salt)
+     20 | md5($salt.$pass)
+   3800 | md5($salt.$pass.$salt)
+   3710 | md5($salt.md5($pass))
+   4110 | md5($salt.md5($pass.$salt))
+   4010 | md5($salt.md5($salt.$pass))
+  21300 | md5($salt.sha1($salt.$pass))
+     40 | md5($salt.utf16le($pass))
+   2600 | md5(md5($pass))
+   3910 | md5(md5($pass).md5($salt))
+   3500 | md5(md5(md5($pass)))
+   4400 | md5(sha1($pass))
+  20900 | md5(sha1($pass).md5($pass).sha1($pass))
+  21200 | md5(sha1($salt).md5($pass))
+   4300 | md5(strtoupper(md5($pass)))
+     30 | md5(utf16le($pass).$salt)
+    110 | sha1($pass.$salt)
+    120 | sha1($salt.$pass)
+   4900 | sha1($salt.$pass.$salt)
+   4520 | sha1($salt.sha1($pass))
+  24300 | sha1($salt.sha1($pass.$salt))
+    140 | sha1($salt.utf16le($pass))
+  19300 | sha1($salt1.$pass.$salt2)
+  14400 | sha1(CX)
+   4700 | sha1(md5($pass))
+   4710 | sha1(md5($pass).$salt)
+  21100 | sha1(md5($pass.$salt))
+  18500 | sha1(md5(md5($pass)))
+   4500 | sha1(sha1($pass))
+   4510 | sha1(sha1($pass).$salt)
+   5000 | sha1(sha1($salt.$pass.$salt))
+    130 | sha1(utf16le($pass).$salt)
+   1410 | sha256($pass.$salt)
+   1420 | sha256($salt.$pass)
+  22300 | sha256($salt.$pass.$salt)
+  20720 | sha256($salt.sha256($pass))
+   1440 | sha256($salt.utf16le($pass))
+  20800 | sha256(md5($pass))
+  20710 | sha256(sha256($pass).$salt)
+  21400 | sha256(sha256_bin($pass))
+   1430 | sha256(utf16le($pass).$salt)
+  10810 | sha384($pass.$salt)
+  10820 | sha384($salt.$pass)
+  10840 | sha384($salt.utf16le($pass))
+  10830 | sha384(utf16le($pass).$salt)
+   1710 | sha512($pass.$salt)
+   1720 | sha512($salt.$pass)
+   1740 | sha512($salt.utf16le($pass))
+   1730 | sha512(utf16le($pass).$salt)
+     50 | HMAC-MD5 (key = $pass)
+     60 | HMAC-MD5 (key = $salt)
+    150 | HMAC-SHA1 (key = $pass)
+    160 | HMAC-SHA1 (key = $salt)
+   1450 | HMAC-SHA256 (key = $pass)
+   1460 | HMAC-SHA256 (key = $salt)
+   1750 | HMAC-SHA512 (key = $pass)
+   1760 | HMAC-SHA512 (key = $salt)
+  11750 | HMAC-Streebog-256 (key = $pass), big-endian
+  11760 | HMAC-Streebog-256 (key = $salt), big-endian
+  11850 | HMAC-Streebog-512 (key = $pass), big-endian
+  11860 | HMAC-Streebog-512 (key = $salt), big-endian
+  11500 | CRC32
+  18700 | Java Object hashCode()
+  25700 | MurmurHash
+  14100 | 3DES (PT = $salt, key = $pass)
+  14000 | DES (PT = $salt, key = $pass)
+  26401 | AES-128-ECB NOKDF (PT = $salt, key = $pass)
+  26402 | AES-192-ECB NOKDF (PT = $salt, key = $pass)
+  26403 | AES-256-ECB NOKDF (PT = $salt, key = $pass)
+  15400 | ChaCha20
+  14500 | Linux Kernel Crypto API (2.4)
+  14900 | Skip32 (PT = $salt, key = $pass)
+  11900 | PBKDF2-HMAC-MD5
+  12000 | PBKDF2-HMAC-SHA1
+  10900 | PBKDF2-HMAC-SHA256
+  12100 | PBKDF2-HMAC-SHA512
+   8900 | scrypt
+    400 | phpass
+  16100 | TACACS+
+  11400 | SIP digest authentication (MD5)
+   5300 | IKE-PSK MD5
+   5400 | IKE-PSK SHA1
+  25100 | SNMPv3 HMAC-MD5-96
+  25000 | SNMPv3 HMAC-MD5-96/HMAC-SHA1-96
+  25200 | SNMPv3 HMAC-SHA1-96
+   2500 | WPA-EAPOL-PBKDF2
+   2501 | WPA-EAPOL-PMK
+  22000 | WPA-PBKDF2-PMKID+EAPOL
+  22001 | WPA-PMK-PMKID+EAPOL
+  16800 | WPA-PMKID-PBKDF2
+  16801 | WPA-PMKID-PMK
+   7300 | IPMI2 RAKP HMAC-SHA1
+  10200 | CRAM-MD5
+  16500 | JWT (JSON Web Token)
+  19600 | Kerberos 5, etype 17, TGS-REP
+  19800 | Kerberos 5, etype 17, Pre-Auth
+  19700 | Kerberos 5, etype 18, TGS-REP
+  19900 | Kerberos 5, etype 18, Pre-Auth
+   7500 | Kerberos 5, etype 23, AS-REQ Pre-Auth
+  13100 | Kerberos 5, etype 23, TGS-REP
+  18200 | Kerberos 5, etype 23, AS-REP
+   5500 | NetNTLMv1 / NetNTLMv1+ESS
+   5600 | NetNTLMv2
+   4800 | iSCSI CHAP authentication, MD5(CHAP)
+   8500 | RACF
+   6300 | AIX {smd5}
+   6700 | AIX {ssha1}
+   6400 | AIX {ssha256}
+   6500 | AIX {ssha512}
+   3000 | LM
+  19000 | QNX /etc/shadow (MD5)
+  19100 | QNX /etc/shadow (SHA256)
+  19200 | QNX /etc/shadow (SHA512)
+  15300 | DPAPI masterkey file v1
+  15900 | DPAPI masterkey file v2
+   7200 | GRUB 2
+  12800 | MS-AzureSync PBKDF2-HMAC-SHA256
+  12400 | BSDi Crypt, Extended DES
+   1000 | NTLM
+   9900 | Radmin2
+   5800 | Samsung Android Password/PIN
+  13800 | Windows Phone 8+ PIN/password
+   2410 | Cisco-ASA MD5
+   9200 | Cisco-IOS $8$ (PBKDF2-SHA256)
+   9300 | Cisco-IOS $9$ (scrypt)
+   5700 | Cisco-IOS type 4 (SHA256)
+   2400 | Cisco-PIX MD5
+   8100 | Citrix NetScaler (SHA1)
+  22200 | Citrix NetScaler (SHA512)
+   1100 | Domain Cached Credentials (DCC), MS Cache
+   2100 | Domain Cached Credentials 2 (DCC2), MS Cache 2
+   7000 | FortiGate (FortiOS)
+  26300 | FortiGate256 (FortiOS256)
+    125 | ArubaOS
+    501 | Juniper IVE
+     22 | Juniper NetScreen/SSG (ScreenOS)
+  15100 | Juniper/NetBSD sha1crypt
+  26500 | iPhone passcode (UID key + System Keybag)
+    122 | macOS v10.4, macOS v10.5, macOS v10.6
+   1722 | macOS v10.7
+   7100 | macOS v10.8+ (PBKDF2-SHA512)
+   3200 | bcrypt $2*$, Blowfish (Unix)
+    500 | md5crypt, MD5 (Unix), Cisco-IOS $1$ (MD5)
+   1500 | descrypt, DES (Unix), Traditional DES
+   7400 | sha256crypt $5$, SHA256 (Unix)
+   1800 | sha512crypt $6$, SHA512 (Unix)
+  24600 | SQLCipher
+    131 | MSSQL (2000)
+    132 | MSSQL (2005)
+   1731 | MSSQL (2012, 2014)
+  24100 | MongoDB ServerKey SCRAM-SHA-1
+  24200 | MongoDB ServerKey SCRAM-SHA-256
+     12 | PostgreSQL
+  11100 | PostgreSQL CRAM (MD5)
+   3100 | Oracle H: Type (Oracle 7+)
+    112 | Oracle S: Type (Oracle 11+)
+  12300 | Oracle T: Type (Oracle 12+)
+   7401 | MySQL $A$ (sha256crypt)
+  11200 | MySQL CRAM (SHA1)
+    200 | MySQL323
+    300 | MySQL4.1/MySQL5
+   8000 | Sybase ASE
+   8300 | DNSSEC (NSEC3)
+  25900 | KNX IP Secure - Device Authentication Code
+  16400 | CRAM-MD5 Dovecot
+   1411 | SSHA-256(Base64), LDAP {SSHA256}
+   1711 | SSHA-512(Base64), LDAP {SSHA512}
+  24900 | Dahua Authentication MD5
+  10901 | RedHat 389-DS LDAP (PBKDF2-HMAC-SHA256)
+  15000 | FileZilla Server >= 0.9.55
+  12600 | ColdFusion 10+
+   1600 | Apache $apr1$ MD5, md5apr1, MD5 (APR)
+    141 | Episerver 6.x < .NET 4
+   1441 | Episerver 6.x >= .NET 4
+   1421 | hMailServer
+    101 | nsldap, SHA-1(Base64), Netscape LDAP SHA
+    111 | nsldaps, SSHA-1(Base64), Netscape LDAP SSHA
+   7700 | SAP CODVN B (BCODE)
+   7701 | SAP CODVN B (BCODE) from RFC_READ_TABLE
+   7800 | SAP CODVN F/G (PASSCODE)
+   7801 | SAP CODVN F/G (PASSCODE) from RFC_READ_TABLE
+  10300 | SAP CODVN H (PWDSALTEDHASH) iSSHA-1
+    133 | PeopleSoft
+  13500 | PeopleSoft PS_TOKEN
+  21500 | SolarWinds Orion
+  21501 | SolarWinds Orion v2
+     24 | SolarWinds Serv-U
+   8600 | Lotus Notes/Domino 5
+   8700 | Lotus Notes/Domino 6
+   9100 | Lotus Notes/Domino 8
+  26200 | OpenEdge Progress Encode
+  20600 | Oracle Transportation Management (SHA256)
+   4711 | Huawei sha1(md5($pass).$salt)
+  20711 | AuthMe sha256
+  22400 | AES Crypt (SHA256)
+  14600 | LUKS
+  13711 | VeraCrypt RIPEMD160 + XTS 512 bit
+  13712 | VeraCrypt RIPEMD160 + XTS 1024 bit
+  13713 | VeraCrypt RIPEMD160 + XTS 1536 bit
+  13741 | VeraCrypt RIPEMD160 + XTS 512 bit + boot-mode
+  13742 | VeraCrypt RIPEMD160 + XTS 1024 bit + boot-mode
+  13743 | VeraCrypt RIPEMD160 + XTS 1536 bit + boot-mode
+  13751 | VeraCrypt SHA256 + XTS 512 bit
+  13752 | VeraCrypt SHA256 + XTS 1024 bit
+  13753 | VeraCrypt SHA256 + XTS 1536 bit
+  13761 | VeraCrypt SHA256 + XTS 512 bit + boot-mode
+  13762 | VeraCrypt SHA256 + XTS 1024 bit + boot-mode
+  13763 | VeraCrypt SHA256 + XTS 1536 bit + boot-mode
+  13721 | VeraCrypt SHA512 + XTS 512 bit
+  13722 | VeraCrypt SHA512 + XTS 1024 bit
+  13723 | VeraCrypt SHA512 + XTS 1536 bit
+  13771 | VeraCrypt Streebog-512 + XTS 512 bit
+  13772 | VeraCrypt Streebog-512 + XTS 1024 bit
+  13773 | VeraCrypt Streebog-512 + XTS 1536 bit
+  13781 | VeraCrypt Streebog-512 + XTS 512 bit + boot-mode
+  13782 | VeraCrypt Streebog-512 + XTS 1024 bit + boot-mode
+  13783 | VeraCrypt Streebog-512 + XTS 1536 bit + boot-mode
+  13731 | VeraCrypt Whirlpool + XTS 512 bit
+  13732 | VeraCrypt Whirlpool + XTS 1024 bit
+  13733 | VeraCrypt Whirlpool + XTS 1536 bit
+  23900 | BestCrypt v3 Volume Encryption
+  16700 | FileVault 2
+  20011 | DiskCryptor SHA512 + XTS 512 bit
+  20012 | DiskCryptor SHA512 + XTS 1024 bit
+  20013 | DiskCryptor SHA512 + XTS 1536 bit
+  22100 | BitLocker
+  12900 | Android FDE (Samsung DEK)
+   8800 | Android FDE <= 4.3
+  18300 | Apple File System (APFS)
+   6211 | TrueCrypt RIPEMD160 + XTS 512 bit
+   6212 | TrueCrypt RIPEMD160 + XTS 1024 bit
+   6213 | TrueCrypt RIPEMD160 + XTS 1536 bit
+   6241 | TrueCrypt RIPEMD160 + XTS 512 bit + boot-mode
+   6242 | TrueCrypt RIPEMD160 + XTS 1024 bit + boot-mode
+   6243 | TrueCrypt RIPEMD160 + XTS 1536 bit + boot-mode
+   6221 | TrueCrypt SHA512 + XTS 512 bit
+   6222 | TrueCrypt SHA512 + XTS 1024 bit
+   6223 | TrueCrypt SHA512 + XTS 1536 bit
+   6231 | TrueCrypt Whirlpool + XTS 512 bit
+   6232 | TrueCrypt Whirlpool + XTS 1024 bit
+   6233 | TrueCrypt Whirlpool + XTS 1536 bit
+  12200 | eCryptfs
+  10400 | PDF 1.1 - 1.3 (Acrobat 2 - 4)
+  10410 | PDF 1.1 - 1.3 (Acrobat 2 - 4), collider #1
+  10420 | PDF 1.1 - 1.3 (Acrobat 2 - 4), collider #2
+  10500 | PDF 1.4 - 1.6 (Acrobat 5 - 8)
+  25400 | PDF 1.4 - 1.6 (Acrobat 5 - 8) - edit password
+  10600 | PDF 1.7 Level 3 (Acrobat 9)
+  10700 | PDF 1.7 Level 8 (Acrobat 10 - 11)
+   9400 | MS Office 2007
+   9500 | MS Office 2010
+   9600 | MS Office 2013
+  25300 | MS Office 2016 - SheetProtection
+   9700 | MS Office <= 2003 $0/$1, MD5 + RC4
+   9710 | MS Office <= 2003 $0/$1, MD5 + RC4, collider #1
+   9720 | MS Office <= 2003 $0/$1, MD5 + RC4, collider #2
+   9810 | MS Office <= 2003 $3, SHA1 + RC4, collider #1
+   9820 | MS Office <= 2003 $3, SHA1 + RC4, collider #2
+   9800 | MS Office <= 2003 $3/$4, SHA1 + RC4
+  18400 | Open Document Format (ODF) 1.2 (SHA-256, AES)
+  18600 | Open Document Format (ODF) 1.1 (SHA-1, Blowfish)
+  16200 | Apple Secure Notes
+  23300 | Apple iWork
+   6600 | 1Password, agilekeychain
+   8200 | 1Password, cloudkeychain
+   9000 | Password Safe v2
+   5200 | Password Safe v3
+   6800 | LastPass + LastPass sniffed
+  13400 | KeePass 1 (AES/Twofish) and KeePass 2 (AES)
+  23400 | Bitwarden
+  16900 | Ansible Vault
+  26000 | Mozilla key3.db
+  26100 | Mozilla key4.db
+  23100 | Apple Keychain
+  11600 | 7-Zip
+  12500 | RAR3-hp
+  23800 | RAR3-p (Compressed)
+  23700 | RAR3-p (Uncompressed)
+  13000 | RAR5
+  17220 | PKZIP (Compressed Multi-File)
+  17200 | PKZIP (Compressed)
+  17225 | PKZIP (Mixed Multi-File)
+  17230 | PKZIP (Mixed Multi-File Checksum-Only)
+  17210 | PKZIP (Uncompressed)
+  20500 | PKZIP Master Key
+  20510 | PKZIP Master Key (6 byte optimization)
+  23001 | SecureZIP AES-128
+  23002 | SecureZIP AES-192
+  23003 | SecureZIP AES-256
+  13600 | WinZip
+  18900 | Android Backup
+  24700 | Stuffit5
+  13200 | AxCrypt 1
+  13300 | AxCrypt 1 in-memory SHA1
+  23500 | AxCrypt 2 AES-128
+  23600 | AxCrypt 2 AES-256
+  14700 | iTunes backup < 10.0
+  14800 | iTunes backup >= 10.0
+   8400 | WBB3 (Woltlab Burning Board)
+   2612 | PHPS
+    121 | SMF (Simple Machines Forum) > v1.1
+   3711 | MediaWiki B type
+   4521 | Redmine
+  24800 | Umbraco HMAC-SHA1
+     11 | Joomla < 2.5.18
+  13900 | OpenCart
+  11000 | PrestaShop
+  16000 | Tripcode
+   7900 | Drupal7
+   4522 | PunBB
+   2811 | MyBB 1.2+, IPB2+ (Invision Power Board)
+   2611 | vBulletin < v3.8.5
+   2711 | vBulletin >= v3.8.5
+  25600 | bcrypt(md5($pass)) / bcryptmd5
+  25800 | bcrypt(sha1($pass)) / bcryptsha1
+     21 | osCommerce, xt:Commerce
+  18100 | TOTP (HMAC-SHA1)
+   2000 | STDOUT
+  99999 | Plaintext
+  21600 | Web2py pbkdf2-sha512
+  10000 | Django (PBKDF2-SHA256)
+    124 | Django (SHA-1)
+  12001 | Atlassian (PBKDF2-HMAC-SHA1)
+  19500 | Ruby on Rails Restful-Authentication
+  20200 | Python passlib pbkdf2-sha512
+  20300 | Python passlib pbkdf2-sha256
+  20400 | Python passlib pbkdf2-sha1
+  24410 | PKCS#8 Private Keys (PBKDF2-HMAC-SHA1 + 3DES/AES)
+  24420 | PKCS#8 Private Keys (PBKDF2-HMAC-SHA256 + 3DES/AES)
+  15500 | JKS Java Key Store Private Keys (SHA1)
+  22911 | RSA/DSA/EC/OpenSSH Private Keys ($0$)
+  22921 | RSA/DSA/EC/OpenSSH Private Keys ($6$)
+  22931 | RSA/DSA/EC/OpenSSH Private Keys ($1, $3$)
+  22941 | RSA/DSA/EC/OpenSSH Private Keys ($4$)
+  22951 | RSA/DSA/EC/OpenSSH Private Keys ($5$)
+  23200 | XMPP SCRAM PBKDF2-SHA1
+  22600 | Telegram Desktop < v2.1.14 (PBKDF2-HMAC-SHA1)
+  24500 | Telegram Desktop >= v2.1.14 (PBKDF2-HMAC-SHA512)
+  22301 | Telegram Mobile App Passcode (SHA256)
+     23 | Skype
+  26600 | MetaMask Wallet
+  21000 | BitShares v0.x - sha512(sha512_bin(pass))
+  11300 | Bitcoin/Litecoin wallet.dat
+  16600 | Electrum Wallet (Salt-Type 1-3)
+  21700 | Electrum Wallet (Salt-Type 4)
+  21800 | Electrum Wallet (Salt-Type 5)
+  12700 | Blockchain, My Wallet
+  15200 | Blockchain, My Wallet, V2
+  18800 | Blockchain, My Wallet, Second Password (SHA256)
+  25500 | Stargazer Stellar Wallet XLM
+  16300 | Ethereum Pre-Sale Wallet, PBKDF2-HMAC-SHA256
+  15600 | Ethereum Wallet, PBKDF2-HMAC-SHA256
+  15700 | Ethereum Wallet, SCRYPT
+  22500 | MultiBit Classic .key (MD5)
+  22700 | MultiBit HD (scrypt)
