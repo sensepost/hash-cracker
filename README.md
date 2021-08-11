@@ -87,6 +87,14 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 * Added function to enter a specific word as input and brute force in front and after it
 * Menu rearrange
 
+### v1.5 - Some new rules
+
+* Introducing some new rules
+* Small changes
+* New wordlists
+* Added search function to easily find the right hashtype mode you need
+* Renamed `processor.sh` to `hash-cracker.sh`
+
 ## License
 
 GNU GPLv3
