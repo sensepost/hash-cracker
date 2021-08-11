@@ -52,7 +52,8 @@ function selector_hashtype () {
 
 function search_hashtype () {
     read -p "Enter search query: " QUERY
-    echo -e "\e[34m" && grep -i $QUERY hashtypes && echo -e "\e[0m" 
+    echo -e "\e[34m" && grep -i $QUERY hashtypes
+    echo -e "\e[0m" 
     main
 }
 
