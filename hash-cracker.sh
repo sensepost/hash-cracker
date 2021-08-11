@@ -12,15 +12,18 @@ fordyv1="rules/fordyv1.rule" # Credits to Fordy
 generated2="rules/generated2.rule"
 hob064="rules/hob064.rule"
 leetspeak="rules/leetspeak.rule"
-OUTD="rules/OptimizedUpToDate.rule"
+NSAKEYv2="rules/NSAKEY.v2.dive.rule"
 ORTRTA="rules/OneRuleToRuleThemAll.rule"
+OUTD="rules/OptimizedUpToDate.rule"
 pantag="rules/pantagrule.popular.rule"
+passwordpro="rules/passwordspro.rule"
+rockyou30000="rules/rockyou-30000.rule"
 toggles1="rules/toggles1.rule"
 toggles2="rules/toggles2.rule"
 williamsuper="rules/williamsuper.rule"
-RULELIST_LIGHT=($ORTRTA $OUTD $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
-RULELIST_HEAVY=($fordyv1 $pantag $OUTD $williamsuper $digits3 $dive)
-RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak $OUTD)
+RULELIST_LIGHT=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+RULELIST_HEAVY=($NSAKEYv2 $fordyv1 $pantag $OUTD $williamsuper $digits3 $dive)
+RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak $rockyou30000 $passwordpro $OUTD)
 
 function requirement_checker () {
     if ! [ -x "$(command -v $HASHCAT)" ]; then
@@ -43,8 +46,14 @@ function selector_hashtype () {
     if [ -z "${HASHTYPE##*[!0-9]*}" ]; then
         echo -e "\e[31mNot a valid hashtype number, try again (https://hashcat.net/wiki/doku.php?id=example_hashes)\e[0m"; selector_hashtype 
     else
-        echo "Hashtype" $HASHTYPE "selected."
+        echo -e "\e[34mHashtype" `grep -w $HASHTYPE hashtypes` "selected.\e[0m"
     fi
+}
+
+function search_hashtype () {
+    read -p "Enter search query: " QUERY
+    echo -e "\e[34m" && grep -i $QUERY hashtypes && echo -e "\e[0m" 
+    main
 }
 
 function selector_hashlist () {
@@ -194,7 +203,7 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.4 by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "Hash-cracker v1.5 by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     requirement_checker
     
@@ -212,6 +221,8 @@ function main () {
     echo "11. Common substring (advise: first run steps above)"
     echo "99. Show info about modules"
     echo "100. Show results in usable format"
+    echo -e "\nOr type 'search' to find hashtypes\n"
+    
     read -p "Please enter number: " START
     if [[ $START = '0' ]]; then
         echo "Bye..."; exit 1
@@ -241,6 +252,8 @@ function main () {
         show_info    
     elif [[ $START = '100' ]]; then
         selector_hashtype; selector_hashlist; results_processing
+    elif [[ $START = 'search' ]]; then
+        search_hashtype
     else
         echo -e "\e[31mNot valid, try again\n\e[0m"; main
     fi
