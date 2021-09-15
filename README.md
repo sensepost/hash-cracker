@@ -123,6 +123,10 @@ Please enter number OR type 'search' to find hashtypes:
 * Added search function to easily find the right hashtype mode you need
 * Renamed `processor.sh` to `hash-cracker.sh`
 
+### v1.6 - Again new rules
+
+* Introducing new rules
+
 ## License
 
 GNU GPLv3
