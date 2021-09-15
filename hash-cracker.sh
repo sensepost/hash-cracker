@@ -21,9 +21,11 @@ rockyou30000="rules/rockyou-30000.rule"
 techtrip2="rules/techtrip_2.rule"
 toggles1="rules/toggles1.rule"
 toggles2="rules/toggles2.rule"
+tenKrules="rules/10krules.rule"
+toprules2020="rules/toprules2020.rule"
 williamsuper="rules/williamsuper.rule"
-RULELIST_LIGHT=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated2 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
-RULELIST_HEAVY=($NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive)
+RULELIST_LIGHT=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+RULELIST_HEAVY=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive)
 RULELIST_SMALL=($digits1 $digits2 $hob064 $leetspeak $rockyou30000 $passwordpro $OUTD)
 
 function requirement_checker () {
