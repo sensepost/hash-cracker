@@ -5,6 +5,7 @@ Simple script to get some hash cracking done effectively.
 Some sites where you can find wordlists:
 
 * <https://weakpass.com/>
+* <https://hashmob.net/>
 
 Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable).
 
