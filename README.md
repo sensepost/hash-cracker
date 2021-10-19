@@ -12,12 +12,13 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ## Usage
 
 ```plain
-$ ./hash-cracker.sh
-Hash-cracker v1.6 by crypt0rr (https://github.com/crypt0rr)
+$ ./hash-cracker.sh  
+Hash-cracker v1.7 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
 [+] common-substr is executable
+[+] Python2 available
 
 0. Exit
 1. Default light rules
@@ -31,6 +32,7 @@ Checking if requirements are met:
 9. Combinator
 10. Prefix suffix (advise: first run steps above)
 11. Common substring (advise: first run steps above)
+12. PACK rulegen (read option 99)
 99. Show info about modules
 100. Show results in usable format
 
@@ -130,7 +132,7 @@ Please enter number OR type 'search' to find hashtypes:
 
 ### v1.7 - PACK
 
-* Added [PACK](https://github.com/iphelix/pack) (Password Analysis and Cracking Kit) `rulegen.py`
+* Added [PACK](https://github.com/iphelix/pack) (Password Analysis and Cracking Kit by Peter Kacherginsky) `rulegen.py`
 * `rulegen.py` implemented and tested for NTLM (mode 1000)
 * Moved some things around
 
