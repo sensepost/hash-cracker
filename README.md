@@ -128,6 +128,12 @@ Please enter number OR type 'search' to find hashtypes:
 
 * Introducing new rules
 
+### v1.7 - PACK
+
+* Added [PACK](https://github.com/iphelix/pack) (Password Analysis and Cracking Kit) `rulegen.py`
+* `rulegen.py` implemented and tested for NTLM (mode 1000)
+* Moved some things around
+
 ## License
 
 GNU GPLv3
