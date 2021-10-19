@@ -34,10 +34,15 @@ function requirement_checker () {
     else
         echo -e '\e[32m[+]' Hashcat 'is installed\e[0m'
     fi
-    if [[ -x "common-substr" ]]; then
+    if [[ -x "extensions/common-substr" ]]; then
         echo -e '\e[32m[+]' 'common-substr is executable\e[0m'
     else
         echo -e '\e[31m[-]' 'common-substr is not executable or found\e[0m'; ((COUNTER=COUNTER + 1))
+    fi
+    if [[ -x "$(command -v python2)" ]]; then
+        echo -e '\e[32m[+]' 'Python2 available\e[0m'
+    else
+        echo -e '\e[31m[-]' 'Python2 is not available but required for PACK\e[0m'
     fi
     if [ "$COUNTER" \> 0 ]; then
         echo -e "\n\e[31mNot all requirements met please fix and try again"; exit 1
@@ -170,7 +175,7 @@ function combinator_processing () {
 
 function prefixsuffix_processing () {
     $HASHCAT -O -m$HASHTYPE $HASHLIST --show > tmp_prefixsuffix
-    cat tmp_prefixsuffix | cut -d ':' -f2 | sort | tee tmp_passwords &>/dev/null && ./common-substr -n -p -f tmp_passwords > tmp_prefix && ./common-substr -n -s -f tmp_passwords > tmp_suffix && rm tmp_passwords tmp_prefixsuffix
+    cat tmp_prefixsuffix | cut -d ':' -f2 | sort | tee tmp_passwords &>/dev/null && ./extensions/common-substr -n -p -f tmp_passwords > tmp_prefix && ./extensions/common-substr -n -s -f tmp_passwords > tmp_suffix && rm tmp_passwords tmp_prefixsuffix
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a1 tmp_prefix tmp_suffix
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a1 tmp_suffix tmp_prefix
     rm tmp_prefix tmp_suffix; echo -e "\n\e[32mPrefix suffix processing done\e[0m\n"; main
@@ -178,9 +183,17 @@ function prefixsuffix_processing () {
 
 function substring_processing () {
     $HASHCAT -O -m$HASHTYPE $HASHLIST --show > tmp_substring
-    cat tmp_substring | cut -d ':' -f2 | sort | tee tmp_passwords &>/dev/null && ./common-substr -n -f tmp_passwords > tmp_allsubstrings && rm tmp_passwords tmp_substring
+    cat tmp_substring | cut -d ':' -f2 | sort | tee tmp_passwords &>/dev/null && ./extensions/common-substr -n -f tmp_passwords > tmp_allsubstrings && rm tmp_passwords tmp_substring
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST -a1 tmp_allsubstrings tmp_allsubstrings
     rm tmp_allsubstrings; echo -e "\n\e[32mSubstring processing done\e[0m\n"; main
+}
+
+function pack_processing () {
+    $HASHCAT -O -m$HASHTYPE $HASHLIST --show | cut -d ':' -f2 | tee tmp_pwonly &>/dev/null
+    python2 extensions/rulegen.py tmp_pwonly
+    rm analysis-sorted.word analysis.word analysis-sorted.rule; selector_wordlist
+    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule --loopback
+    rm analysis.rule  tmp_pwonly; main
 }
 
 function show_info () {
@@ -196,6 +209,7 @@ function show_info () {
     echo "9. Combinator: Will combine two input wordlists to create new passwords"
     echo "10. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
     echo "11. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
+    echo "12. PACK rulegen will take the already cracked cleartext passwords and create a new rule, the rule is then used with the wordlist of your choise. Requires python2 and pyenchant (pip install pyenchant==3.0.0a1)"
     main
 }
 
@@ -207,7 +221,7 @@ function results_processing () {
 }
 
 function main () {
-    echo -e "Hash-cracker v1.6 by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "Hash-cracker v1.7 by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     requirement_checker
     
@@ -223,6 +237,7 @@ function main () {
     echo "9. Combinator"
     echo "10. Prefix suffix (advise: first run steps above)"
     echo "11. Common substring (advise: first run steps above)"
+    echo "12. PACK rulegen (read option 99)"
     echo "99. Show info about modules"
     echo -e "100. Show results in usable format\n"
 
@@ -251,6 +266,8 @@ function main () {
         selector_hashtype; selector_hashlist; prefixsuffix_processing
     elif [[ $START = '11' ]]; then
         selector_hashtype; selector_hashlist; substring_processing
+    elif [[ $START = '12' ]]; then
+        selector_hashtype; selector_hashlist; pack_processing
     elif [[ $START = '99' ]]; then
         show_info    
     elif [[ $START = '100' ]]; then
