@@ -193,7 +193,7 @@ function pack_processing () {
     python2 extensions/rulegen.py tmp_pwonly
     rm analysis-sorted.word analysis.word analysis-sorted.rule; selector_wordlist
     $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule --loopback
-    rm analysis.rule  tmp_pwonly; main
+    rm analysis.rule tmp_pwonly; main
 }
 
 function show_info () {
