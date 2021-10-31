@@ -3,8 +3,8 @@
 
 echo -e "\e[34m\nInformation about the modules"
 echo "1. Brute force: A commonly known set of brute force tasks"
-echo "2. Default light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
-echo "3. Default heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
+echo "2. Light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
+echo "3. Heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
 echo "4. Enter your own word, for example a company name to change around with rules"
 echo "5. Enter your own word, for example a company name to brute force before and after"
 echo "6. Hybrid: Wordlist + bruteforce random combined"
