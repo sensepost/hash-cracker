@@ -25,7 +25,7 @@ function menu () {
     echo -e "99. Show info about modules\n"
 
     read -p "Please enter number OR type 'search' to find hashtypes: " START
-    if [[ $START = '0' ]]; then
+    if [[ "$START" = "0" || "exit" ]]; then
         echo "Bye..."; exit 1
     elif [[ $START = '1' ]]; then
         source scripts/processors/bruteforce.sh
