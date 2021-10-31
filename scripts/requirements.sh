@@ -2,11 +2,11 @@
 # Copyright crypt0rr
 
 # Requirements
-HASHCAT="/usr/local/bin/hashcat"
+HASHCAT=$(command -v hashcat)
 
 # Logic
 if ! [ -x "$(command -v $HASHCAT)" ]; then
-    echo -e '\e[31m[-]' Hashcat  'is not installed or not in path (/usr/local/bin/hashcat)\e[0m'; ((COUNTER=COUNTER + 1))
+    echo -e '\e[31m[-]' Hashcat  'is not installed or sourced in your profile\e[0m'; ((COUNTER=COUNTER + 1))
 else
     echo -e '\e[32m[+]' Hashcat 'is installed\e[0m'
 fi
