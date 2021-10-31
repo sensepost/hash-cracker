@@ -3,6 +3,10 @@
 ## v2.0 - Redone way of working
 
 * Took everything from the script and put it into separate scripts
+* Changed from hardcoding hashcat path to dynamically with `command -v`
+* Minor rearrange of menu options
+* Search function showing sorted on number instead of source file
+* Removed exporting results for now - will be back in future update
 
 ## v1.7 - PACK
 
