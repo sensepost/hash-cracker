@@ -40,7 +40,7 @@ Please enter number OR type 'search' to find hashtypes:
 
 ## Version log
 
-[See here](https://github.com/crypt0rr/hash-cracker/blob/master/VERSION)
+[See here](VERSION)
 
 ## License
 
