@@ -54,7 +54,7 @@ function selector_hashtype () {
     if [ -z "${HASHTYPE##*[!0-9]*}" ]; then
         echo -e "\e[31mNot a valid hashtype number, try again (https://hashcat.net/wiki/doku.php?id=example_hashes)\e[0m"; selector_hashtype 
     else
-        echo -e "\e[34mHashtype" `grep -w $HASHTYPE hashtypes` "selected.\e[0m"
+        echo -e "\e[34mHashtype" `grep -w $HASHTYPE extensions/hashtypes` "selected.\e[0m"
     fi
 }
 
