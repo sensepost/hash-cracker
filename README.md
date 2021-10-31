@@ -40,7 +40,7 @@ Please enter number OR type 'search' to find hashtypes:
 
 ## Version log
 
-[See here](VERSION)
+[See here](VERSION.md)
 
 ## License
 
