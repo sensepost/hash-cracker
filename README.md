@@ -12,8 +12,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ## Usage
 
 ```plain
-$ ./hash-cracker.sh 
-Hash-cracker v2.0 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.0 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
@@ -22,10 +21,10 @@ Checking if requirements are met:
 
 0. Exit
 1. Brute force
-2. Default light rules
-3. Default heavy rules
-4. Enter specific word/name
-5. Enter specific word/name (bruteforce)
+2. Light rules
+3. Heavy rules
+4. Enter specific word/name/company
+5. Enter specific word/name/company (bruteforce)
 6. Hybrid
 7. Toggle-case
 8. Combinator
