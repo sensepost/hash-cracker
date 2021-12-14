@@ -12,7 +12,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ## Usage
 
 ```plain
-hash-cracker v2.0 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.1 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
