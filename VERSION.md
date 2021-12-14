@@ -1,5 +1,10 @@
 # Version log
 
+## v2.1 - Extra rules for iterating
+
+* Added 4 rules
+* Extended the iterating processor
+
 ## v2.0 - Redone way of working
 
 * Took everything from the script and put it into separate scripts
