@@ -2,7 +2,7 @@
 # Copyright crypt0rr
 
 function main () {
-    echo -e "hash-cracker \e[32mv2.1\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "hash-cracker \e[32mv2.2\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     source scripts/requirements.sh
     menu
