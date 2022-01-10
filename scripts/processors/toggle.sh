@@ -12,7 +12,7 @@ RULELIST=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated
 
 # Logic
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE --loopback
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE --loopback
 done
 echo -e "\n\e[32mToggle processing done\e[0m\n"

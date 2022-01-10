@@ -13,7 +13,7 @@ RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $
 read -p "Enter a word (e.g. company name): " WORD
 echo $WORD > tmp_word
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST tmp_word -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_word -r $RULE --loopback
 done
 rm tmp_word
 echo -e "\n\e[32mWord processing done\e[0m\n"
