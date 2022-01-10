@@ -12,12 +12,13 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ## Usage
 
 ```plain
-hash-cracker v2.1 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.2 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
 [+] common-substr is executable
 [+] Python2 available
+[+] Potfile "hash-cracker.pot" present
 
 0. Exit
 1. Brute force
