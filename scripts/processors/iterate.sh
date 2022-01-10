@@ -11,8 +11,8 @@ RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $
 
 # Logic
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O -m$HASHTYPE $HASHLIST --show > tmp_output && cat tmp_output | cut -d ':' -f2 | sort -u | tee tmp_pwonly &>/dev/null; rm tmp_output
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST tmp_pwonly -r $RULE --loopback
+    $HASHCAT -O --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST --show > tmp_output && cat tmp_output | cut -d ':' -f2 | sort -u | tee tmp_pwonly &>/dev/null; rm tmp_output
+    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwonly -r $RULE --loopback
 done
 rm tmp_pwonly
 echo -e "\n\e[32mIteration processing done\e[0m\n"

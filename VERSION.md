@@ -1,5 +1,9 @@
 # Version log
 
+## v2.2 - Potfile
+
+* Added specific [potfile](https://hashcat.net/wiki/doku.php?id=frequently_asked_questions#what_is_a_potfile) instead of default
+
 ## v2.1 - Extra rules for iterating
 
 * Added 4 rules

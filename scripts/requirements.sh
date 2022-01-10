@@ -3,6 +3,7 @@
 
 # Requirements
 HASHCAT=$(command -v hashcat)
+POTFILE=(hash-cracker.pot)
 
 # Logic
 if ! [ -x "$(command -v $HASHCAT)" ]; then
@@ -19,6 +20,12 @@ if [[ -x "$(command -v python2)" ]]; then
     echo -e '\e[32m[+]' 'Python2 available\e[0m'
 else
     echo -e '\e[31m[-]' 'Python2 is not available but required for PACK\e[0m'
+fi
+if test -f "$POTFILE"; then
+    echo -e '\e[32m[+]' 'Potfile "hash-cracker.pot" present\e[0m'
+else
+    echo -e '\e[33m[-]' 'Potfile not present, will create "hash-cracker.pot"\e[0m'
+    touch hash-cracker.pot
 fi
 if [ "$COUNTER" \> 0 ]; then
     echo -e "\n\e[31mNot all requirements are met. Please fix and try again."; exit 1

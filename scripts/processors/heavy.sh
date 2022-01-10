@@ -11,8 +11,8 @@ source scripts/rules/rules.config
 RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive)
 
 # Logic
-$HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST
+$HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O --bitmap-max=24 -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE --loopback
 done
 echo -e "\n\e[32mDefault processing with heavy rules done\e[0m\n"
