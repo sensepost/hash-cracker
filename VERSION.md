@@ -5,6 +5,7 @@
 * Removed standalone usage of `rulegen.py`
 * Added complete [PACK](https://github.com/iphelix/pack) (Password Analysis and Cracking Kit by Peter Kacherginsky) repo
 * Added [Mask Attack](https://hashcat.net/wiki/doku.php?id=mask_attack)
+* Added NTLM (-m1000) example hashes
 
 ## v2.3 - Fingerprinting
 
