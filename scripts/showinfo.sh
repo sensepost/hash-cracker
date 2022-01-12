@@ -14,5 +14,6 @@ echo "9. Iterate results: Iterate gathered results from a previous performed job
 echo "10. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
 echo "11. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
 echo "12. PACK rulegen will take the already cracked plaintext passwords and create a new rule, the rule is then used with the wordlist of your choise. Requires python2 and pyenchant (pip install pyenchant==3.0.0a1)"
-echo "13. Fingerprint attack, disassembling cracked plaintext passwords into all its possible mutations. Using as new input and afterwards running with some rules"
+echo "13. PACK maskgen will craft pattern-based mask attacks."
+echo "14. Fingerprint attack, disassembling cracked plaintext passwords into all its possible mutations. Using as new input and afterwards running with some rules"
 echo -e "\e[0m"

@@ -2,7 +2,7 @@
 # Copyright crypt0rr
 
 function main () {
-    echo -e "hash-cracker \e[32mv2.3\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "hash-cracker \e[32mv2.4\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     source scripts/requirements.sh
     menu
@@ -22,7 +22,8 @@ function menu () {
     echo "10. Prefix suffix (advise: first run steps above)"
     echo "11. Common substring (advise: first run steps above)"
     echo "12. PACK rulegen (read option 99)"
-    echo "13. Fingerprint attack"
+    echo "13. PACK mask (read option 99)"
+    echo "14. Fingerprint attack"
     echo -e "99. Show info about modules\n"
 
     read -p "Please enter number OR type 'search' to find hashtypes: " START
@@ -51,8 +52,10 @@ function menu () {
     elif [[ $START = '11' ]]; then
         source scripts/processors/commonsubstring.sh
     elif [[ $START = '12' ]]; then
-        source scripts/processors/pack.sh
+        source scripts/processors/pack-rule.sh
     elif [[ $START = '13' ]]; then
+        source scripts/processors/pack-mask.sh
+    elif [[ $START = '14' ]]; then
         source scripts/processors/fingerprint.sh
     elif [[ $START = '99' ]]; then
         bash scripts/showinfo.sh
