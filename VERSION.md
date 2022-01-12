@@ -1,5 +1,10 @@
 # Version log
 
+## v2.3 - Fingerprinting
+
+* Added [Fingerprint Attack](https://hashcat.net/wiki/doku.php?id=fingerprint_attack)
+* Added [hashcat-utils](https://github.com/hashcat/hashcat-utils)
+
 ## v2.2 - Potfile
 
 * Added specific [potfile](https://hashcat.net/wiki/doku.php?id=frequently_asked_questions#what_is_a_potfile) instead of default
