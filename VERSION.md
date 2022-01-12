@@ -1,5 +1,11 @@
 # Version log
 
+## v2.4 - Mask Attack
+
+* Removed standalone usage of `rulegen.py`
+* Added complete [PACK](https://github.com/iphelix/pack) (Password Analysis and Cracking Kit by Peter Kacherginsky) repo
+* Added [Mask Attack](https://hashcat.net/wiki/doku.php?id=mask_attack)
+
 ## v2.3 - Fingerprinting
 
 * Added [Fingerprint Attack](https://hashcat.net/wiki/doku.php?id=fingerprint_attack)
