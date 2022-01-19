@@ -1,5 +1,9 @@
 # Version log
 
+## v2.5 - Small extras
+
+* Added extra brute force task
+
 ## v2.4 - Mask Attack
 
 * Removed standalone usage of `rulegen.py`
