@@ -6,6 +6,7 @@
 * Fixed issue where the variable was not cleared properly on self restart of the 'selector' scripts
 * Fixed issue with hashtype selector not restarting on not-known hashtype
 * Added `multiple-wordlists.sh` processor - option 15
+* Changed starting point after finishing task to 'main' instead of 'menu'
 
 ## v2.4 - Mask Attack
 
