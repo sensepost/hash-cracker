@@ -1,9 +1,10 @@
 # Version log
 
-## v2.5 - Small extras
+## v2.5 - Small fixes/extras
 
 * Added extra brute force task
 * Fixed issue where the variable was not cleared properly on self restart of the 'selector' scripts
+* Fixed issue with hashtype selector not restarting on not-known hashtype
 
 ## v2.4 - Mask Attack
 
