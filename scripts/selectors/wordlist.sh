@@ -14,8 +14,8 @@ if ! [[ $START = '15' ]]; then
 fi
 if [[ $START = '8' ]]; then
     read -e -p "Enter full path to second wordlist: " WORDLIST2
-    if [ -f "$WORDLIST" ]; then
-    echo "\e[32mWordlist" $WORDLIST "selected.\e[0m"
+    if [ -f "$WORDLIST2" ]; then
+    echo -e "\e[32mWordlist" $WORDLIST2 "selected.\e[0m"
     else
         echo -e "\e[31mFile does not exist, try again.\e[0m"; $RESTART
     fi
