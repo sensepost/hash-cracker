@@ -36,6 +36,7 @@ Checking if requirements are met:
 12. PACK rulegen (read option 99)
 13. PACK mask (read option 99)
 14. Fingerprint attack
+15. Directory of wordlists with some rules
 99. Show info about modules
 
 Please enter number OR type 'search' to find hashtypes:
