@@ -7,6 +7,7 @@
 * Fixed issue with hashtype selector not restarting on not-known hashtype
 * Added `multiple-wordlists.sh` processor - option 15
 * Changed starting point after finishing task to 'main' instead of 'menu'
+* Added three new wordlists
 
 ## v2.4 - Mask Attack
 
