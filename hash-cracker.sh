@@ -24,6 +24,7 @@ function menu () {
     echo "12. PACK rulegen (read option 99)"
     echo "13. PACK mask (read option 99)"
     echo "14. Fingerprint attack"
+    echo "15. Directory of wordlists with some rules"
     echo -e "99. Show info about modules\n"
 
     read -p "Please enter number OR type 'search' to find hashtypes: " START
@@ -57,6 +58,8 @@ function menu () {
         source scripts/processors/pack-mask.sh
     elif [[ $START = '14' ]]; then
         source scripts/processors/fingerprint.sh
+    elif [[ $START = '15' ]]; then
+        source scripts/processors/multiple-wordlists.sh
     elif [[ $START = '99' ]]; then
         bash scripts/showinfo.sh
     elif [[ $START = 'search' ]]; then
