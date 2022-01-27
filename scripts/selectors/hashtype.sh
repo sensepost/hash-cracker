@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copyright crypt0rr
-RESTART="bash scripts/selectors/hashtype.sh"
+RESTART="source scripts/selectors/hashtype.sh"
 TYPELIST="scripts/extensions/hashtypes"
 
 read -p "Enter hashtype (number): " HASHTYPE

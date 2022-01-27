@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copyright crypt0rr
-RESTART="bash scripts/selectors/wordlist.sh"
+RESTART="source scripts/selectors/wordlist.sh"
 
 read -e -p "Enter full path to wordlist: " WORDLIST
 if [ -f "$WORDLIST" ]; then
