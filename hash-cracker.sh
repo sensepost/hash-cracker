@@ -2,7 +2,7 @@
 # Copyright crypt0rr
 
 function main () {
-    echo -e "hash-cracker \e[32mv2.4\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "hash-cracker \e[32mv2.5\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     source scripts/requirements.sh
     menu
@@ -24,6 +24,7 @@ function menu () {
     echo "12. PACK rulegen (read option 99)"
     echo "13. PACK mask (read option 99)"
     echo "14. Fingerprint attack"
+    echo "15. Directory of wordlists plain and then with OneRuleToRuleThemAll"
     echo -e "99. Show info about modules\n"
 
     read -p "Please enter number OR type 'search' to find hashtypes: " START
@@ -57,6 +58,8 @@ function menu () {
         source scripts/processors/pack-mask.sh
     elif [[ $START = '14' ]]; then
         source scripts/processors/fingerprint.sh
+    elif [[ $START = '15' ]]; then
+        source scripts/processors/multiple-wordlists.sh
     elif [[ $START = '99' ]]; then
         bash scripts/showinfo.sh
     elif [[ $START = 'search' ]]; then
@@ -64,7 +67,7 @@ function menu () {
     else
         echo -e "\e[31mNot valid, try again\n\e[0m"; menu
     fi
-    menu
+    main
 }
 
 main

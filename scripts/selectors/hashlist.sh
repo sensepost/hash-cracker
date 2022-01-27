@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copyright crypt0rr
-RESTART="bash scripts/selectors/hashlist.sh"
+RESTART="source scripts/selectors/hashlist.sh"
 
 read -e -p "Enter full path to hashlist: " HASHLIST
 if [ -f "$HASHLIST" ]; then

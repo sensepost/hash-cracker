@@ -12,7 +12,7 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 ## Usage
 
 ```plain
-hash-cracker v2.4 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.5 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
@@ -36,6 +36,7 @@ Checking if requirements are met:
 12. PACK rulegen (read option 99)
 13. PACK mask (read option 99)
 14. Fingerprint attack
+15. Directory of wordlists with some rules
 99. Show info about modules
 
 Please enter number OR type 'search' to find hashtypes:

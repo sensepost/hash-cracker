@@ -1,5 +1,14 @@
 # Version log
 
+## v2.5 - Small fixes/extras
+
+* Added extra brute force task
+* Fixed issue where the variable was not cleared properly on self restart of the 'selector' scripts
+* Fixed issue with hashtype selector not restarting on not-known hashtype
+* Added `multiple-wordlists.sh` processor - option 15
+* Changed starting point after finishing task to 'main' instead of 'menu'
+* Added three new wordlists
+
 ## v2.4 - Mask Attack
 
 * Removed standalone usage of `rulegen.py`
