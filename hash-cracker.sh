@@ -67,7 +67,7 @@ function menu () {
     else
         echo -e "\e[31mNot valid, try again\n\e[0m"; menu
     fi
-    menu
+    main
 }
 
 main
