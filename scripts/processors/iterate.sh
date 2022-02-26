@@ -7,7 +7,7 @@ source scripts/selectors/hashlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive $TOXIC10k $big $generated3 $huge)
+RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $TOXICSP $techtrip2 $williamsuper $digits3 $dive $TOXIC10k $big $generated3 $huge)
 
 # Logic
 for RULE in ${RULELIST[*]}; do
