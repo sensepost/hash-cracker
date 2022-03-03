@@ -1,5 +1,11 @@
 # Version log
 
+## v2.6 - No more colors
+
+* Added working directory for easy removal after finishing project
+* Added new rule
+* Removed coloring
+
 ## v2.5 - Small fixes/extras
 
 * Added extra brute force task
