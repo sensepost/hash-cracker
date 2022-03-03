@@ -14,4 +14,4 @@ source scripts/selectors/wordlist.sh
 
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule --loopback
 rm analysis.rule tmp_pwonly
-echo -e "\n\e[32mPACK rule processing done\e[0m\n"
+echo -e "\nPACK rule processing done\n"

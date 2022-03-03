@@ -15,4 +15,4 @@ $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a7 '?
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 tmp_word '?a?a?a?a' -i
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a7 '?a?a?a?a' tmp_word -i
 rm tmp_word
-echo -e "\n\e[32mWord processing done\e[0m\n"
+echo -e "\nWord processing done\n"

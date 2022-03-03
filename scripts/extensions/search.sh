@@ -2,6 +2,7 @@
 # Copyright crypt0rr
 TYPELIST="scripts/extensions/hashtypes"
 
+echo -e "\n"
 read -p "Enter search query: " QUERY
-echo -e "\e[32m" && grep -i $QUERY $TYPELIST | sort -h
-echo -e "\e[0m"
+grep -i $QUERY $TYPELIST | sort
+echo -e "\n"

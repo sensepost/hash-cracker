@@ -15,4 +15,4 @@ for RULE in ${RULELIST[*]}; do
     $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwonly -r $RULE --loopback
 done
 rm tmp_pwonly
-echo -e "\n\e[32mIteration processing done\e[0m\n"
+echo -e "\nIteration processing done\n"
