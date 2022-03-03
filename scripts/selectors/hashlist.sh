@@ -4,7 +4,7 @@ RESTART="source scripts/selectors/hashlist.sh"
 
 read -e -p "Enter full path to hashlist: " HASHLIST
 if [ -f "$HASHLIST" ]; then
-    echo -e "\e[32mHashlist" $HASHLIST "selected.\e[0m"
+    echo "Hashlist" $HASHLIST "selected."
 else
-    echo -e "\e[31mFile does not exist, try again\e[0m"; $RESTART
+    echo "File does not exist, try again."; $RESTART
 fi

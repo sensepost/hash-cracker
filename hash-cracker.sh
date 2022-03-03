@@ -2,7 +2,7 @@
 # Copyright crypt0rr
 
 function main () {
-    echo -e "hash-cracker \e[32mv2.5\e[0m by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "hash-cracker v2.6 by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Checking if requirements are met:"
     source scripts/requirements.sh
     menu
@@ -65,7 +65,7 @@ function menu () {
     elif [[ $START = 'search' ]]; then
         source scripts/extensions/search.sh
     else
-        echo -e "\e[31mNot valid, try again\n\e[0m"; menu
+        echo -e "Not valid, try again\n"; menu
     fi
     main
 }

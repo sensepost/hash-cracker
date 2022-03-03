@@ -15,4 +15,4 @@ $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDL
 for RULE in ${RULELIST[*]}; do
     $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE --loopback
 done
-echo -e "\n\e[32mDefault processing with light rules done\e[0m\n"
+echo -e "\nDefault processing with light rules done\n"

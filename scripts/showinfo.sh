@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright crypt0rr
 
-echo -e "\e[34m\nInformation about the modules"
+echo -e "\nInformation about the modules"
 echo "1. Brute force: A commonly known set of brute force tasks"
 echo "2. Light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
 echo "3. Heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
@@ -17,4 +17,3 @@ echo "12. PACK rulegen will take the already cracked plaintext passwords and cre
 echo "13. PACK maskgen will craft pattern-based mask attacks."
 echo "14. Fingerprint attack, disassembling cracked plaintext passwords into all its possible mutations. Using as new input and afterwards running with some rules"
 echo "15. Takes all wordlists in a folder, for example the 'wordlists'. Goes thru them plaintext and then again with OneRuleToRuleThemAll."
-echo -e "\e[0m"
