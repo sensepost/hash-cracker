@@ -16,4 +16,4 @@ for RULE in ${RULELIST[*]}; do
     $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_word -r $RULE --loopback
 done
 rm tmp_word
-echo -e "\n\e[32mWord processing done\e[0m\n"
+echo -e "\nWord processing done\n"
