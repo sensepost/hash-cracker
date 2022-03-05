@@ -9,6 +9,10 @@ Some sites where you can find wordlists:
 
 Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable).
 
+## Apple Silicon Edition
+
+There is a separate repo with support for Apple Silicon based systems. Find it over here: [hash-cracker-apple-silicon](https://github.com/crypt0rr/hash-cracker-apple-silicon)
+
 ## Usage
 
 ```plain
