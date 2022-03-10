@@ -1,5 +1,10 @@
 # Version log
 
+## v2.7 - Username as Password
+
+* Added support for username as password (currently only NTLM tested)
+  * Extended the username as password with rules
+
 ## v2.6 - No more colors
 
 * Added working directory for easy removal after finishing project

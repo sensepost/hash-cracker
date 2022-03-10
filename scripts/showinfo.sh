@@ -17,3 +17,4 @@ echo "12. PACK rulegen will take the already cracked plaintext passwords and cre
 echo "13. PACK maskgen will craft pattern-based mask attacks."
 echo "14. Fingerprint attack, disassembling cracked plaintext passwords into all its possible mutations. Using as new input and afterwards running with some rules"
 echo "15. Takes all wordlists in a folder, for example the 'wordlists'. Goes thru them plaintext and then again with OneRuleToRuleThemAll."
+echo "16. Usernames will be stripped out the NTDS dump you provide and used as input list for cracking hashes."
