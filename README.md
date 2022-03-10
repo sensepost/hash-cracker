@@ -16,7 +16,7 @@ There is a separate repo with support for Apple Silicon based systems. Find it o
 ## Usage
 
 ```plain
-hash-cracker v2.6 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.7 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
@@ -40,7 +40,8 @@ Checking if requirements are met:
 12. PACK rulegen (read option 99)
 13. PACK mask (read option 99)
 14. Fingerprint attack
-15. Directory of wordlists with some rules
+15. Directory of wordlists plain and then with OneRuleToRuleThemAll
+16. Username iteration (read option 99, only NTLM)
 99. Show info about modules
 
 Please enter number OR type 'search' to find hashtypes:
