@@ -8,7 +8,7 @@ source scripts/selectors/wordlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rockyou30000 $ORTRTA $OUTD $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+RULELIST=($3rule $rockyou30000 $ORTRTA $OUTD $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
 
 # Logic
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
