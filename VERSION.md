@@ -1,5 +1,12 @@
 # Version log
 
+## v2.8 - 3-rule
+
+* Added `3.rule`
+* Updated `light.sh` and `iterate.sh` with `3.rule`
+* Added COVID-19 related word list (2 parts)
+* Added `Robot_MyFavorite.rule`
+
 ## v2.7 - Username as Password
 
 * Added support for username as password (currently only NTLM tested)
