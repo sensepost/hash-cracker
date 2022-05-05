@@ -1,5 +1,11 @@
 # Version log
 
+## v2.9 - TBD
+
+* Added `keyboardwalk.txt`
+* Added `email-domains`
+* Added descriptive text for combinator in `showinfo.sh`
+
 ## v2.8 - 3-rule
 
 * Added `3.rule`
