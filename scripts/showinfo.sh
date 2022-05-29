@@ -9,7 +9,7 @@ echo "4. Enter your own word, for example a company name to change around with r
 echo "5. Enter your own word, for example a company name to brute force before and after"
 echo "6. Hybrid: Wordlist + bruteforce random combined"
 echo "7. Toggle case: Will toggle chars randomly based on toggle rules and add couple simple rules to create variations"
-echo "8. Combinator: Will combine two input wordlists to create new passwords"
+echo "8. Combinator: Will combine two input wordlists to create new passwords - first list given is the 'left' side, second list 'right' side"
 echo "9. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
 echo "10. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
 echo "11. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
