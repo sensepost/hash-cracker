@@ -5,6 +5,8 @@
 * Added `keyboardwalk.txt`
 * Added `email-domains`
 * Added descriptive text for combinator in `showinfo.sh`
+* Added `?a` to brute-force pattern
+* Added multiple brute-force patterns
 
 ## v2.8 - 3-rule
 
