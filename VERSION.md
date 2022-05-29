@@ -1,6 +1,6 @@
 # Version log
 
-## v2.9 - TBD
+## v2.9 - More better
 
 * Added `keyboardwalk.txt`
 * Added `email-domains`
