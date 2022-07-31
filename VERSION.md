@@ -1,5 +1,12 @@
 # Version log
 
+## v2.9.2 - Additional word lists
+
+* Added two Afrikaans word lists
+* Extended public email providers list based on:
+  * [Kikobeats/free-email-domains](https://github.com/Kikobeats/free-email-domains/blob/master/domains.json)
+  * [ammarshah/all_email_provider_domains.txt](https://gist.github.com/ammarshah/f5c2624d767f91a7cbdc4e54db8dd0bf)
+
 ## v2.9.1 - AWK
 
 * Moved from `cut` to `awk` since previously it was not compatible with multiple outputs
