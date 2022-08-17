@@ -11,7 +11,7 @@ RULELIST=($rule3 $robotmyfavorite $tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $T
 
 # Logic
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST --show > tmp_output && cat tmp_output | awk -F: '{print $NF}' | sort -u | tee tmp_pwonly &>/dev/null; rm tmp_output
+    cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee tmp_pwonly &>/dev/null
     $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwonly -r $RULE --loopback
 done
 rm tmp_pwonly

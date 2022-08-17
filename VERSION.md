@@ -1,5 +1,10 @@
 # Version log
 
+## v2.9.3 - Dump Optimization
+
+* Moved from showing cracked hashes with hashcat for use as input to directly taking the potfile
+  * Performance gain +/- 15%
+
 ## v2.9.2 - Additional word lists
 
 * Added two Afrikaans word lists
