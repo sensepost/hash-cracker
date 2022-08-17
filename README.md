@@ -16,7 +16,7 @@ There is a separate repo with support for Apple Silicon based systems. Find it o
 ## Usage
 
 ```plain
-hash-cracker v2.9.2 by crypt0rr (https://github.com/crypt0rr)
+hash-cracker v2.9.3 by crypt0rr (https://github.com/crypt0rr)
 
 Checking if requirements are met:
 [+] Hashcat is installed
