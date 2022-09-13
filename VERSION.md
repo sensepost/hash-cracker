@@ -3,6 +3,7 @@
 ## v2.9.4 - Fixed issue
 
 * Fixed issue with splitting usernames from source file
+* Added Russian wordlist
 
 ## v2.9.3 - Dump Optimization
 
