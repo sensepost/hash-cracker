@@ -1,5 +1,10 @@
 # Version log
 
+## v2.9.4 - Fixed issue
+
+* Fixed issue with splitting usernames from source file
+* Added Russian wordlist
+
 ## v2.9.3 - Dump Optimization
 
 * Moved from showing cracked hashes with hashcat for use as input to directly taking the potfile
