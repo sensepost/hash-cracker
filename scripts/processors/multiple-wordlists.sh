@@ -4,7 +4,7 @@
 # Requirements
 source scripts/selectors/hashtype.sh
 source scripts/selectors/hashlist.sh
-source scripts/selectors/wordlist.sh
+source scripts/selectors/multiple-wordlist.sh
 
 # Rules
 source scripts/rules/rules.config
