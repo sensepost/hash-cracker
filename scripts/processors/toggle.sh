@@ -4,7 +4,15 @@
 # Requirements
 source scripts/selectors/hashtype.sh
 source scripts/selectors/hashlist.sh
-source scripts/selectors/wordlist.sh
+
+# Single or multiple wordlist
+read -p "Single or Multiple wordlist mode? S/M: " MODE
+
+if [[ $MODE = [Ss] ]]; then
+    source scripts/selectors/wordlist.sh
+elif [[ $MODE = [Mm] ]]; then
+    source scripts/selectors/multiple-wordlist.sh
+fi
 
 # Rules
 source scripts/rules/rules.config
