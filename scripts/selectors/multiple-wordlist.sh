@@ -11,6 +11,11 @@ if ! [[ $START = '8' ]]; then
     fi
 fi
 if [[ $START = '8' ]]; then
+    read -e -p "Enter full path to first wordlist: " WORDLIST
+    echo "Wordlist" $WORDLIST "selected."
+    else
+        echo "File does not exist, try again."; $RESTART
+    fi
     read -e -p "Enter full path to second wordlist: " WORDLIST2
     if [ -f "$WORDLIST2" ]; then
     echo "Wordlist" $WORDLIST2 "selected."

@@ -4,7 +4,7 @@
 # Requirements
 source scripts/selectors/hashtype.sh
 source scripts/selectors/hashlist.sh
-source scripts/selectors/wordlist.sh
+source scripts/selectors/multiple-wordlist.sh
 
 # Logic
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $WORDLIST $WORDLIST2
