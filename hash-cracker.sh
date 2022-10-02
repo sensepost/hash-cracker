@@ -14,7 +14,7 @@ function menu () {
     echo "2. Light rules"
     echo "3. Heavy rules"
     echo "4. Enter specific word/name/company"
-    echo "5. Enter specific word/name/company (bruteforce)"
+    echo "5. Enter specific word/name/company (brute force)"
     echo "6. Hybrid"
     echo "7. Toggle-case"
     echo "8. Combinator"
@@ -24,7 +24,7 @@ function menu () {
     echo "12. PACK rulegen (read option 99)"
     echo "13. PACK mask (read option 99)"
     echo "14. Fingerprint attack"
-    echo "15. Directory of wordlists plain and then with OneRuleToRuleThemAll"
+    echo "15. Directory of word lists plain and then with OneRuleToRuleThemAll"
     echo "16. Username iteration (read option 99, only NTLM)"
     echo -e "99. Show info about modules\n"
 
