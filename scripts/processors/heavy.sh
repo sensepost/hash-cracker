@@ -16,7 +16,7 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive $robotmyfavorite)
+RULELIST=($tenKrules $fbfull $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive $robotmyfavorite)
 
 # Logic
 $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
