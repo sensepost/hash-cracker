@@ -7,6 +7,7 @@ Besides some small changes you can now chose if you want to run things with a si
 * Added multi word list support
 * Added `german.txt` word list
 * Added two new, FaceBook based rules, thanks [@singe](https://twitter.com/singe)
+* Disabled hardware monitoring (`--hwmon-disable`) for all processors
 
 ## v2.9.4 - Fixed issue
 
