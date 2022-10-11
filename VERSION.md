@@ -8,6 +8,7 @@ Besides some small changes you can now chose if you want to run things with a si
 * Added `german.txt` word list
 * Added two new, FaceBook based rules, thanks [@singe](https://twitter.com/singe)
 * Disabled hardware monitoring (`--hwmon-disable`) for all processors
+* Added word list `brutas-combined` - combining all lists in the 'passwords' category from [brutas](https://github.com/tasooshi/brutas/tree/master/wordlists/passwords)
 
 ## v2.9.4 - Fixed issue
 
