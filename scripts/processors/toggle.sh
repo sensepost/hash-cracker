@@ -4,7 +4,15 @@
 # Requirements
 source scripts/selectors/hashtype.sh
 source scripts/selectors/hashlist.sh
-source scripts/selectors/wordlist.sh
+
+# Single or multiple wordlist
+read -p "Single or Multiple wordlist mode? S/M: " MODE
+
+if [[ $MODE = [Ss] ]]; then
+    source scripts/selectors/wordlist.sh
+elif [[ $MODE = [Mm] ]]; then
+    source scripts/selectors/multiple-wordlist.sh
+fi
 
 # Rules
 source scripts/rules/rules.config
@@ -12,7 +20,7 @@ RULELIST=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated
 
 # Logic
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE --loopback
-    $HASHCAT -O --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE --loopback
+    $HASHCAT -O --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE --loopback
 done
 echo -e "\nToggle processing done\n"
