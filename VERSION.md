@@ -1,5 +1,11 @@
 # Version log
 
+## v3.1 - To speed or not to speed #kernels
+
+* Optimized kernels are used by default but can be disabled with the `-n` or `--no-limit` flag
+* Help menu implemented
+* Moved search functionality
+
 ## v3.0 - 🚀
 
 Besides some small changes you can now chose if you want to run things with a single or multiple word lists. As you can imagine, this will take much longer, but it is worth it.
