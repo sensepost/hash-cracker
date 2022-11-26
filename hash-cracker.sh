@@ -1,8 +1,7 @@
 #!/bin/bash
 # Copyright crypt0rr
 
-function main () {
-    echo -e "hash-cracker v3.0 by crypt0rr (https://github.com/crypt0rr)\n"
+function hash-cracker () {
     echo -e "Checking if requirements are met:"
     source scripts/requirements.sh
     menu
@@ -28,7 +27,7 @@ function menu () {
     echo "16. Username iteration (read option 99, only NTLM)"
     echo -e "99. Show info about modules\n"
 
-    read -p "Please enter number OR type 'search' to find hashtypes: " START
+    read -p "Please enter job number: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
         echo "Bye..."; exit 1
     elif [[ $START = '1' ]]; then
@@ -63,14 +62,28 @@ function menu () {
         source scripts/processors/multiple-wordlists.sh
     elif [[ $START = '16' ]]; then
         source scripts/processors/usernameaspassword.sh
-    elif [[ $START = '99' ]]; then
-        bash scripts/showinfo.sh
-    elif [[ $START = 'search' ]]; then
-        source scripts/extensions/search.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi
-    main
+    hash-cracker
 }
 
-main
+echo -e "hash-cracker v3.1 by crypt0rr (https://github.com/crypt0rr)\n"
+
+NOP=$1
+
+if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
+    echo -e "Note: flags are optional, by default hash-cracker will run with optimized kernels enabled."
+    echo -e "\nUsage: ./hash-cracker [FLAG]"
+    echo -e "\nFlags:"
+    echo -e "\t-n / --no-limit\n\t\t Disable the use of optimized kernels (un-limits password length)"
+    echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
+    echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
+elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
+    bash scripts/showinfo.sh
+elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
+    TYPELIST="scripts/extensions/hashtypes"
+    grep -i $2 $TYPELIST | sort
+else
+    hash-cracker
+fi
