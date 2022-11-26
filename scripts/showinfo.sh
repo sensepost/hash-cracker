@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright crypt0rr
 
-echo -e "\nInformation about the modules"
+echo "Information about the modules"
 echo "1. Brute force: A commonly known set of brute force tasks"
 echo "2. Light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
 echo "3. Heavy rules: A wordlist + a set of heavy rules is ran agains the hashlist (take a cup or 10 of coffee)"
