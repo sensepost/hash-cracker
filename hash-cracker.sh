@@ -20,11 +20,11 @@ function menu () {
     echo "9. Iterate results"
     echo "10. Prefix suffix (advise: first run steps above)"
     echo "11. Common substring (advise: first run steps above)"
-    echo "12. PACK rulegen (read option 99)"
-    echo "13. PACK mask (read option 99)"
+    echo "12. PACK rulegen"
+    echo "13. PACK mask"
     echo "14. Fingerprint attack"
     echo "15. Directory of word lists plain and then with OneRuleToRuleThemAll"
-    echo "16. Username iteration (read option 99, only NTLM)"
+    echo "16. Username iteration (only complete NTDS)"
     echo -e "17. Markov-chain passwords generator\n"
 
     read -p "Please enter job number: " START
