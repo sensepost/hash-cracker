@@ -18,7 +18,7 @@ elif [ "$LIST" == 'w' ]; then
     source scripts/selectors/wordlist.sh
     LIST=$WORDLIST
 else
-    echo -e "Try again...\n"; exit
+    echo -e "Try again...\n"; hash-cracker
 fi
 
 read -p "Minimum password (length) character limit: " NGRAM
