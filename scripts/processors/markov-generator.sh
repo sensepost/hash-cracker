@@ -31,11 +31,12 @@ if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in ${RULELIST[*]}; do
     $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated -r $RULE --loopback
     done
+    rm tmp_pwcreated
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
     $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated
+    rm tmp_pwcreated
 else
     echo -e "Try again...\n"
-    hash-cracker
 fi
 
-rm tmp_pwcreated; echo -e "\nMarkov-chain processing done\n"
+echo -e "\nMarkov-chain processing done\n"
