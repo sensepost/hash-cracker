@@ -13,6 +13,14 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 
 There is a separate repo with support for Apple Silicon based systems. Find it over here: [hash-cracker-apple-silicon](https://github.com/crypt0rr/hash-cracker-apple-silicon)
 
+## Installation
+
+```plain
+git clone https://github.com/crypt0rr/hash-cracker
+```
+
+For the current implementation of PACK, python2 is required, also install `pip install pyenchant==3.0.0a1`. If you don't have python2 (ofc), you are not able to use option 12 and 13.
+
 ## Usage
 
 ```plain
