@@ -6,6 +6,7 @@
 * Help menu implemented
 * Moved search functionality
 * Added Markov-chain password generator based on [bujimuji/markov-passwords](https://github.com/bujimuji/markov-passwords)
+* Added [Dutch OpenTaal wordlist](https://github.com/OpenTaal/opentaal-wordlist/blob/master/wordlist.txt)
 
 ## v3.0 - 🚀
 
