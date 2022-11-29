@@ -17,6 +17,8 @@ if [ "$LIST" == 'p' ]; then
 elif [ "$LIST" == 'w' ]; then
     source scripts/selectors/wordlist.sh
     LIST=$WORDLIST
+else
+    echo -e "Try again...\n"; exit
 fi
 
 read -p "Minimum password (length) character limit: " NGRAM
