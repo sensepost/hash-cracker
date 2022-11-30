@@ -35,3 +35,10 @@ fi
 if [ "$COUNTER" \> 0 ]; then
     echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
 fi
+if [ "$NOP" == '-n' ] || [ "$NOP" == '--no-limit' ]; then
+    echo "[-] Optimised kernels disabled"
+    KERNEL=''
+else
+    echo "[+] Optimised kernels enabled"
+    KERNEL='-O'
+fi

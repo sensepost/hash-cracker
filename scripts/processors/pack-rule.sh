@@ -12,6 +12,6 @@ rm analysis-sorted.word analysis.word analysis-sorted.rule
 
 source scripts/selectors/wordlist.sh
 
-$HASHCAT -O --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule --loopback
+$HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule --loopback
 rm analysis.rule tmp_pwonly
 echo -e "\nPACK rule processing done\n"

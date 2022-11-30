@@ -13,38 +13,31 @@ Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-t
 
 There is a separate repo with support for Apple Silicon based systems. Find it over here: [hash-cracker-apple-silicon](https://github.com/crypt0rr/hash-cracker-apple-silicon)
 
+## Installation
+
+```plain
+git clone https://github.com/crypt0rr/hash-cracker
+```
+
+For the current implementation of PACK, python2 is required, also install `pip install pyenchant==3.0.0a1`. If you don't have python2 (ofc), you are not able to use option 12 and 13.
+
 ## Usage
 
 ```plain
-hash-cracker v3.0 by crypt0rr (https://github.com/crypt0rr)
+./hash-cracker [FLAG]
+```
 
-Checking if requirements are met:
-[+] Hashcat is installed
-[+] common-substr is executable
-[+] Python2 available
-[+] expander is executable
-[+] Potfile "hash-cracker.pot" present
+## Flags
 
-0. Exit
-1. Brute force
-2. Light rules
-3. Heavy rules
-4. Enter specific word/name/company
-5. Enter specific word/name/company (bruteforce)
-6. Hybrid
-7. Toggle-case
-8. Combinator
-9. Iterate results
-10. Prefix suffix (advise: first run steps above)
-11. Common substring (advise: first run steps above)
-12. PACK rulegen (read option 99)
-13. PACK mask (read option 99)
-14. Fingerprint attack
-15. Directory of wordlists plain and then with OneRuleToRuleThemAll
-16. Username iteration (read option 99, only NTLM)
-99. Show info about modules
+Note: flags are optional, by default hash-cracker will run with optimized kernels enabled.
 
-Please enter number OR type 'search' to find hashtypes:
+```plain
+    -n / --no-limit
+            Disable the use of optimized kernels (limits password length)
+    -m / --module-info
+            Display information around modules/options
+    -s [hash-name] / --search [hash-name]
+            Will search local DB for hash module. E.g. '-s ntlm'
 ```
 
 ## Version log
