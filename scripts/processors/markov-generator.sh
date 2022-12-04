@@ -31,11 +31,11 @@ read -p "Use rules? (y/n): " USERULES
 
 if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated -r $RULE --loopback
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated -r $RULE --loopback
     done
     rm tmp_pwcreated
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
-    $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated
     rm tmp_pwcreated
 else
     echo -e "Try again...\n"
