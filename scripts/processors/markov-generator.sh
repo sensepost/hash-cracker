@@ -7,7 +7,7 @@ source scripts/selectors/hashlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rule3 $rockyou30000 $ORTRTA $fbfull $pantag $OUTD $techtrip2 $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $hob064 $leetspeak)
+RULELIST=($rule3 $rockyou30000 $ORTRTS $fbfull $pantag $OUTD $techtrip2 $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $hob064 $leetspeak)
 
 # Logic
 read -p "Use potfile (p) or wordlist (w): " LIST
