@@ -1,5 +1,11 @@
 # Version log
 
+## v3.2 - 
+
+* Added Polish [wordlist](https://raw.githubusercontent.com/sigo/polish-dictionary/master/dist/pl.txt)
+* Added missing `--hwmon-disable` flag to `markov-generator.sh`
+* Replaced OneRuleToRuleThemAll with [OneRuleToRuleThemStill](https://github.com/stealthsploit/OneRuleToRuleThemStill)
+
 ## v3.1 - To speed or not to speed #kernels
 
 * Optimized kernels are used by default but can be disabled with the `-n` or `--no-limit` flag
