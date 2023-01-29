@@ -21,6 +21,12 @@ if [[ -x "scripts/extensions/hashcat-utils/bin/expander.bin" ]]; then
 else
     echo '[-] Expander is not available/executable or found (option 14)'
 fi
+if [[ -x "command -v cewl" ]]; then
+    echo '[+] CeWL is executable'
+    CEWL=$(command -v cewl)
+else
+    echo '[-] CeWL is not executable or found (option 18)'
+fi
 
 echo -e "\nKernel mode:"
 if [ "$NOP" == '-n' ] || [ "$NOP" == '--no-limit' ]; then

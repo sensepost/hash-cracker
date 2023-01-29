@@ -1,10 +1,12 @@
 # Version log
 
-## v3.2 - 
+## v3.2 - Custom Word List Generator
 
 * Added Polish [wordlist](https://raw.githubusercontent.com/sigo/polish-dictionary/master/dist/pl.txt)
 * Added missing `--hwmon-disable` flag to `markov-generator.sh`
 * Replaced OneRuleToRuleThemAll with [OneRuleToRuleThemStill](https://github.com/stealthsploit/OneRuleToRuleThemStill)
+* Split `requirements.sh` into two files `mandatory` and `optional`
+* Added Custom Word List Generator - [CeWL](https://github.com/digininja/CeWL/)
 
 ## v3.1 - To speed or not to speed #kernels
 

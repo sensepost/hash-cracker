@@ -27,7 +27,8 @@ function menu () {
     echo "14. Fingerprint attack"
     echo "15. Directory of word lists plain and then with OneRuleToRuleThemAll"
     echo "16. Username iteration (only complete NTDS)"
-    echo -e "17. Markov-chain passwords generator\n"
+    echo "17. Markov-chain passwords generator"
+    echo -e "18. CeWL wordlist generator\n"
 
     read -p "Please enter job number: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
@@ -66,6 +67,8 @@ function menu () {
         source scripts/processors/usernameaspassword.sh
     elif [[ $START = '17' ]]; then
         source scripts/processors/markov-generator.sh
+    elif [[ $START = '18' ]]; then
+        source scripts/processors/cewl.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi
