@@ -2,8 +2,10 @@
 # Copyright crypt0rr
 
 function hash-cracker () {
-    echo -e "Checking if requirements are met:"
-    source scripts/requirements.sh
+    echo -e "Mandatory modules:"
+    source scripts/mandatory-checks.sh
+    echo -e "\nOptional modules:"
+    source scripts/optional-checks.sh
     menu
 }
 
@@ -70,7 +72,7 @@ function menu () {
     hash-cracker
 }
 
-echo -e "hash-cracker v3.1 by crypt0rr (https://github.com/crypt0rr)\n"
+echo -e "hash-cracker v3.2 by crypt0rr (https://github.com/crypt0rr)\n"
 
 NOP=$1
 
