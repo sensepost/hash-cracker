@@ -21,7 +21,7 @@ if [[ -x "scripts/extensions/hashcat-utils/bin/expander.bin" ]]; then
 else
     echo '[-] Expander is not available/executable or found (option 14)'
 fi
-if [[ -x "command -v cewl" ]]; then
+if [[ -x "$(command -v cewl)" ]]; then
     echo '[+] CeWL is executable'
     CEWL=$(command -v cewl)
 else
