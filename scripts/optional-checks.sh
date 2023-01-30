@@ -9,23 +9,23 @@ POTFILE=(hash-cracker.pot)
 if [[ -x "scripts/extensions/common-substr" ]]; then
     echo '[+] Common-substr is executable'
 else
-    echo '[-] Common-substr is not executable or found (option 10 / 11)'
+    echo '[-] Common-substr is not available/executable (option 10 / 11)'
 fi
 if [[ -x "$(command -v python2)" ]]; then
-    echo '[+] Python2 is available'
+    echo '[+] Python2 is executable'
 else
-    echo '[-] Python2 is not available (option 12 / 13)'
+    echo '[-] Python2 is not available/executable (option 12 / 13)'
 fi
 if [[ -x "scripts/extensions/hashcat-utils/bin/expander.bin" ]]; then
     echo '[+] Expander is executable'
 else
-    echo '[-] Expander is not available/executable or found (option 14)'
+    echo '[-] Expander is not available/executable (option 14)'
 fi
 if [[ -x "$(command -v cewl)" ]]; then
     echo '[+] CeWL is executable'
     CEWL=$(command -v cewl)
 else
-    echo '[-] CeWL is not executable or found (option 18)'
+    echo '[-] CeWL is not available/executable (option 18)'
 fi
 
 echo -e "\nKernel mode:"
