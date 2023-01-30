@@ -1,10 +1,6 @@
 #!/bin/bash
 # Copyright crypt0rr
 
-# Requirements
-HASHCAT=$(command -v hashcat)
-POTFILE=(hash-cracker.pot)
-
 # Logic
 if [[ -x "scripts/extensions/common-substr" ]]; then
     echo '[+] Common-substr is executable'

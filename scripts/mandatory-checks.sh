@@ -7,9 +7,9 @@ POTFILE=(hash-cracker.pot)
 
 # Logic
 if ! [ -x "$(command -v $HASHCAT)" ]; then
-    echo '[-] Hashcat is not installed or sourced in your profile'; ((COUNTER=COUNTER + 1))
+    echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
 else
-    echo '[+] Hashcat is installed'
+    echo '[+] Hashcat is executable'
 fi
 if test -f "$POTFILE"; then
     echo '[+] Potfile "hash-cracker.pot" present'
