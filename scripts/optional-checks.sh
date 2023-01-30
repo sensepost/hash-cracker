@@ -12,7 +12,7 @@ else
     echo '[-] Common-substr is not executable or found (option 10 / 11)'
 fi
 if [[ -x "$(command -v python2)" ]]; then
-    echo '[+] Python2 available'
+    echo '[+] Python2 is available'
 else
     echo '[-] Python2 is not available (option 12 / 13)'
 fi
