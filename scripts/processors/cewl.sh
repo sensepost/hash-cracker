@@ -6,15 +6,15 @@ read -p "Please enter the full URL to spider (e.g. https://kb.offsec.nl): " URL
 read -p "Output name for the CeWL wordlist: " CEWLLIST
 
 read -p "Depth to spider to (0-9): " DEPTH
-until [[ $DEPTH = [0-9] ]]; do
-     echo "Please only use 0-9."
-     read -p "Depth to spider to (0-9): " DEPTH
+until [[ $DEPTH = [0-9] || [0-9][0-9] ]]; do
+     echo "Please only use 0-99."
+     read -p "Depth to spider to (0-99): " DEPTH
 done
 
 read -p "Minimum word length (1-9): " LENGTH
-until [[ $LENGTH = [1-9] ]]; do
-     echo "Please only use 1-9."
-     read -p "Minimum word length (1-9): " LENGTH
+until [[ $LENGTH = [1-9] || [1-9][0-9] ]]; do
+     echo "Please only use 1-99."
+     read -p "Minimum word length (1-99): " LENGTH
 done
 
 echo -e "\nCeWL is going to start, this will take some time..."
