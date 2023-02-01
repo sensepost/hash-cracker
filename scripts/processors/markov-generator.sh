@@ -7,7 +7,7 @@ source scripts/selectors/hashlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rule3 $rockyou30000 $ORTRTA $fbfull $pantag $OUTD $techtrip2 $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $hob064 $leetspeak)
+RULELIST=($rule3 $rockyou30000 $ORTRTS $fbfull $pantag $OUTD $techtrip2 $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $hob064 $leetspeak)
 
 # Logic
 read -p "Use potfile (p) or wordlist (w): " LIST
@@ -31,11 +31,11 @@ read -p "Use rules? (y/n): " USERULES
 
 if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated -r $RULE --loopback
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated -r $RULE --loopback
     done
     rm tmp_pwcreated
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
-    $HASHCAT $KERNEL --bitmap-max=24 --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_pwcreated
     rm tmp_pwcreated
 else
     echo -e "Try again...\n"

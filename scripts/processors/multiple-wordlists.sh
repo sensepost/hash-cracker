@@ -8,7 +8,7 @@ source scripts/selectors/multiple-wordlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($ORTRTA)
+RULELIST=($ORTRTS)
 
 # Logic
 $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST

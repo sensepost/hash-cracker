@@ -4,8 +4,8 @@ Simple script to get some hash cracking done effectively.
 
 Some sites where you can find wordlists:
 
-* <https://weakpass.com/>
-* <https://hashmob.net/>
+- <https://weakpass.com/>
+- <https://hashmob.net/>
 
 Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable).
 
@@ -19,7 +19,11 @@ There is a separate repo with support for Apple Silicon based systems. Find it o
 git clone https://github.com/crypt0rr/hash-cracker
 ```
 
-For the current implementation of PACK, python2 is required, also install `pip install pyenchant==3.0.0a1`. If you don't have python2 (ofc), you are not able to use option 12 and 13.
+### Requirements for Full Functionality
+
+- Python2
+  - `pip install pyenchant==3.0.0a1`
+- [CeWL](https://github.com/digininja/CeWL/)
 
 ## Usage
 

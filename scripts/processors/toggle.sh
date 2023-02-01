@@ -16,7 +16,7 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rockyou30000 $ORTRTA $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+RULELIST=($rockyou30000 $ORTRTS $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
 
 # Logic
 for RULE in ${RULELIST[*]}; do
