@@ -1,5 +1,9 @@
 # Version log
 
+## v3.3 - 1234567890
+
+* Added `digitremover.sh`
+
 ## v3.2 - Custom Word List Generator
 
 * Added Polish [wordlist](https://raw.githubusercontent.com/sigo/polish-dictionary/master/dist/pl.txt)
