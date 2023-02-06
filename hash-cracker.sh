@@ -29,7 +29,7 @@ function menu () {
     echo "16. Username iteration (only complete NTDS)"
     echo "17. Markov-chain passwords generator"
     echo "18. CeWL wordlist generator"
-    echo -e "19. Digit remover + Hybrid\n"
+    echo -e "19. Digit remover\n"
 
     read -p "Please enter job number: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
