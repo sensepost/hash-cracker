@@ -7,7 +7,7 @@ source scripts/selectors/hashlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($fbfull $ORTRTS $NSAKEYv2 $techtrip2 $generated3)
+RULELIST=($fbfull $ORTRTS $NSAKEYv2 $techtrip2)
 
 # Digitfilter
 cat $POTFILE | awk -F: '{print $NF}' | sed 's/[0-9]//g' | tee tmp_digitfiltered &>/dev/null
