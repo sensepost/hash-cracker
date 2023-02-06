@@ -21,7 +21,7 @@ $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASH
 $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 tmp_digitfiltered '?a?a' --increment
 
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_digitfiltered -r $RULE --loopback
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST tmp_digitfiltered -r $RULE
 done
 rm tmp_digitfiltered
 echo -e "\nDigit removal / Hybrid processing done\n"
