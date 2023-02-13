@@ -20,3 +20,4 @@ echo "15. Takes all wordlists in a folder, for example the 'wordlists'. Goes thr
 echo "16. Usernames will be stripped out the NTDS dump you provide and used as input list for cracking hashes."
 echo "17. Markov-chain password generator will generate new password sets based on Time-Space Tradeoff - https://www.cs.cornell.edu/~shmat/shmat_ccs05pwd.pdf"
 echo "18. Custom Word List Generator - CeWL - Spiders a given URL and creates a custom wordlist."
+echo "19. Will take the potfile, strip the digits from the cleartexts and perform a hybrid attack accordingly, thereafter some rules to finish the job."

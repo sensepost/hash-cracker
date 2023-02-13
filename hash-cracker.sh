@@ -28,7 +28,8 @@ function menu () {
     echo "15. Directory of word lists plain and then with OneRuleToRuleThemAll"
     echo "16. Username iteration (only complete NTDS)"
     echo "17. Markov-chain passwords generator"
-    echo -e "18. CeWL wordlist generator\n"
+    echo "18. CeWL wordlist generator"
+    echo -e "19. Digit remover\n"
 
     read -p "Please enter job number: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
@@ -69,13 +70,15 @@ function menu () {
         source scripts/processors/markov-generator.sh
     elif [[ $START = '18' ]]; then
         source scripts/processors/cewl.sh
+    elif [[ $START = '19' ]]; then
+        source scripts/processors/digitremover.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi
     hash-cracker
 }
 
-echo -e "hash-cracker v3.2 by crypt0rr (https://github.com/crypt0rr)\n"
+echo -e "hash-cracker v3.3 by crypt0rr (https://github.com/crypt0rr)\n"
 
 NOP=$1
 
