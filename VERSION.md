@@ -1,5 +1,9 @@
 # Version log
 
+## v3.3.1 - Small Effective Adjustments
+
+* Changes to `digitremover.sh`
+
 ## v3.3 - 1234567890
 
 * Added `digitremover.sh`
