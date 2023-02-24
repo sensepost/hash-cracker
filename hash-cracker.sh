@@ -78,7 +78,7 @@ function menu () {
     hash-cracker
 }
 
-echo -e "hash-cracker v3.3 by crypt0rr (https://github.com/crypt0rr)\n"
+echo -e "hash-cracker v3.3.1 by crypt0rr (https://github.com/crypt0rr)\n"
 
 NOP=$1
 
