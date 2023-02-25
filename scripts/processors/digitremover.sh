@@ -9,8 +9,18 @@ source scripts/selectors/hashlist.sh
 source scripts/rules/rules.config
 RULELIST=($fbfull $ORTRTS $NSAKEYv2 $techtrip2)
 
+# Cleanup
+function clean_up {
+    rm $tmp 2>/dev/null
+    exit
+}
+
+trap clean_up SIGINT SIGTERM
+
+# Temporary Files
+tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+
 # Digitfilter
-tmp=$(mktemp)
 cat $POTFILE | cut -d: -f2- | grep -v '^\$HEX\[' | sed 's/[0-9]//g' | tee $tmp &>/dev/null
 cat $POTFILE | cut -d: -f2- | grep '^\$HEX\[' | sed "s/\$HEX\[\(.*\)\]/\10a/" | xxd -r -ps | LC_ALL=C sed 's/[0-9]//g' | LC_ALL=C tee -a $tmp &>/dev/null
 
