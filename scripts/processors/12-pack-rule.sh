@@ -7,7 +7,7 @@ source scripts/selectors/hashlist.sh
 
 # Cleanup
 function clean_up {
-    rm $tmp analysis.rule 2>/dev/null
+    rm $tmp analysis.rule analysis-sorted.word analysis.word analysis-sorted.rule 2>/dev/null
     exit
 }
 
