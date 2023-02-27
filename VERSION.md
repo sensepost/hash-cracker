@@ -5,6 +5,7 @@
 * Moved from `tmp_` files to proper temporary file handling
 * Handling of `CTRL+C` - will remove temporary file(s)
 * Renamed processors to match with menu option number
+* Added `cracklib.txt`
 
 ## v3.3.1 - Small Effective Adjustments
 
