@@ -52,7 +52,7 @@ Example hashes are provided in 3 formats within the `example-hashes` directory.
 - SHA1 (`-m 100`)
 - NTLM (`-m 1000`)
 
-If you feel like cracking a large database, have a look at *Have I Been Pwned (SHA1 / NTLM)* - <https://haveibeenpwned.com/Passwords>
+If you feel like cracking a large database, have a look at [*Have I Been Pwned (SHA1 / NTLM)*](https://haveibeenpwned.com/Passwords)
 
 ## Version log
 
