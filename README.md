@@ -7,7 +7,7 @@ Some sites where you can find wordlists:
 - <https://weakpass.com/>
 - <https://hashmob.net/>
 
-Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable).
+Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
 
 ## Apple Silicon Edition
 
@@ -43,6 +43,16 @@ Note: flags are optional, by default hash-cracker will run with optimized kernel
     -s [hash-name] / --search [hash-name]
             Will search local DB for hash module. E.g. '-s ntlm'
 ```
+
+## Example Hashes
+
+Example hashes are provided in 3 formats within the `example-hashes` directory.
+
+- MD5 (`-m 0`)
+- SHA1 (`-m 100`)
+- NTLM (`-m 1000`)
+
+If you feel like cracking a large database, have a look at *Have I Been Pwned (SHA1 / NTLM)* - <https://haveibeenpwned.com/Passwords>
 
 ## Version log
 
