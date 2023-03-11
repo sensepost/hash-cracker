@@ -43,7 +43,7 @@ read -p "Use rules? (y/n): " USERULES
 
 if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp2 -r $RULE --loopback
+    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp2 -r $RULE $LOOPBACK
     done
     rm $tmp2
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
