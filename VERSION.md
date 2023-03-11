@@ -1,11 +1,13 @@
 # Version log
 
-## v3.4 - No more tmp_
+## v3.4 - No More tmp_ and More Flexibility
 
 * Moved from `tmp_` files to proper temporary file handling
 * Handling of `CTRL+C` - will remove temporary file(s)
 * Renamed processors to match with menu option number
 * Added `cracklib.txt`
+* Added new `parameters.sh` checking script that handles parameters given by the user
+* Added option to disable `--loopback` (default: Enabled)
 
 ## v3.3.1 - Small Effective Adjustments
 
