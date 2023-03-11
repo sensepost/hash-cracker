@@ -33,7 +33,7 @@ git clone https://github.com/crypt0rr/hash-cracker
 
 ## Flags
 
-Note: flags are optional, by default hash-cracker will run with optimized kernels enabled.
+Note: flags are optional, by default hash-cracker will run with optimized kernels enabled and perform loopback actions.
 
 ```plain
         -l / --no-loopback
