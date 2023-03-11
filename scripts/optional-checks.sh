@@ -23,12 +23,3 @@ if [[ -x "$(command -v cewl)" ]]; then
 else
     echo '[-] CeWL is not available/executable (option 18)'
 fi
-
-echo -e "\nKernel mode:"
-if [ "$NOP" == '-n' ] || [ "$NOP" == '--no-limit' ]; then
-    echo "[-] Optimised kernels disabled"
-    KERNEL=''
-else
-    echo "[+] Optimised kernels enabled"
-    KERNEL='-O'
-fi
