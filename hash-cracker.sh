@@ -2,11 +2,11 @@
 # Copyright crypt0rr
 
 function hash-cracker () {
+    echo -e "hash-cracker v3.4 Apple Silicon Edition by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Mandatory modules:"
     source scripts/mandatory-checks.sh
     echo -e "\nOptional modules:"
     source scripts/optional-checks.sh
-    menu
 }
 
 function menu () {
@@ -75,25 +75,9 @@ function menu () {
     else
         echo -e "Not valid, try again\n"; menu
     fi
-    hash-cracker
+    source scripts/parameters.sh "$@"
+    menu
 }
 
-echo -e "hash-cracker v3.4 by crypt0rr (https://github.com/crypt0rr)\n"
-
-NOP=$1
-
-if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
-    echo -e "Note: flags are optional, by default hash-cracker will run with optimized kernels enabled."
-    echo -e "\nUsage: ./hash-cracker [FLAG]"
-    echo -e "\nFlags:"
-    echo -e "\t-n / --no-limit\n\t\t Disable the use of optimized kernels (un-limits password length)"
-    echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
-    echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
-elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
-    bash scripts/showinfo.sh
-elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
-    TYPELIST="scripts/extensions/hashtypes"
-    grep -i $2 $TYPELIST | sort
-else
-    hash-cracker
-fi
+source scripts/parameters.sh "$@"
+menu
