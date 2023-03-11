@@ -36,12 +36,14 @@ git clone https://github.com/crypt0rr/hash-cracker
 Note: flags are optional, by default hash-cracker will run with optimized kernels enabled.
 
 ```plain
-    -n / --no-limit
-            Disable the use of optimized kernels (limits password length)
-    -m / --module-info
-            Display information around modules/options
-    -s [hash-name] / --search [hash-name]
-            Will search local DB for hash module. E.g. '-s ntlm'
+        -l / --no-loopback
+                Disable loopback functionality
+        -n / --no-limit
+                Disable the use of optimized kernels (un-limits password length)
+        -m / --module-info
+                Display information around modules/options
+        -s [hash-name] / --search [hash-name]
+                Will search local DB for hash module. E.g. '-s ntlm'
 ```
 
 ## Example Hashes
