@@ -1,6 +1,6 @@
 # Version log
 
-## v3.5 - TOOOOOODOODDOODOD
+## v3.5 - New hashes
 
 * Updated supported hash types, based on hashcat `v6.2.6-420-gdc51a1a97`
 
