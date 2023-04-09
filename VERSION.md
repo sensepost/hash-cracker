@@ -1,5 +1,9 @@
 # Version log
 
+## v3.5 - New hashes
+
+* Updated supported hash types, based on hashcat `v6.2.6-420-gdc51a1a97`
+
 ## v3.4 - No More tmp_ and More Flexibility
 
 * Moved from `tmp_` files to proper temporary file handling
