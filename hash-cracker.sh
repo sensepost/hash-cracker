@@ -2,7 +2,7 @@
 # Copyright crypt0rr
 
 function hash-cracker () {
-    echo -e "hash-cracker v4.0 by crypt0rr (https://github.com/crypt0rr)\n"
+    echo -e "hash-cracker v3.6 by crypt0rr (https://github.com/crypt0rr)\n"
     echo -e "Mandatory modules:"
     source scripts/mandatory-checks.sh
     echo -e "\nOptional modules:"
