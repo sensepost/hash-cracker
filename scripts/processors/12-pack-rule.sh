@@ -23,6 +23,6 @@ rm analysis-sorted.word analysis.word analysis-sorted.rule
 
 source scripts/selectors/wordlist.sh
 
-$HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule $LOOPBACK
+$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule $LOOPBACK
 rm analysis.rule $tmp
 echo -e "\nPACK rule processing done\n"

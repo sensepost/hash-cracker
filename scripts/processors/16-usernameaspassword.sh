@@ -22,8 +22,8 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 
 # Logic
 cat $HASHLIST | cut -d '\' -f2 | awk -F: '{print $1}' > $tmp
-$HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp
+$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
 done
 rm $tmp; echo -e "\nUsername as Password processing with rules done\n"

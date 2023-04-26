@@ -20,6 +20,6 @@ tmp2=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 # Logic
 cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
 ./scripts/extensions/hashcat-utils/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
-$HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
+$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
 rm $tmp2
 echo -e "\nFingerprint attack done\n"
