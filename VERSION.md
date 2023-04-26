@@ -1,10 +1,11 @@
 # Version log
 
-## v4.0 - Its All About The Flags
+## v3.6 - Its All About The Flags
 
 * New rule - [stacking58](https://github.com/hashcat/hashcat/blob/master/rules/stacking58.rule)
 * New rule - [stacking58](https://github.com/hashcat/hashcat/blob/master/rules/stacking58.rule)
 * Added Stacker based on new rule
+* Hashcat hardware monitoring can be enabled from now upon
 
 ## v3.5 - New hashes
 
