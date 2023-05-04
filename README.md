@@ -37,13 +37,15 @@ Note: flags are optional, by default hash-cracker will run with optimized kernel
 
 ```plain
         -l / --no-loopback
-                Disable loopback functionality
+                 Disable loopback functionality
         -n / --no-limit
-                Disable the use of optimized kernels (un-limits password length)
+                 Disable the use of optimized kernels (un-limits password length)
+        --hwmon-enable
+                 Enable hashcat to do hardware monitoring
         -m / --module-info
-                Display information around modules/options
+                 Display information around modules/options
         -s [hash-name] / --search [hash-name]
-                Will search local DB for hash module. E.g. '-s ntlm'
+                 Will search local DB for hash module. E.g. '-s ntlm'
 ```
 
 ## Example Hashes

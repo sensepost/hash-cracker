@@ -22,5 +22,5 @@ tmp4=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 # Logic
 cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null > $tmp2; rm $tmp
 cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
-$HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp4
+$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp4
 rm $tmp4; echo -e "\nSubstring processing done\n"

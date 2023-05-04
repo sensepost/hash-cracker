@@ -24,7 +24,7 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 read -p "Enter a word (e.g. company name): " WORD
 echo $WORD > $tmp
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 --hwmon-disable --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
 done
 rm $tmp
 echo -e "\nWord processing done\n"

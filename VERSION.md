@@ -1,5 +1,11 @@
 # Version log
 
+## v3.6 - World Password Day
+
+* New rule - [stacking58](https://github.com/hashcat/hashcat/blob/master/rules/stacking58.rule)
+* Added Stacker based on new rule
+* Hashcat hardware monitoring can be enabled from now upon
+
 ## v3.5 - New hashes
 
 * Updated supported hash types, based on hashcat `v6.2.6-420-gdc51a1a97`

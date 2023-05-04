@@ -16,11 +16,11 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($tenKrules $fbfull $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive $robotmyfavorite)
+RULELIST=($rule3 $fbtop $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2 $OUTD)
 
 # Logic
-$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
+$HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $stacking58 -r $stacking58 $LOOPBACK
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $stacking58 -r $RULE $LOOPBACK
 done
-echo -e "\nDefault processing with heavy rules done\n"
+echo -e "\nStacking with light rules done\n"
