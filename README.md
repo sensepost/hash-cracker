@@ -46,7 +46,18 @@ Note: flags are optional, by default hash-cracker will run with optimized kernel
                  Display information around modules/options
         -s [hash-name] / --search [hash-name]
                  Will search local DB for hash module. E.g. '-s ntlm'
+        --static
+                 Use the 'hash-cracker.conf' static configuration file.
 ```
+
+## Static Configuration File
+
+By default, hash-cracker will run in 'ask you all variable' mode. When specifying `--static` the `hash-cracker.conf` file is used for some basic settings. You can specify:
+
+- `HASHCAT` - binary path where you've installed [hashcat](https://github.com/hashcat/hashcat)
+- `HASHTYPE` - mode hashcat will run in (e.g. 1000 (NTLM))
+- `HASHLIST` - file containing target hashes
+- `POTFILE` - specify the potfile you want to use / create
 
 ## Example Hashes
 
