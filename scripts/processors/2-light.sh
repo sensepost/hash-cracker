@@ -2,8 +2,12 @@
 # Copyright crypt0rr
 
 # Requirements
-source scripts/selectors/hashtype.sh
-source scripts/selectors/hashlist.sh
+if [[ "$STATICCONFIG" = true ]]; then
+    source hash-cracker.conf
+else
+    source scripts/selectors/hashtype.sh
+    source scripts/selectors/hashlist.sh
+fi
 
 # Single or multiple wordlist
 read -p "Single or Multiple wordlist mode? S/M: " MODE

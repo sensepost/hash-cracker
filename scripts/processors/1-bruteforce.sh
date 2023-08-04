@@ -2,8 +2,12 @@
 # Copyright crypt0rr
 
 # Requirements
-source scripts/selectors/hashtype.sh
-source scripts/selectors/hashlist.sh
+if [[ "$STATICCONFIG" = true ]]; then
+    source hash-cracker.conf
+else
+    source scripts/selectors/hashtype.sh
+    source scripts/selectors/hashlist.sh
+fi
 
 # Logic
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 '?a?a?a?a?a' --increment
@@ -32,4 +36,4 @@ $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HAS
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 '?d?d?d?d?d?d?d?d?u?u' --increment
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 '?d?d?l?d?d?l?d?d?l' --increment
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 '?d?d?u?d?d?u?d?d?u' --increment
-echo -e "\nmBrute force processing done\n"
+echo -e "\nBrute force processing done\n"
