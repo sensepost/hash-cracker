@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 
 # Logic
 read -p "Please enter the full URL to spider (e.g. https://kb.offsec.nl): " URL

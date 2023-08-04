@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 
 function hash-cracker () {
     echo -e "\nhash-cracker v3.7 by crypt0rr (https://github.com/crypt0rr)"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 RESTART="source scripts/selectors/hashlist.sh"
 
 read -e -p "Enter full path to hashlist: " HASHLIST

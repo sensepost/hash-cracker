@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 
 if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "Note: flags are optional, by default hash-cracker will run with optimized kernels enabled and perform loopback actions."
