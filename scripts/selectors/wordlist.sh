@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 RESTART="source scripts/selectors/wordlist.sh"
 
 read -e -p "Enter full path to wordlist: " WORDLIST

@@ -1,9 +1,13 @@
 #!/bin/bash
-# Copyright crypt0rr
+# Author: crypt0rr - https://github.com/crypt0rr/
 
 # Requirements
-source scripts/selectors/hashtype.sh
-source scripts/selectors/hashlist.sh
+if [[ "$STATICCONFIG" = true ]]; then
+    source hash-cracker.conf
+else
+    source scripts/selectors/hashtype.sh
+    source scripts/selectors/hashlist.sh
+fi
 
 # Rules
 source scripts/rules/rules.config

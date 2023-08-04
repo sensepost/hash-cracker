@@ -1,5 +1,12 @@
 # Version log
 
+## v3.7 - Just before
+
+* Introduced `hash-cracker.conf` to set a static config yourself
+* Merged `mandatory-checks.sh` and `optional-checks.sh` into `parameters.sh`
+* Changed all processors to use the static config file if chosen
+* Option to use the static config `--static`
+
 ## v3.6 - World Password Day
 
 * New rule - [stacking58](https://github.com/hashcat/hashcat/blob/master/rules/stacking58.rule)
