@@ -10,6 +10,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--hwmon-enable\n\t\t Enable hashcat to do hardware monitoring"
     echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
+    echo -e "\t--static\n\t\t Use the 'hash-cracker.conf' static configuration file."
     exit 1
 elif [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
@@ -32,7 +33,7 @@ elif [ "$1" == '--module-info' ]; then
     echo "17. Markov-chain password generator will generate new password sets based on Time-Space Tradeoff - https://www.cs.cornell.edu/~shmat/shmat_ccs05pwd.pdf"
     echo "18. Custom Word List Generator - CeWL - Spiders a given URL and creates a custom wordlist."
     echo "19. Will take the potfile, strip the digits from the cleartexts and perform a hybrid attack accordingly, thereafter some rules to finish the job."
-    echo "20. Stacker"
+    echo "20. Using the stacking58.rule with a rule stacked on top of it to create even more variation on the randomness."
     exit 1
 elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
     TYPELIST="scripts/extensions/hashtypes"
@@ -46,12 +47,66 @@ while [[ "$#" -gt 0 ]]; do
         -n|--no-limit) KERNEL=' ' ;;
         -l|--no-loopback) LOOPBACK=' ' ;;
         --hwmon-enable) HWMON=' ';;
+        --static) CONFIGFILE=' ' ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
 
+if [ "$CONFIGFILE" = ' ' ]; then
+    STATICCONFIG=true
+else
+    STATICCONFIG=false
+fi
+
 hash-cracker
+
+if [[ "$STATICCONFIG" = true ]]; then
+    source hash-cracker.conf
+else
+    HASHCAT=$(command -v hashcat)
+    POTFILE=(hash-cracker.pot)
+fi
+
+# Logic
+echo -e "\nMandatory modules:" 
+if ! [ -x "$(command -v $HASHCAT)" ]; then
+    echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
+else
+    echo '[+] Hashcat is executable'
+fi
+if test -f "$POTFILE"; then
+    echo '[+] Potfile' $POTFILE 'present'
+else
+    echo '[-] Potfile not present, will create' $POTFILE
+    touch $POTFILE
+fi
+if [ "$COUNTER" \> 0 ]; then
+    echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
+fi
+
+echo -e "\nOptional modules:" 
+if [[ -x "scripts/extensions/common-substr" ]]; then
+    echo '[+] Common-substr is executable'
+else
+    echo '[-] Common-substr is not available/executable (option 10 / 11)'
+fi
+if [[ -x "$(command -v python2)" ]]; then
+    echo '[+] Python2 is executable'
+else
+    echo '[-] Python2 is not available/executable (option 12 / 13)'
+fi
+if [[ -x "scripts/extensions/hashcat-utils/bin/expander.bin" ]]; then
+    echo '[+] Expander is executable'
+else
+    echo '[-] Expander is not available/executable (option 14)'
+fi
+if [[ -x "$(command -v cewl)" ]]; then
+    echo '[+] CeWL is executable'
+    CEWL=$(command -v cewl)
+else
+    echo '[-] CeWL is not available/executable (option 18)'
+fi
 
 echo -e "\nVariable Parameters:" 
 if [ "$KERNEL" = ' ' ]; then
