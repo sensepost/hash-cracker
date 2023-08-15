@@ -1,5 +1,9 @@
 # Version log
 
+## v3.8 - Keep it static
+
+* Even more ability to set static parameters
+
 ## v3.7 - Just before
 
 * Introduced `hash-cracker.conf` to set a static config yourself
