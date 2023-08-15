@@ -58,6 +58,8 @@ By default, hash-cracker will run in 'ask you all variable' mode. When specifyin
 - `HASHTYPE` - mode hashcat will run in (e.g. 1000 (NTLM))
 - `HASHLIST` - file containing target hashes
 - `POTFILE` - specify the potfile you want to use / create
+- `WORDLIST` - specify the first static word list
+- `WORDLIST2` - specify the second static word list
 
 ## Example Hashes
 
