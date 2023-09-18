@@ -1,6 +1,6 @@
 # hash-cracker
 
-Simple script to get some hash cracking done effectively.
+Simple script to get some hash cracking done effectively. In [this blog](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/) you can read some background on hash-cracker.
 
 Some sites where you can find wordlists:
 
