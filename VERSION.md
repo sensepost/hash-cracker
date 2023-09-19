@@ -3,6 +3,7 @@
 ## v3.8 - Keep it static
 
 * Even more ability to set static parameters
+* Added link to new [blog](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/)
 
 ## v3.7 - Just before
 
