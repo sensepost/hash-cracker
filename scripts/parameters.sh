@@ -129,3 +129,12 @@ else
     echo "[-] Hardware monitoring disabled"
     HWMON='--hwmon-disable'
 fi
+
+if [[ "$STATICCONFIG" = true ]]; then
+    echo -e "\nStatic parameters:"
+    echo "[+] Potfile:" $POTFILE
+    echo "[+] Hashlist:" $HASHLIST
+    echo "[+] Hashtype:" $HASHTYPE
+    echo "[+] Wordlist 1:" $WORDLIST
+    echo "[+] Wordlist 2:" $WORDLIST2  
+fi
