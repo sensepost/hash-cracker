@@ -3,6 +3,13 @@
 
 RESTART="source scripts/processors/21-custom-brute-force.sh"
 
+# CTRL-C catch
+function clean_up {
+    source hash-cracker.sh
+}
+
+trap clean_up SIGINT SIGTERM
+
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
