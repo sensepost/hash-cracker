@@ -29,7 +29,7 @@ function menu () {
     echo "20. Stacker"
     echo -e "21. Custom brute force\n"
 
-    read -p "Please enter job number: " START
+    read -p "Please enter job number or type exit: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
         echo "Bye..."; exit 1
     elif [[ $START = '1' ]]; then
