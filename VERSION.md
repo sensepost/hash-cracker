@@ -1,5 +1,9 @@
 # Version log
 
+## v3.9 - Custom Brute Force
+
+* For the heavy lifters, you can now do custom length brute force attacks
+
 ## v3.8 - Keep it static
 
 * Even more ability to set static parameters
