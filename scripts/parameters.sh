@@ -34,6 +34,7 @@ elif [ "$1" == '--module-info' ]; then
     echo "18. Custom Word List Generator - CeWL - Spiders a given URL and creates a custom wordlist."
     echo "19. Will take the potfile, strip the digits from the cleartexts and perform a hybrid attack accordingly, thereafter some rules to finish the job."
     echo "20. Using the stacking58.rule with a rule stacked on top of it to create even more variation on the randomness."
+    echo "21. You can specify a lenght you want to brute-force, this will use the '?a' setting so the full charspace. Incremental approach is optional."
     exit 1
 elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
     TYPELIST="scripts/extensions/hashtypes"
