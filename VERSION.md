@@ -1,5 +1,10 @@
 # Version log
 
+## v3.9 - Custom Brute Force
+
+* For the heavy lifters, you can now do custom length brute force attacks
+* Changed the behavior of `trap` to not only clean temporary files but keep hash-cracker alive when intentionally or unintentionally `CTRL+C` is pressed
+
 ## v3.8 - Keep it static
 
 * Even more ability to set static parameters

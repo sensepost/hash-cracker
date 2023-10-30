@@ -2,7 +2,7 @@
 # Author: crypt0rr - https://github.com/crypt0rr/
 
 function hash-cracker () {
-    echo -e "\nhash-cracker v3.8 by crypt0rr (https://github.com/crypt0rr)"
+    echo -e "\nhash-cracker v3.9 by crypt0rr (https://github.com/crypt0rr)"
 }
 
 function menu () {
@@ -26,9 +26,10 @@ function menu () {
     echo "17. Markov-chain passwords generator"
     echo "18. CeWL wordlist generator"
     echo "19. Digit remover"
-    echo -e "20. Stacker\n"
+    echo "20. Stacker"
+    echo -e "21. Custom brute force\n"
 
-    read -p "Please enter job number: " START
+    read -p "Please enter job number or type exit: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
         echo "Bye..."; exit 1
     elif [[ $START = '1' ]]; then
@@ -71,6 +72,8 @@ function menu () {
         source scripts/processors/19-digitremover.sh
     elif [[ $START = '20' ]]; then
         source scripts/processors/20-stacker.sh
+    elif [[ $START = '21' ]]; then
+        source scripts/processors/21-custom-brute-force.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi

@@ -1,6 +1,14 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+# CTRL-C catch + cleanup of temp files
+function clean_up {
+    rm $tmp 2>/dev/null
+    source hash-cracker.sh
+}
+
+trap clean_up SIGINT SIGTERM
+
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
@@ -12,14 +20,6 @@ fi
 # Rules
 source scripts/rules/rules.config
 RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive)
-
-# Cleanup
-function clean_up {
-    rm $tmp 2>/dev/null
-    exit
-}
-
-trap clean_up SIGINT SIGTERM
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)

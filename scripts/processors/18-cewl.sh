@@ -1,6 +1,13 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+# CTRL-C catch
+function clean_up {
+    source hash-cracker.sh
+}
+
+trap clean_up SIGINT SIGTERM
+
 # Logic
 read -p "Please enter the full URL to spider (e.g. https://kb.offsec.nl): " URL
 read -p "Output name for the CeWL wordlist: " CEWLLIST

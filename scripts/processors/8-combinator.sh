@@ -1,6 +1,13 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+# CTRL-C catch
+function clean_up {
+    source hash-cracker.sh
+}
+
+trap clean_up SIGINT SIGTERM
+
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
