@@ -22,10 +22,16 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp2=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp3=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp4=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
 
 # Logic
-cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
-cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
+if [ "$MACHINE" == "Mac" ]; then
+    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-mac -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr-mac -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-linux -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr-linux -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
+fi
+
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp3 $tmp4
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp3
-rm $tmp3 $tmp4; echo -e "\nPrefix suffix processing done\n"
+rm $tmp3 $tmp4
+echo -e "\nPrefix suffix processing done\n"
