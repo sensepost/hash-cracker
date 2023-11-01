@@ -98,6 +98,9 @@ if [ "$MACHINE" == "Mac" ]; then
     source scripts/mac.sh
 elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     source scripts/linux.sh
+else
+    echo "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
+    source scripts/linux.sh
 fi
 
 echo -e "\nVariable Parameters:" 
