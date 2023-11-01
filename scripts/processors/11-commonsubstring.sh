@@ -22,9 +22,15 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp2=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp3=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp4=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null > $tmp2; rm $tmp
 
 # Logic
-cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null > $tmp2; rm $tmp
-cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
+if [ "$MACHINE" == "Mac" ]; then
+    cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr-mac -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr-linux -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
+fi
+
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp4
-rm $tmp4; echo -e "\nSubstring processing done\n"
+rm $tmp4
+echo -e "\nSubstring processing done\n"
