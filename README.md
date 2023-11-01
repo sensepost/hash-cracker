@@ -17,8 +17,14 @@ git clone https://github.com/crypt0rr/hash-cracker
 
 ### Requirements for Full Functionality
 
+#### Linux
+
 - Python2
   - `pip install pyenchant==3.0.0a1`
+- [CeWL](https://github.com/digininja/CeWL/)
+
+#### macOS
+
 - [CeWL](https://github.com/digininja/CeWL/)
 
 ## Usage
