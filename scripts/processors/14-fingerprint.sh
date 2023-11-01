@@ -20,10 +20,15 @@ fi
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 tmp2=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
 
 # Logic
-cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
-./scripts/extensions/hashcat-utils/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
+if [ "$MACHINE" == "Mac" ]; then
+    ./scripts/extensions/hashcat-utils-mac/bin/expander.bin < $tmp | iconv -f ISO-8859-1 -t UTF-8//TRANSLIT | sort -u > $tmp2 && rm $tmp
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    ./scripts/extensions/hashcat-utils-linux/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
+fi
+
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
 rm $tmp2
 echo -e "\nFingerprint attack done\n"

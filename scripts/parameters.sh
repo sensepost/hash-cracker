@@ -86,27 +86,18 @@ if [ "$COUNTER" \> 0 ]; then
     echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
 fi
 
-echo -e "\nOptional modules:" 
-if [[ -x "scripts/extensions/common-substr" ]]; then
-    echo '[+] Common-substr is executable'
-else
-    echo '[-] Common-substr is not available/executable (option 10 / 11)'
-fi
-if [[ -x "$(command -v python2)" ]]; then
-    echo '[+] Python2 is executable'
-else
-    echo '[-] Python2 is not available/executable (option 12 / 13)'
-fi
-if [[ -x "scripts/extensions/hashcat-utils/bin/expander.bin" ]]; then
-    echo '[+] Expander is executable'
-else
-    echo '[-] Expander is not available/executable (option 14)'
-fi
-if [[ -x "$(command -v cewl)" ]]; then
-    echo '[+] CeWL is executable'
-    CEWL=$(command -v cewl)
-else
-    echo '[-] CeWL is not available/executable (option 18)'
+# Apple macOS vs Linux
+UNAMEOUT="$(uname -s)"
+case "${UNAMEOUT}" in
+    Linux*)     MACHINE=Linux;;
+    Darwin*)    MACHINE=Mac;;
+    *)          MACHINE="UNKNOWN:${UNAMEOUT}"
+esac
+
+if [ "$MACHINE" == "Mac" ]; then
+    source scripts/mac.sh
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    source scripts/linux.sh
 fi
 
 echo -e "\nVariable Parameters:" 

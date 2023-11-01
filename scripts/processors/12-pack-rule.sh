@@ -19,11 +19,16 @@ fi
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
 
 # Logic
-cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
-python2 scripts/extensions/pack/rulegen.py $tmp
-rm analysis-sorted.word analysis.word analysis-sorted.rule
+if [ "$MACHINE" == "Mac" ]; then
+    echo "This option is currently unavailable on Mac."
+    source hash-cracker.sh
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    python2 scripts/extensions/pack-linux/rulegen.py $tmp
+    rm analysis-sorted.word analysis.word analysis-sorted.rule
+fi
 
 source scripts/selectors/wordlist.sh
 
