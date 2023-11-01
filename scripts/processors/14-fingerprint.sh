@@ -25,7 +25,7 @@ cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
     ./scripts/extensions/hashcat-utils-mac/bin/expander.bin < $tmp | iconv -f ISO-8859-1 -t UTF-8//TRANSLIT | sort -u > $tmp2 && rm $tmp
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+else
     ./scripts/extensions/hashcat-utils-linux/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
 fi
 

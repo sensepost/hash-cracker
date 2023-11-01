@@ -25,7 +25,7 @@ cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
 if [ "$MACHINE" == "Mac" ]; then
     echo "This option is currently unavailable on Mac."
     source hash-cracker.sh
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+else
     python2 scripts/extensions/pack-linux/rulegen.py $tmp
     rm analysis-sorted.word analysis.word analysis-sorted.rule
 fi

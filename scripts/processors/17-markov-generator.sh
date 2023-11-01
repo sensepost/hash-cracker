@@ -44,7 +44,7 @@ cat $LIST | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
 
 if [ "$MACHINE" == "Mac" ]; then
     ./scripts/extensions/mkpass-mac -infile $tmp -ngram $NGRAM -m $AMOUNT | tee $tmp2 &>/dev/null && rm $tmp
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+else
     ./scripts/extensions/mkpass-linux -infile $tmp -ngram $NGRAM -m $AMOUNT | tee $tmp2 &>/dev/null && rm $tmp
 fi
 

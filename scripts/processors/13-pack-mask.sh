@@ -27,7 +27,7 @@ cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
 if [ "$MACHINE" == "Mac" ]; then
     python3 scripts/extensions/pack-mac/statsgen.py $tmp -o $tmp2
     python3 scripts/extensions/pack-mac/maskgen.py $tmp2 --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o $tmp3
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+else
     python2 scripts/extensions/pack-linux/statsgen.py $tmp -o $tmp2
     python2 scripts/extensions/pack-linux/maskgen.py $tmp2 --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o $tmp3
 fi

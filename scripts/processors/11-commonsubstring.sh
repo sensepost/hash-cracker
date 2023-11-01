@@ -27,7 +27,7 @@ cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null > $tmp2; rm $tmp
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
     cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr-mac -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+else
     cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr-linux -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
 fi
 
