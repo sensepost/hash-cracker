@@ -1,6 +1,10 @@
 # hash-cracker
 
+---
+
 Simple script to get some hash cracking done effectively. In [this blog](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/) you can read some background on hash-cracker.
+
+---
 
 Some sites where you can find wordlists:
 
@@ -8,10 +12,6 @@ Some sites where you can find wordlists:
 - <https://hashmob.net/>
 
 Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
-
-## Apple Silicon Edition
-
-There is a separate repo with support for Apple Silicon based systems. Find it over here: [hash-cracker-apple-silicon](https://github.com/crypt0rr/hash-cracker-apple-silicon)
 
 ## Installation
 
@@ -21,8 +21,14 @@ git clone https://github.com/crypt0rr/hash-cracker
 
 ### Requirements for Full Functionality
 
+#### Linux
+
 - Python2
   - `pip install pyenchant==3.0.0a1`
+- [CeWL](https://github.com/digininja/CeWL/)
+
+#### macOS
+
 - [CeWL](https://github.com/digininja/CeWL/)
 
 ## Usage

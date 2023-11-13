@@ -41,7 +41,12 @@ read -p "Minimum password (length) character limit: " NGRAM
 read -p "Amount of passwords to create: " AMOUNT
 
 cat $LIST | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
-./scripts/extensions/mkpass -infile $tmp -ngram $NGRAM -m $AMOUNT | tee $tmp2 &>/dev/null && rm $tmp
+
+if [ "$MACHINE" == "Mac" ]; then
+    ./scripts/extensions/mkpass-mac -infile $tmp -ngram $NGRAM -m $AMOUNT | tee $tmp2 &>/dev/null && rm $tmp
+else
+    ./scripts/extensions/mkpass-linux -infile $tmp -ngram $NGRAM -m $AMOUNT | tee $tmp2 &>/dev/null && rm $tmp
+fi
 
 read -p "Use rules? (y/n): " USERULES
 
