@@ -12,7 +12,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
     echo -e "\t--static\n\t\t Use the 'hash-cracker.conf' static configuration file."
     exit 1
-elif [ "$1" == '--module-info' ]; then
+elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
     echo "1. Brute force: A commonly known set of brute force tasks"
     echo "2. Light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
