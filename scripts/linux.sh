@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "\nOptional modules:" 
+echo -e "\nOptional Modules:" 
 if [[ -x "scripts/extensions/common-substr-linux" ]]; then
     echo '[+] common-substr-linux is executable'
 else

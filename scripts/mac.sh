@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "\nOptional modules:"
+echo -e "\nOptional Modules:"
 if [[ -x "scripts/extensions/common-substr-mac" ]]; then
     echo '[+] common-substr-mac is executable'
 else
