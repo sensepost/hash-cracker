@@ -1,5 +1,10 @@
 # Version log
 
+## v4.1 - To Show or not to Show
+
+- Added option `-d` / `--disable-cracked`, this will stop cracked hashes being shown, preventing flooding of the console.
+- Minor fixes
+
 ## v4.0 - The Merge
 
 - Merge of [hash-cracker-apple-silicon](https://github.com/sensepost/hash-cracker-apple-silicon) into hash-cracker
@@ -9,12 +14,12 @@
 - For the heavy lifters, you can now do custom length brute force attacks
 - Changed the behavior of `trap` to not only clean temporary files but keep hash-cracker alive when intentionally or unintentionally `CTRL+C` is pressed
 
-## v3.8 - Keep it static
+## v3.8 - Keep it Static
 
 - Even more ability to set static parameters
 - Added link to new [blog](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/)
 
-## v3.7 - Just before
+## v3.7 - Just Before
 
 - Introduced `hash-cracker.conf` to set a static config yourself
 - Merged `mandatory-checks.sh` and `optional-checks.sh` into `parameters.sh`
