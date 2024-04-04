@@ -11,8 +11,9 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
     echo -e "\t--static\n\t\t Use the 'hash-cracker.conf' static configuration file."
+    echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
     exit 1
-elif [ "$1" == '--module-info' ]; then
+elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
     echo "1. Brute force: A commonly known set of brute force tasks"
     echo "2. Light rules: A wordlist + a set of non-heavy rules is ran agains the hashlist"
@@ -49,6 +50,7 @@ while [[ "$#" -gt 0 ]]; do
         -l|--no-loopback) LOOPBACK=' ' ;;
         --hwmon-enable) HWMON=' ';;
         --static) CONFIGFILE=' ' ;;
+        -d|--disable-cracked) SHOWCRACKED=' ' ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -123,6 +125,13 @@ if [ "$HWMON" = ' ' ]; then
 else
     echo "[-] Hardware monitoring disabled"
     HWMON='--hwmon-disable'
+fi
+
+if [ "$SHOWCRACKED" = ' ' ]; then
+    echo "[-] STDOUT cracked hashes disabled"
+    SHOWCRACKED='-o /dev/null'
+else
+    echo "[+] STDOUT cracked hashes enabled"
 fi
 
 if [[ "$STATICCONFIG" = true ]]; then

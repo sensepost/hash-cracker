@@ -24,7 +24,7 @@ git clone https://github.com/crypt0rr/hash-cracker
 #### Linux
 
 - Python2
-  - `pip install pyenchant==3.0.0a1`
+  - `python2 -m pip install pyenchant==3.0.0a1`
 - [CeWL](https://github.com/digininja/CeWL/)
 
 #### macOS
@@ -54,6 +54,8 @@ Note: flags are optional, by default hash-cracker will run with optimized kernel
                  Will search local DB for hash module. E.g. '-s ntlm'
         --static
                  Use the 'hash-cracker.conf' static configuration file.
+        -d / --disable-cracked
+                 Will stop output cracked hashes directly on screen.
 ```
 
 ## Static Configuration File
