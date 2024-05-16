@@ -1,5 +1,10 @@
 # Version log
 
+## v4.2 - Extra Wordlists
+
+- Added [rockyou.txt](https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt) split in two parts `rockyou_p1.txt` / `rockyou_p2.txt`
+- Added [NetZwerg.txt](https://weakpass.com/wordlist/510)
+
 ## v4.1 - To Show or not to Show
 
 - Added option `-d` / `--disable-cracked`, this will stop cracked hashes being shown, preventing flooding of the console.
