@@ -27,7 +27,8 @@ function menu () {
     echo "18. CeWL wordlist generator"
     echo "19. Digit remover"
     echo "20. Stacker"
-    echo -e "21. Custom brute force\n"
+    echo "21. Custom brute force"
+    echo -e "22. Directory of word lists plain and then with buka_400k\n"
 
     read -p "Please enter job number or type exit: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
