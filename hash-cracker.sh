@@ -2,7 +2,7 @@
 # Author: crypt0rr - https://github.com/crypt0rr/
 
 function hash-cracker () {
-    echo -e "\nhash-cracker v4.2 by crypt0rr (https://github.com/crypt0rr)"
+    echo -e "\nhash-cracker v4.2.1 by crypt0rr (https://github.com/crypt0rr)"
 }
 
 function menu () {
@@ -27,7 +27,8 @@ function menu () {
     echo "18. CeWL wordlist generator"
     echo "19. Digit remover"
     echo "20. Stacker"
-    echo -e "21. Custom brute force\n"
+    echo "21. Custom brute force"
+    echo -e "22. Directory of word lists plain and then with buka_400k\n"
 
     read -p "Please enter job number or type exit: " START
     if [[ "$START" = "0" ]] || [[ "$START" = "exit" ]]; then
@@ -74,6 +75,8 @@ function menu () {
         source scripts/processors/20-stacker.sh
     elif [[ $START = '21' ]]; then
         source scripts/processors/21-custom-brute-force.sh
+    elif [[ $START = '22' ]]; then
+        source scripts/processors/22-multiple-wordlists-buka.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi
