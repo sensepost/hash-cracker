@@ -75,6 +75,8 @@ function menu () {
         source scripts/processors/20-stacker.sh
     elif [[ $START = '21' ]]; then
         source scripts/processors/21-custom-brute-force.sh
+    elif [[ $START = '22' ]]; then
+        source scripts/processors/22-multiple-wordlists-buka.sh
     else
         echo -e "Not valid, try again\n"; menu
     fi
