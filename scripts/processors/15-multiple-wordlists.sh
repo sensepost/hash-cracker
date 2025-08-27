@@ -19,7 +19,7 @@ source scripts/selectors/multiple-wordlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($ORTRTS)
+RULELIST=($ORTRTS $buka)
 
 # Logic
 $HASHCAT $KERNEL --bitmap-max=24 $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST

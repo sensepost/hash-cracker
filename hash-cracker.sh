@@ -2,7 +2,7 @@
 # Author: crypt0rr - https://github.com/crypt0rr/
 
 function hash-cracker () {
-    echo -e "\nhash-cracker v4.2 by crypt0rr (https://github.com/crypt0rr)"
+    echo -e "\nhash-cracker v4.2.1 by crypt0rr (https://github.com/crypt0rr)"
 }
 
 function menu () {
