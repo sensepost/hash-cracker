@@ -29,6 +29,6 @@ else
     ./scripts/extensions/hashcat-utils-linux/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
+$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
 rm $tmp2
 echo -e "\nFingerprint attack done\n"

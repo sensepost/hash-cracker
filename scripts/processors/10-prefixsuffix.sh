@@ -31,7 +31,7 @@ else
     cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-linux -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr-linux -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp3 $tmp4
-$HASHCAT $KERNEL --bitmap-max=24 $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp3
+$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp3 $tmp4
+$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp3
 rm $tmp3 $tmp4
 echo -e "\nPrefix suffix processing done\n"
