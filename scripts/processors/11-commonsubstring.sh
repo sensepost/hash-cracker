@@ -31,6 +31,6 @@ else
     cat $tmp2 | awk -F: '{print $NF}' | sort | tee $tmp3 &>/dev/null && ./scripts/extensions/common-substr-linux -n -f $tmp3 > $tmp4 && rm $tmp3 $tmp2
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp4
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp4 $tmp4
 rm $tmp4
 echo -e "\nSubstring processing done\n"

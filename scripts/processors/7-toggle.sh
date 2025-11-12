@@ -31,7 +31,7 @@ RULELIST=($rockyou30000 $ORTRTS $OUTD $passwordpro $d3ad0ne $d3adhob0 $generated
 
 # Logic
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE $LOOPBACK
-    $HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles1 -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $toggles2 -r $RULE $LOOPBACK
 done
 echo -e "\nToggle processing done\n"

@@ -18,5 +18,5 @@ fi
 source scripts/selectors/multiple-wordlist.sh
 
 # Logic
-$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $WORDLIST $WORDLIST2 
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $WORDLIST $WORDLIST2 
 echo -e "\nCombinator processing done\n"

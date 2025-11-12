@@ -42,6 +42,6 @@ else
     $RESTART
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 $TARGET $INCREMENT
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 $TARGET $INCREMENT
 
 echo -e "\nCustom Brute Force Processing Done\n"

@@ -30,8 +30,8 @@ source scripts/rules/rules.config
 RULELIST=($tenKrules $fbfull $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive $robotmyfavorite)
 
 # Logic
-$HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
 for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
+    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
 done
 echo -e "\nDefault processing with heavy rules done\n"
