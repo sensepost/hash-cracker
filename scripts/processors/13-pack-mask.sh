@@ -32,6 +32,6 @@ else
     python2 scripts/extensions/pack-linux/maskgen.py $tmp2 --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o $tmp3
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 3 $tmp3
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 3 $tmp3
 rm $tmp $tmp2 $tmp3
 echo -e "\nPACK mask processing done\n"
