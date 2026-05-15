@@ -1,87 +1,198 @@
 # hash-cracker
 
----
+Simple Bash wrapper around `hashcat` for running a curated set of cracking workflows from an interactive menu. Background and usage philosophy are covered in [this blog post](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/).
 
-Simple script to get some hash cracking done effectively. In [this blog](https://sensepost.com/blog/2023/hash-cracker-password-cracking-done-effectively/) you can read some background on hash-cracker.
-
----
-
-Some sites where you can find wordlists:
+Useful wordlist sources:
 
 - <https://weakpass.com/>
 - <https://hashmob.net/>
 
-Want to make the ***$HEX[1234]*** Hashcat output readable? Have a look at [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
+If `hashcat` outputs values as `$HEX[...]`, see [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
 
 ## Installation
 
-```plain
+```bash
 git clone https://github.com/crypt0rr/hash-cracker
+cd hash-cracker
+chmod +x hash-cracker.sh
 ```
 
-### Requirements for Full Functionality
+## Requirements
+
+### Mandatory
+
+- `hashcat` must be installed and executable
+- `hash-cracker.conf` must exist in the repository root
+
+At startup, `hash-cracker` checks that:
+
+- `HASHCAT` points to an executable `hashcat` binary
+- `POTFILE` exists, or can be created
+- the required config keys are set in `hash-cracker.conf`
+
+### Optional Dependencies
+
+These are only needed for specific menu options.
 
 #### Linux
 
-- Python2
-  - `python2 -m pip install pyenchant==3.0.0a1`
-- [CeWL](https://github.com/digininja/CeWL/)
+- `python2`
+  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - The tool text recommends `python2 -m pip install pyenchant==3.0.0a1` for option `12`
+- `cewl`
+  - Needed for option `18`
+- `scripts/extensions/common-substr-linux`
+  - Needed for options `10` and `11`
+- `scripts/extensions/hashcat-utils-linux/bin/expander.bin`
+  - Needed for option `14`
 
 #### macOS
 
-- [CeWL](https://github.com/digininja/CeWL/)
+- `scripts/extensions/cewl/cewl.rb`
+  - Needed for option `18`
+- `scripts/extensions/common-substr-mac`
+  - Needed for options `10` and `11`
+- `scripts/extensions/hashcat-utils-mac/bin/expander.bin`
+  - Needed for option `14`
+- `python3`
+  - Used by option `13` (PACK mask)
+
+Notes:
+
+- Option `12` is currently unavailable on macOS.
+- Option `13` uses the bundled PACK scripts and generates masks from the existing potfile.
+
+## Configuration
+
+`hash-cracker.conf` is required and is loaded automatically on every start.
+
+The file must live in the repository root and define these settings:
+
+- `HASHCAT` - path to the `hashcat` binary
+- `DEVICE` - value passed to `hashcat -d`
+- `HASHTYPE` - hash mode, for example `1000` for NTLM
+- `HASHLIST` - file containing target hashes
+- `POTFILE` - potfile path to use or create
+- `WORDLIST` - primary wordlist path
+- `WORDLIST2` - secondary wordlist path used by combinator-style workflows
+
+Current example:
+
+```bash
+# Hashcat path
+HASHCAT=(/usr/local/bin/hashcat)
+
+# Device to Use (hashcat -d $DEVICE)
+DEVICE=1
+
+# Hashtype
+HASHTYPE=1000
+
+# File containing target hashes
+HASHLIST=input
+
+# Potfile you want to use
+POTFILE=hash-cracker.pot
+
+# Wordlist(s)
+WORDLIST=wordlists/ignis-1M.txt
+WORDLIST2=wordlists/ignis-1K.txt
+```
 
 ## Usage
 
-```plain
-./hash-cracker [FLAG]
+Run from the repository root:
+
+```bash
+./hash-cracker.sh
+```
+
+With flags:
+
+```bash
+./hash-cracker.sh [FLAG]
+```
+
+Help:
+
+```bash
+./hash-cracker.sh --help
+```
+
+Show module descriptions:
+
+```bash
+./hash-cracker.sh --module-info
+```
+
+Search the local hash type list:
+
+```bash
+./hash-cracker.sh --search ntlm
 ```
 
 ## Flags
 
-Note: flags are optional, by default hash-cracker will run with optimized kernels enabled and perform loopback actions.
+By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.
 
-```plain
-        -l / --no-loopback
-                 Disable loopback functionality
-        -n / --no-limit
-                 Disable the use of optimized kernels (un-limits password length)
-        --hwmon-enable
-                 Enable hashcat to do hardware monitoring
-        -m / --module-info
-                 Display information around modules/options
-        -s [hash-name] / --search [hash-name]
-                 Will search local DB for hash module. E.g. '-s ntlm'
-        --static
-                 Use the 'hash-cracker.conf' static configuration file.
-        -d / --disable-cracked
-                 Will stop output cracked hashes directly on screen.
-```
+- `-l`, `--no-loopback` - disable loopback functionality
+- `-n`, `--no-limit` - disable optimized kernels
+- `--hwmon-enable` - enable hardware monitoring
+- `-m`, `--module-info` - print descriptions of the available modules and exit
+- `-s [hash-name]`, `--search [hash-name]` - search the local hash type database and exit
+- `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
 
-## Static Configuration File
+## Menu Options
 
-By default, hash-cracker will run in 'ask you all variable' mode. When specifying `--static` the `hash-cracker.conf` file is used for some basic settings. You can specify:
+When the tool starts successfully, it opens an interactive menu with these options:
 
-- `HASHCAT` - binary path where you've installed [hashcat](https://github.com/hashcat/hashcat)
-- `HASHTYPE` - mode hashcat will run in (e.g. 1000 (NTLM))
-- `HASHLIST` - file containing target hashes
-- `POTFILE` - specify the potfile you want to use / create
-- `WORDLIST` - specify the first static word list
-- `WORDLIST2` - specify the second static word list
+1. Brute force
+2. Light rules
+3. Heavy rules
+4. Enter specific word/name/company
+5. Enter specific word/name/company (brute force)
+6. Hybrid
+7. Toggle-case
+8. Combinator
+9. Iterate results
+10. Prefix suffix
+11. Common substring
+12. PACK rulegen
+13. PACK mask
+14. Fingerprint attack
+15. Directory of word lists plain and then with `OneRuleToRuleThemAll`
+16. Username iteration (only complete NTDS)
+17. Markov-chain passwords generator
+18. CeWL wordlist generator
+19. Digit remover
+20. Stacker
+21. Custom brute force
+22. Directory of word lists plain and then with `buka_400k`
+
+## Module Notes
+
+- Options `2`, `3`, `6`, `7`, and `20` ask whether to use a single wordlist or multiple wordlists.
+- Option `8` uses `WORDLIST` and `WORDLIST2` from the config file.
+- Options `15` and `22` ask for a directory containing multiple wordlists.
+- Options `4` and `5` prompt for a custom word or company name.
+- Option `16` expects an NTDS-style input file and extracts usernames from `HASHLIST`.
+- Option `17` can generate candidates from either the potfile or a selected wordlist.
+- Option `18` prompts for a URL, output wordlist name, spider depth, and minimum word length.
+- Option `21` prompts for brute-force length and whether increment mode should be enabled.
 
 ## Example Hashes
 
-Example hashes are provided in 3 formats within the `example-hashes` directory.
+Sample hashes are provided in `example-hashes/`:
 
 - MD5 (`-m 0`)
 - SHA1 (`-m 100`)
 - NTLM (`-m 1000`)
 
-If you feel like cracking a large database, have a look at [*Have I Been Pwned (SHA1 / NTLM)*](https://haveibeenpwned.com/Passwords)
+For large public datasets, see [Have I Been Pwned Passwords](https://haveibeenpwned.com/Passwords).
 
-## Version log
+## Version Log
 
-[See here](VERSION.md)
+See [VERSION.md](VERSION.md).
 
 ## License
 

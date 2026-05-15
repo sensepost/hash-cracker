@@ -1,5 +1,10 @@
 # Version log
 
+## v4.3 - Static By Default
+
+- `hash-cracker.conf` is now required at startup
+- Removed the `--static` flag and always load the configuration file by default
+
 ## v4.2 - Extra Wordlists
 
 - Added [rockyou.txt](https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt) split in two parts `rockyou_p1.txt` / `rockyou_p2.txt`
