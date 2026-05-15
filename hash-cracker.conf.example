@@ -1,5 +1,5 @@
 # Hashcat path
-HASHCAT=(/opt/homebrew/bin/hashcat)
+HASHCAT=(/usr/local/bin/hashcat)
 
 # Device to Use (hashcat -d $DEVICE)
 DEVICE=1
