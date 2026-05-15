@@ -10,7 +10,6 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--hwmon-enable\n\t\t Enable hashcat to do hardware monitoring"
     echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
-    echo -e "\t--static\n\t\t Use the 'hash-cracker.conf' static configuration file."
     echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -49,27 +48,31 @@ while [[ "$#" -gt 0 ]]; do
         -n|--no-limit) KERNEL=' ' ;;
         -l|--no-loopback) LOOPBACK=' ' ;;
         --hwmon-enable) HWMON=' ';;
-        --static) CONFIGFILE=' ' ;;
         -d|--disable-cracked) SHOWCRACKED=' ' ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
 
-if [ "$CONFIGFILE" = ' ' ]; then
-    STATICCONFIG=true
-else
-    STATICCONFIG=false
+CONFIGFILE="hash-cracker.conf"
+STATICCONFIG=true
+
+if [ ! -f "$CONFIGFILE" ]; then
+    echo "Missing required configuration file: $CONFIGFILE"
+    exit 1
 fi
 
 hash-cracker
 
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-else
-    HASHCAT=$(command -v hashcat)
-    POTFILE=(hash-cracker.pot)
-fi
+source "$CONFIGFILE"
+
+REQUIRED_CONFIG_VARS=(HASHCAT HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
+for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
+    if [ -z "${!REQUIRED_CONFIG_VAR}" ]; then
+        echo "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
+        exit 1
+    fi
+done
 
 # Logic
 echo -e "\nMandatory modules:" 
@@ -134,11 +137,9 @@ else
     echo "[+] STDOUT cracked hashes enabled"
 fi
 
-if [[ "$STATICCONFIG" = true ]]; then
-    echo -e "\nStatic parameters:"
-    echo "[+] Potfile:" $POTFILE
-    echo "[+] Hashlist:" $HASHLIST
-    echo "[+] Hashtype:" $HASHTYPE
-    echo "[+] Wordlist 1:" $WORDLIST
-    echo "[+] Wordlist 2:" $WORDLIST2  
-fi
+echo -e "\nStatic parameters:"
+echo "[+] Potfile:" $POTFILE
+echo "[+] Hashlist:" $HASHLIST
+echo "[+] Hashtype:" $HASHTYPE
+echo "[+] Wordlist 1:" $WORDLIST
+echo "[+] Wordlist 2:" $WORDLIST2
