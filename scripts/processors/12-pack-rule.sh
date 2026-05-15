@@ -3,7 +3,7 @@
 
 # CTRL-C catch + cleanup of temp files
 function clean_up {
-    rm $tmp analysis.rule 2>/dev/null
+    rm -f -- "$tmp" analysis.rule 2>/dev/null
     source hash-cracker.sh
 }
 
@@ -19,19 +19,19 @@ fi
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
-cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
+cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
 
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
     echo "This option is currently unavailable on Mac."
     source hash-cracker.sh
 else
-    python2 scripts/extensions/pack-linux/rulegen.py $tmp
-    rm analysis-sorted.word analysis.word analysis-sorted.rule
+    python2 scripts/extensions/pack-linux/rulegen.py "$tmp"
+    rm -f -- analysis-sorted.word analysis.word analysis-sorted.rule
 fi
 
 source scripts/selectors/wordlist.sh
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r analysis.rule $LOOPBACK
-rm analysis.rule $tmp
+$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$WORDLIST" -r analysis.rule $LOOPBACK
+rm -f -- analysis.rule "$tmp"
 echo -e "\nPACK rule processing done\n"

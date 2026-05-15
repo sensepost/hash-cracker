@@ -38,7 +38,11 @@ elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     exit 1
 elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
     TYPELIST="scripts/extensions/hashtypes"
-    grep -i $2 $TYPELIST | sort
+    if [ -z "$2" ]; then
+        echo "Please provide a search value, e.g. '--search ntlm'"
+        exit 1
+    fi
+    grep -i -- "$2" "$TYPELIST" | sort
     exit 1
 fi
 
@@ -55,7 +59,9 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 CONFIGFILE="hash-cracker.conf"
+# shellcheck disable=SC2034
 STATICCONFIG=true
+COUNTER=0
 
 if [ ! -f "$CONFIGFILE" ]; then
     echo "Missing required configuration file: $CONFIGFILE"
@@ -64,6 +70,7 @@ fi
 
 hash-cracker
 
+# shellcheck source=/dev/null
 source "$CONFIGFILE"
 
 REQUIRED_CONFIG_VARS=(HASHCAT HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
@@ -76,18 +83,18 @@ done
 
 # Logic
 echo -e "\nMandatory modules:" 
-if ! [ -x "$(command -v $HASHCAT)" ]; then
+if ! [ -x "$(command -v "$HASHCAT")" ]; then
     echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
 else
     echo '[+] Hashcat is executable'
 fi
 if test -f "$POTFILE"; then
-    echo '[+] Potfile' $POTFILE 'present'
+    echo '[+] Potfile' "$POTFILE" 'present'
 else
-    echo '[-] Potfile not present, will create' $POTFILE
-    touch $POTFILE
+    echo '[-] Potfile not present, will create' "$POTFILE"
+    touch "$POTFILE"
 fi
-if [ "$COUNTER" \> 0 ]; then
+if [ "$COUNTER" -gt 0 ]; then
     echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
 fi
 
@@ -101,7 +108,7 @@ esac
 
 if [ "$MACHINE" == "Mac" ]; then
     source scripts/mac.sh
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+elif [ "$MACHINE" == "Linux" ]; then
     source scripts/linux.sh
 else
     echo "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
@@ -138,8 +145,24 @@ else
 fi
 
 echo -e "\nStatic parameters:"
-echo "[+] Potfile:" $POTFILE
-echo "[+] Hashlist:" $HASHLIST
-echo "[+] Hashtype:" $HASHTYPE
-echo "[+] Wordlist 1:" $WORDLIST
-echo "[+] Wordlist 2:" $WORDLIST2
+echo "[+] Potfile:" "$POTFILE"
+echo "[+] Hashlist:" "$HASHLIST"
+HASHTYPE_DISPLAY=$(
+    awk -F'\\|' -v mode="$HASHTYPE" '
+        {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+            if ($1 == mode) {
+                print $1 " " $2
+                exit
+            }
+        }
+    ' scripts/extensions/hashtypes
+)
+if [ -n "$HASHTYPE_DISPLAY" ]; then
+    echo "[+] Hashtype:" "$HASHTYPE_DISPLAY"
+else
+    echo "[+] Hashtype:" "$HASHTYPE"
+fi
+echo "[+] Wordlist 1:" "$WORDLIST"
+echo "[+] Wordlist 2:" "$WORDLIST2"

@@ -19,13 +19,13 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rule3 $robotmyfavorite $fbfull $tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $TOXICSP $techtrip2 $williamsuper $digits3 $dive $TOXIC10k $big $generated3 $huge)
+RULELIST=("$rule3" "$robotmyfavorite" "$fbfull" "$tenKrules" "$NSAKEYv2" "$fordyv1" "$pantag" "$OUTD" "$TOXICSP" "$techtrip2" "$williamsuper" "$digits3" "$dive" "$TOXIC10k" "$big" "$generated3" "$huge")
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 
 # Logic
-for RULE in ${RULELIST[*]}; do
+for RULE in "${RULELIST[@]}"; do
     cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
 done

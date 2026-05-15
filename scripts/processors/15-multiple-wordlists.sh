@@ -19,11 +19,11 @@ source scripts/selectors/multiple-wordlist.sh
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($ORTRTS)
+RULELIST=("$ORTRTS")
 
 # Logic
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
-for RULE in ${RULELIST[*]}; do
+for RULE in "${RULELIST[@]}"; do
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
 done
 echo -e "\nMultiple wordlists done\n"

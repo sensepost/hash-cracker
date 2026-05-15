@@ -27,11 +27,11 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rule3 $rockyou30000 $ORTRTS $fbtop $OUTD $TOXICSP $passwordpro $d3ad0ne $d3adhob0 $generated2 $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2)
+RULELIST=("$rule3" "$rockyou30000" "$ORTRTS" "$fbtop" "$OUTD" "$TOXICSP" "$passwordpro" "$d3ad0ne" "$d3adhob0" "$generated2" "$toprules2020" "$digits1" "$digits2" "$hob064" "$leetspeak" "$toggles1" "$toggles2")
 
 # Logic
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
-for RULE in ${RULELIST[*]}; do
+for RULE in "${RULELIST[@]}"; do
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
 done
 echo -e "\nDefault processing with light rules done\n"

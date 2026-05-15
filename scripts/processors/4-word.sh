@@ -19,7 +19,7 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($tenKrules $NSAKEYv2 $fordyv1 $pantag $OUTD $techtrip2 $williamsuper $digits3 $dive)
+RULELIST=("$tenKrules" "$NSAKEYv2" "$fordyv1" "$pantag" "$OUTD" "$techtrip2" "$williamsuper" "$digits3" "$dive")
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
@@ -27,7 +27,7 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 # Logic
 read -p "Enter a word (e.g. company name): " WORD
 echo $WORD > $tmp
-for RULE in ${RULELIST[*]}; do
+for RULE in "${RULELIST[@]}"; do
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE $LOOPBACK
 done
 rm $tmp

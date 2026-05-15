@@ -1,5 +1,20 @@
 # Version log
 
+## v5.0 - Hardening and Hashtype Clarity
+
+- Startup now shows hash mode and resolved name together, e.g. `1000 NTLM`
+- Improved `--search` handling:
+  - Validates that a search value is provided
+  - Safer matching against local hashtype list
+- Fixed CeWL input validation for depth and minimum length (proper numeric bounds)
+- Fixed Markov processor restart flow on invalid input
+- Fixed malformed brute-force mask pattern in option `1`
+- Fixed numeric comparison logic in custom brute-force processor
+- Improved multi-wordlist directory validation to properly check directory existence and non-empty content
+- Improved temporary file cleanup and quoting in PACK/common-substr/Markov related processors
+- Standardized rule array handling (`RULELIST`) and iteration for safer behavior
+- Additional shell safety and lint-driven hardening across startup/selectors/processors
+
 ## v4.3 - Static By Default
 
 - `hash-cracker.conf` is now required at startup

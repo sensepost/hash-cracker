@@ -19,7 +19,7 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($fbfull $ORTRTS $NSAKEYv2 $techtrip2)
+RULELIST=("$fbfull" "$ORTRTS" "$NSAKEYv2" "$techtrip2")
 
 # Temporary Files
 tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
@@ -36,7 +36,7 @@ $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 $tmp '?d?d?d?d?s' --increment
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 $tmp '?a?a' --increment
 
-for RULE in ${RULELIST[*]}; do
+for RULE in "${RULELIST[@]}"; do
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $tmp -r $RULE
 done
 rm $tmp

@@ -13,6 +13,7 @@ else
 fi
 if [[ -x "scripts/extensions/cewl/cewl.rb" ]]; then
     echo '[+] CeWL is executable'
+    # shellcheck disable=SC2034
     CEWL="scripts/extensions/cewl/cewl.rb"
 else
     echo '[-] CeWL is not executable or found (option 18)'

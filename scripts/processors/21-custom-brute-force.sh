@@ -24,11 +24,13 @@ TARGET=''
 [ -n "$CHARS" ] && [ "$CHARS" -eq "$CHARS" ] 2>/dev/null
 if [ $? -ne 0 ]; then
     echo $CHARS is not a number.; $RESTART
-elif [[ "$CHARS" < 1 ]]; then
+elif [ "$CHARS" -lt 1 ]; then
         echo NO!; $RESTART
     else
-        for i in $(seq 1 $CHARS); do
+        COUNT="$CHARS"
+        while [ "$COUNT" -gt 0 ]; do
             TARGET+="?a"
+            COUNT=$((COUNT - 1))
         done
 fi
 

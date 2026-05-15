@@ -18,6 +18,7 @@ else
 fi
 if [[ -x "$(command -v cewl)" ]]; then
     echo '[+] CeWL is executable'
+    # shellcheck disable=SC2034
     CEWL=$(command -v cewl)
 else
     echo '[-] CeWL is not available/executable (option 18)'
