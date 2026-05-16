@@ -1,19 +1,70 @@
 # Version log
 
-## v5.0 - Hardening and Hashtype Clarity
+## v5.0 - UX, Reliability, and Maintainability
 
-- Startup now shows hash mode and resolved name together, e.g. `1000 NTLM`
-- Improved `--search` handling:
-  - Validates that a search value is provided
-  - Safer matching against local hashtype list
-- Fixed CeWL input validation for depth and minimum length (proper numeric bounds)
-- Fixed Markov processor restart flow on invalid input
-- Fixed malformed brute-force mask pattern in option `1`
-- Fixed numeric comparison logic in custom brute-force processor
-- Improved multi-wordlist directory validation to properly check directory existence and non-empty content
-- Improved temporary file cleanup and quoting in PACK/common-substr/Markov related processors
-- Standardized rule array handling (`RULELIST`) and iteration for safer behavior
-- Additional shell safety and lint-driven hardening across startup/selectors/processors
+### Highlights
+
+- Major menu/runner stability and UX polish.
+- Stronger dependency validation with precise per-job fix guidance.
+- New non-interactive health checks (`--self-test` / `--doctor`).
+- Maintainer quality gates and CI automation.
+
+### Added
+
+- Dynamic hashtype naming in setup output:
+  - Startup now shows mode + name, for example `Hashtype: 1000 NTLM`.
+- New ASCII intro banner behavior:
+  - Version included in banner (`v5.0`).
+  - Dynamic banner status based on selected hash mode, for example `status: cracking NTLM (1000)`.
+  - Center alignment fixes for version/progress/status lines.
+- Per-job dependency validation:
+  - Checks only what the selected option needs.
+  - Returns precise fix messages on failure.
+- New non-interactive health-check mode:
+  - `--self-test` / `--doctor`.
+  - Validates config and dependencies and exits with pass/fail status.
+- Maintainer tooling:
+  - `make lint`, `make format-check`, `make format`, `make qa`, `make test-smoke`.
+- CI workflow:
+  - Runs lint, format-check, and smoke tests on push/pull request.
+- Smoke test suite:
+  - Menu exit and invalid-option recovery.
+  - Dry-run combinator execution checks.
+  - Self-test execution checks.
+  - Ctrl+C regression check during a running job.
+
+### Changed
+
+- Release version updated to `v5.0`.
+- Menu UX polish:
+  - Dry-run marker in prompt.
+  - Better spacing between setup summary and job selection.
+- Colorized status output (Linux/macOS compatible):
+  - Green for successful checks.
+  - Red for errors/missing requirements.
+  - Safe no-color fallback in unsupported terminals.
+- Processor architecture cleanup:
+  - Shared processor bootstrap helper (`processor_bootstrap`).
+  - Shared hashcat base runner (`hashcat_base`).
+  - Shared interrupt/cleanup helpers (`processor_interrupt`, `processor_cleanup`).
+- Dry-run hardening:
+  - Preprocessor/file/tool side effects are skipped and shown as `[DRY-RUN] would ...`.
+  - Startup no longer creates potfile in dry-run mode; reports `would create`.
+
+### Fixed
+
+- Ctrl+C handling issues that could result in poor post-job menu behavior.
+- Inconsistent processor trap/cleanup patterns.
+- Broken cleanup path in option `5` interrupt handling.
+- Options `15` and `22` now support both:
+  - Directory of wordlists.
+  - Single wordlist file.
+- Additional shell safety and consistency fixes across processors and selectors.
+
+### Internal
+
+- Reduced duplication across processor scripts.
+- Standardized processor startup and hashcat execution flow.
 
 ## v4.3 - Static By Default
 
