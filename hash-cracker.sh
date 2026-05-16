@@ -55,7 +55,7 @@ function hash-cracker() {
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text="v5.0"
+    version_text='v5.0 "Steel Menu"'
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
