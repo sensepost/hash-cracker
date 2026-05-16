@@ -3,3 +3,4 @@ hash-cracker.pot
 hash-cracker.conf
 .DS_Store
 input
+logs/*.log

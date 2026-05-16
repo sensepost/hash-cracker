@@ -194,6 +194,21 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Option `18` prompts for a URL, output wordlist name, spider depth, and minimum word length.
 - Option `21` prompts for brute-force length and whether increment mode should be enabled.
 
+## Runtime Status Output
+
+- At startup, before initial counters are built, the tool prints:
+  - `Preparing session stats (counting potfile and input hashes)...`
+- After a job, if the potfile changed and unique plaintext recount is needed, the tool prints:
+  - `Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)...`
+- The menu session line reports:
+  - session delta (`new ... lines`, `... unique`, `... bytes`)
+  - total cracked passwords in potfile (`... lines`)
+  - unique input hashes from the active `HASHLIST`
+- Session stats are written to a timestamped log file:
+  - Default per-session file: `logs/session-YYYYmmdd-HHMMSS-PID.log`
+  - Convenience pointer: `logs/latest.log` points to the current session file
+  - Override path with `SESSION_STATS_LOGFILE`
+
 ## Example Hashes
 
 Sample hashes are provided in `example-hashes/`:
