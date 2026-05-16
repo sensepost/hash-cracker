@@ -1,6 +1,32 @@
 # Version log
 
-## v5.0 - UX, Reliability, and Maintainability
+## v5.1 - Iron Pulse
+
+### Highlights
+
+- Session-stats clarity improvements in the main menu.
+- Better user feedback during expensive stats recount operations.
+- Release codename update in the startup banner.
+
+### Added
+
+- Input hash visibility in session stats:
+  - Shows unique hash count from the active input hashlist.
+- Startup progress feedback:
+  - `Preparing session stats (counting potfile and input hashes)...`
+- Recount progress feedback after jobs when potfile changed:
+  - `Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)...`
+
+### Changed
+
+- Menu layout polish:
+  - Added a blank line between `Current setup` and `Session stats`.
+- Session stats wording:
+  - `total cracked passwords in potfile: <N> lines`
+  - This makes clear the total value is read from the configured potfile.
+- Banner version/codename updated to `v5.1 "Iron Pulse"`.
+
+## v5.0 - Steel Menu
 
 ### Highlights
 

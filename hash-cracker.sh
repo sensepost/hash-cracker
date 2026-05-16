@@ -55,7 +55,7 @@ function hash-cracker() {
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.0 "Steel Menu"'
+    version_text='v5.1 "Iron Pulse"'
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -425,6 +425,7 @@ function menu() {
             echo "$option_id. $option_text"
         done < <(menu_entries)
         echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
+        echo
         echo "Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
         echo
 
