@@ -195,6 +195,22 @@ For large public datasets, see [Have I Been Pwned Passwords](https://haveibeenpw
 
 See [VERSION.md](VERSION.md).
 
+## Maintainer Quality Checks
+
+These checks are maintainer-only and are not required for end users running `hash-cracker`.
+
+```bash
+make lint
+make format-check
+make format
+make qa
+```
+
+- `make lint` runs `shellcheck` on project shell scripts.
+- `make format-check` verifies formatting with `shfmt`.
+- `make format` applies `shfmt` formatting changes.
+- CI runs `make lint` and `make format-check` automatically on push and pull request.
+
 ## License
 
 GNU GPLv3

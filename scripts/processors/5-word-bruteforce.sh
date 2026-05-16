@@ -21,7 +21,7 @@ tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
 
 # Logic
 read -p "Enter a word (e.g. company name): " WORD
-echo $WORD > $tmp
+echo $WORD >$tmp
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 $tmp '?d?d?d?d?d?d?d?d' -i
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a6 $tmp '?l?l?l?l?l?l' -i
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a7 '?d?d?d?d?d?d?d?d' $tmp -i

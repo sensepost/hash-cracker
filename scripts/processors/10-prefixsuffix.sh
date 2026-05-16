@@ -27,9 +27,9 @@ cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
 
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
-    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-mac -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr-mac -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
+    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-mac -n -p -f $tmp2 >$tmp3 && ./scripts/extensions/common-substr-mac -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
 else
-    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-linux -n -p -f $tmp2 > $tmp3 && ./scripts/extensions/common-substr-linux -n -s -f $tmp2 > $tmp4 && rm $tmp2 $tmp
+    cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-linux -n -p -f $tmp2 >$tmp3 && ./scripts/extensions/common-substr-linux -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
 fi
 
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a1 $tmp3 $tmp4

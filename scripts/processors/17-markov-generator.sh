@@ -37,7 +37,9 @@ elif [ "$LIST" == 'w' ]; then
     source scripts/selectors/wordlist.sh
     LIST=$WORDLIST
 else
-    echo -e "Try again...\n"; $RESTART; exit 0
+    echo -e "Try again...\n"
+    $RESTART
+    exit 0
 fi
 
 read -p "Minimum password (length) character limit: " NGRAM
@@ -55,14 +57,16 @@ read -p "Use rules? (y/n): " USERULES
 
 if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in "${RULELIST[@]}"; do
-    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2" -r "$RULE" $LOOPBACK
+        $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2" -r "$RULE" $LOOPBACK
     done
     rm -f -- "$tmp2"
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2"
     rm -f -- "$tmp2"
 else
-    echo -e "Try again...\n"; $RESTART; exit 0
+    echo -e "Try again...\n"
+    $RESTART
+    exit 0
 fi
 
 echo -e "\nMarkov-chain processing done\n"

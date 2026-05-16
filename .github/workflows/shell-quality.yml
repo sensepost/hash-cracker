@@ -1,0 +1,23 @@
+name: Shell Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shell-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install lint/format tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck shfmt
+
+      - name: Run shell lint
+        run: make lint
+
+      - name: Run format check
+        run: make format-check

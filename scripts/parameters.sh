@@ -50,12 +50,15 @@ fi
 # Dynamic Parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -n|--no-limit) KERNEL=' ' ;;
-        -l|--no-loopback) LOOPBACK=' ' ;;
-        --hwmon-enable) HWMON=' ';;
-        -d|--disable-cracked) SHOWCRACKED=' ' ;;
+        -n | --no-limit) KERNEL=' ' ;;
+        -l | --no-loopback) LOOPBACK=' ' ;;
+        --hwmon-enable) HWMON=' ' ;;
+        -d | --disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
-        *) status_error "Unknown parameter passed: $1"; exit 1 ;;
+        *)
+            status_error "Unknown parameter passed: $1"
+            exit 1
+            ;;
     esac
     shift
 done
@@ -135,11 +138,12 @@ BANNER_STATUS="$BANNER_STATUS_VALUE"
 hash-cracker
 
 # Logic
-echo -e "\nMandatory modules:" 
+echo -e "\nMandatory modules:"
 if [ "$DRYRUN" = ' ' ]; then
     status_ok "Hashcat executable check skipped (dry-run mode)"
 elif ! [ -x "$(command -v "$HASHCAT_BIN")" ]; then
-    status_bad "Hashcat is not available/executable"; ((COUNTER=COUNTER + 1))
+    status_bad "Hashcat is not available/executable"
+    ((COUNTER = COUNTER + 1))
 else
     status_ok "Hashcat is executable"
 fi
@@ -150,15 +154,16 @@ else
     touch "$POTFILE"
 fi
 if [ "$COUNTER" -gt 0 ]; then
-    status_error "Not all mandatory requirements are met. Please fix and try again."; exit 1
+    status_error "Not all mandatory requirements are met. Please fix and try again."
+    exit 1
 fi
 
 # Apple macOS vs Linux
 UNAMEOUT="$(uname -s)"
 case "${UNAMEOUT}" in
-    Linux*)     MACHINE=Linux;;
-    Darwin*)    MACHINE=Mac;;
-    *)          MACHINE="UNKNOWN:${UNAMEOUT}"
+    Linux*) MACHINE=Linux ;;
+    Darwin*) MACHINE=Mac ;;
+    *) MACHINE="UNKNOWN:${UNAMEOUT}" ;;
 esac
 
 if [ "$MACHINE" == "Mac" ]; then
@@ -170,7 +175,7 @@ else
     source scripts/linux.sh
 fi
 
-echo -e "\nVariable Parameters:" 
+echo -e "\nVariable Parameters:"
 if [ "$KERNEL" = ' ' ]; then
     status_bad "Optimised kernels disabled"
 else

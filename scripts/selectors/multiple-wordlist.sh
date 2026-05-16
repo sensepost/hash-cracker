@@ -9,7 +9,8 @@ if ! [[ $START = '8' ]]; then
     elif [ -f "$WORDLIST" ]; then
         echo "Wordlist file" "$WORDLIST" "selected."
     else
-        echo "Input must be a non-empty directory or an existing file, try again."; $RESTART
+        echo "Input must be a non-empty directory or an existing file, try again."
+        $RESTART
     fi
 fi
 
@@ -19,20 +20,23 @@ if [[ $START = '8' ]]; then
             echo "Wordlist 1:" "$WORDLIST"
             echo "Wordlist 2:" "$WORDLIST2"
         else
-            echo "Wordlist 1 and/or 2 does not exist, edit static configuration in 'hash-cracker.conf'."; exit
+            echo "Wordlist 1 and/or 2 does not exist, edit static configuration in 'hash-cracker.conf'."
+            exit
         fi
     else
         read -e -p "Enter full path to first wordlist: " WORDLIST
         if [ -f "$WORDLIST" ]; then
             echo "Wordlist" "$WORDLIST" "selected."
         else
-            echo "File does not exist, try again."; $RESTART
+            echo "File does not exist, try again."
+            $RESTART
         fi
         read -e -p "Enter full path to second wordlist: " WORDLIST2
         if [ -f "$WORDLIST2" ]; then
             echo "Wordlist" "$WORDLIST2" "selected."
         else
-            echo "File does not exist, try again."; $RESTART
+            echo "File does not exist, try again."
+            $RESTART
         fi
     fi
 fi

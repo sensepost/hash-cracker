@@ -24,15 +24,17 @@ read -p "Heavy lifting? How much chars are we going to brute-force? (1-99): " CH
 TARGET=''
 [ -n "$CHARS" ] && [ "$CHARS" -eq "$CHARS" ] 2>/dev/null
 if [ $? -ne 0 ]; then
-    echo $CHARS is not a number.; $RESTART
+    echo $CHARS is not a number.
+    $RESTART
 elif [ "$CHARS" -lt 1 ]; then
-        echo NO!; $RESTART
-    else
-        COUNT="$CHARS"
-        while [ "$COUNT" -gt 0 ]; do
-            TARGET+="?a"
-            COUNT=$((COUNT - 1))
-        done
+    echo NO!
+    $RESTART
+else
+    COUNT="$CHARS"
+    while [ "$COUNT" -gt 0 ]; do
+        TARGET+="?a"
+        COUNT=$((COUNT - 1))
+    done
 fi
 
 read -p "Enable increment? (y/n) " INCREMENT

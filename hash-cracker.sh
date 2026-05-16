@@ -1,7 +1,7 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-function init_colors () {
+function init_colors() {
     if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
         COLOR_RED=$'\033[31m'
         COLOR_GREEN=$'\033[1;32m'
@@ -15,23 +15,23 @@ function init_colors () {
     fi
 }
 
-function status_ok () {
+function status_ok() {
     printf '%b[+] %s%b\n' "$COLOR_GREEN" "$1" "$COLOR_RESET"
 }
 
-function status_bad () {
+function status_bad() {
     printf '%b[-] %s%b\n' "$COLOR_RED" "$1" "$COLOR_RESET"
 }
 
-function status_error () {
+function status_error() {
     printf '%b[!] %s%b\n' "$COLOR_RED" "$1" "$COLOR_RESET"
 }
 
-function status_heading () {
+function status_heading() {
     printf '%b%s%b\n' "$COLOR_CYAN" "$1" "$COLOR_RESET"
 }
 
-function banner_center_line () {
+function banner_center_line() {
     local text="$1"
     local inner_width=91
     local clipped
@@ -49,7 +49,7 @@ function banner_center_line () {
     printf '│ %*s%s%*s │\n' "$pad_left" '' "$clipped" "$pad_right" ''
 }
 
-function hash-cracker () {
+function hash-cracker() {
     local status_text
     local version_text
     local progress_text
@@ -78,7 +78,7 @@ EOF
 EOF
 }
 
-function menu_entries () {
+function menu_entries() {
     cat <<'EOF'
 1|Brute force|scripts/processors/1-bruteforce.sh
 2|Light rules|scripts/processors/2-light.sh
@@ -105,13 +105,13 @@ function menu_entries () {
 EOF
 }
 
-function dependency_fail () {
+function dependency_fail() {
     status_error "$1"
     printf '%b    Fix: %s%b\n' "$COLOR_RED" "$2" "$COLOR_RESET"
     return 1
 }
 
-function check_job_dependencies () {
+function check_job_dependencies() {
     local selected="$1"
     local common_substr_bin
     local expander_bin
@@ -120,7 +120,7 @@ function check_job_dependencies () {
     local maskgen
 
     case "$selected" in
-        10|11)
+        10 | 11)
             common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
             if [ ! -x "$common_substr_bin" ]; then
                 dependency_fail \
@@ -194,7 +194,7 @@ function check_job_dependencies () {
     return 0
 }
 
-function run_processor () {
+function run_processor() {
     local selected="$1"
     local option_id option_text processor
     local selected_processor=""
@@ -217,7 +217,7 @@ function run_processor () {
     return 0
 }
 
-function menu () {
+function menu() {
     local option_id option_text processor
 
     while true; do
@@ -241,7 +241,7 @@ function menu () {
         fi
 
         case "$START" in
-            0|exit|quit|q)
+            0 | exit | quit | q)
                 echo "Bye..."
                 exit 0
                 ;;
