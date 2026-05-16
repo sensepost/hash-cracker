@@ -4,7 +4,7 @@
 function init_colors () {
     if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
         COLOR_RED=$'\033[31m'
-        COLOR_GREEN=$'\033[32m'
+        COLOR_GREEN=$'\033[1;32m'
         COLOR_CYAN=$'\033[36m'
         COLOR_RESET=$'\033[0m'
     else
