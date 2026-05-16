@@ -131,6 +131,12 @@ Search the local hash type list:
 ./hash-cracker.sh --search ntlm
 ```
 
+Run non-interactive health checks:
+
+```bash
+./hash-cracker.sh --self-test
+```
+
 ## Flags
 
 By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.
@@ -142,6 +148,7 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `-s [hash-name]`, `--search [hash-name]` - search the local hash type database and exit
 - `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
 - `--dry-run` - print the resolved hashcat commands without executing them
+- `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
 

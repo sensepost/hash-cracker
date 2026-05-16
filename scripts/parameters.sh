@@ -12,6 +12,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
     echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
     echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
+    echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
@@ -48,6 +49,7 @@ elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
 fi
 
 # Dynamic Parameters
+# shellcheck disable=SC2034
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -n | --no-limit) KERNEL=' ' ;;
@@ -55,6 +57,7 @@ while [[ "$#" -gt 0 ]]; do
         --hwmon-enable) HWMON=' ' ;;
         -d | --disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
+        --self-test | --doctor) SELFTEST=' ' ;;
         *)
             status_error "Unknown parameter passed: $1"
             exit 1

@@ -217,6 +217,68 @@ function run_processor() {
     return 0
 }
 
+function run_self_test() {
+    local failures=0
+    local option_id option_text processor
+
+    echo
+    status_heading "Self-test: configuration and dependency checks"
+
+    echo -e "\nConfiguration paths:"
+    if [ -f "$HASHLIST" ]; then
+        status_ok "HASHLIST exists: $HASHLIST"
+    else
+        status_bad "HASHLIST missing: $HASHLIST"
+        printf '%b    Fix: set HASHLIST to an existing file in hash-cracker.conf%b\n' "$COLOR_RED" "$COLOR_RESET"
+        ((failures = failures + 1))
+    fi
+
+    if [ -f "$WORDLIST" ]; then
+        status_ok "WORDLIST exists: $WORDLIST"
+    else
+        status_bad "WORDLIST missing: $WORDLIST"
+        printf '%b    Fix: set WORDLIST to an existing file in hash-cracker.conf%b\n' "$COLOR_RED" "$COLOR_RESET"
+        ((failures = failures + 1))
+    fi
+
+    if [ -f "$WORDLIST2" ]; then
+        status_ok "WORDLIST2 exists: $WORDLIST2"
+    else
+        status_bad "WORDLIST2 missing: $WORDLIST2"
+        printf '%b    Fix: set WORDLIST2 to an existing file in hash-cracker.conf%b\n' "$COLOR_RED" "$COLOR_RESET"
+        ((failures = failures + 1))
+    fi
+
+    if [ "$DRYRUN" = ' ' ]; then
+        status_ok "HASHCAT executable check skipped (dry-run mode)"
+    elif [ -x "$HASHCAT_BIN" ] || command -v "$HASHCAT_BIN" >/dev/null 2>&1; then
+        status_ok "HASHCAT executable available: $HASHCAT_BIN"
+    else
+        status_bad "HASHCAT executable missing/unusable: $HASHCAT_BIN"
+        printf '%b    Fix: set HASHCAT to a valid executable path in hash-cracker.conf%b\n' "$COLOR_RED" "$COLOR_RESET"
+        ((failures = failures + 1))
+    fi
+
+    echo -e "\nJob-specific checks:"
+    while IFS='|' read -r option_id option_text processor; do
+        if check_job_dependencies "$option_id"; then
+            status_ok "Option $option_id ($option_text): OK"
+        else
+            status_bad "Option $option_id ($option_text): missing dependency"
+            ((failures = failures + 1))
+        fi
+    done < <(menu_entries)
+
+    echo
+    if [ "$failures" -gt 0 ]; then
+        status_error "Self-test failed: $failures issue(s) found."
+        return 1
+    fi
+
+    status_ok "Self-test passed: all checks succeeded."
+    return 0
+}
+
 function menu() {
     local option_id option_text processor
 
@@ -263,4 +325,10 @@ function menu() {
 
 init_colors
 source scripts/parameters.sh "$@"
+
+if [ "$SELFTEST" = ' ' ]; then
+    run_self_test
+    exit $?
+fi
+
 menu "$@"
