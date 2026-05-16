@@ -217,6 +217,10 @@ function run_processor() {
     return 0
 }
 
+function hashcat_base() {
+    "$HASHCAT" $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST "$@"
+}
+
 function run_self_test() {
     local failures=0
     local option_id option_text processor

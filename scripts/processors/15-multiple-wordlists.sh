@@ -23,8 +23,8 @@ source scripts/rules/rules.config
 RULELIST=("$ORTRTS")
 
 # Logic
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST
+hashcat_base $WORDLIST
 for RULE in "${RULELIST[@]}"; do
-    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $RULE $LOOPBACK
+    hashcat_base $WORDLIST -r $RULE $LOOPBACK
 done
 echo -e "\nMultiple wordlists done\n"
