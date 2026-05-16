@@ -1,6 +1,36 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+function init_colors () {
+    if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+        COLOR_RED=$'\033[31m'
+        COLOR_GREEN=$'\033[32m'
+        COLOR_CYAN=$'\033[36m'
+        COLOR_RESET=$'\033[0m'
+    else
+        COLOR_RED=''
+        COLOR_GREEN=''
+        COLOR_CYAN=''
+        COLOR_RESET=''
+    fi
+}
+
+function status_ok () {
+    printf '%b[+] %s%b\n' "$COLOR_GREEN" "$1" "$COLOR_RESET"
+}
+
+function status_bad () {
+    printf '%b[-] %s%b\n' "$COLOR_RED" "$1" "$COLOR_RESET"
+}
+
+function status_error () {
+    printf '%b[!] %s%b\n' "$COLOR_RED" "$1" "$COLOR_RESET"
+}
+
+function status_heading () {
+    printf '%b%s%b\n' "$COLOR_CYAN" "$1" "$COLOR_RESET"
+}
+
 function banner_center_line () {
     local text="$1"
     local inner_width=91
@@ -76,8 +106,8 @@ EOF
 }
 
 function dependency_fail () {
-    echo "[!] $1"
-    echo "    Fix: $2"
+    status_error "$1"
+    printf '%b    Fix: %s%b\n' "$COLOR_RED" "$2" "$COLOR_RESET"
     return 1
 }
 
@@ -231,5 +261,6 @@ function menu () {
     done
 }
 
+init_colors
 source scripts/parameters.sh "$@"
 menu "$@"

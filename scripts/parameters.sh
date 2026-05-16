@@ -55,7 +55,7 @@ while [[ "$#" -gt 0 ]]; do
         --hwmon-enable) HWMON=' ';;
         -d|--disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+        *) status_error "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
@@ -66,7 +66,7 @@ STATICCONFIG=true
 COUNTER=0
 
 if [ ! -f "$CONFIGFILE" ]; then
-    echo "Missing required configuration file: $CONFIGFILE"
+    status_error "Missing required configuration file: $CONFIGFILE"
     exit 1
 fi
 
@@ -76,7 +76,7 @@ source "$CONFIGFILE"
 REQUIRED_CONFIG_VARS=(HASHCAT HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
 for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
     if [ -z "${!REQUIRED_CONFIG_VAR}" ]; then
-        echo "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
+        status_error "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
         exit 1
     fi
 done
@@ -137,20 +137,20 @@ hash-cracker
 # Logic
 echo -e "\nMandatory modules:" 
 if [ "$DRYRUN" = ' ' ]; then
-    echo '[+] Hashcat executable check skipped (dry-run mode)'
+    status_ok "Hashcat executable check skipped (dry-run mode)"
 elif ! [ -x "$(command -v "$HASHCAT_BIN")" ]; then
-    echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
+    status_bad "Hashcat is not available/executable"; ((COUNTER=COUNTER + 1))
 else
-    echo '[+] Hashcat is executable'
+    status_ok "Hashcat is executable"
 fi
 if test -f "$POTFILE"; then
-    echo '[+] Potfile' "$POTFILE" 'present'
+    status_ok "Potfile $POTFILE present"
 else
-    echo '[-] Potfile not present, will create' "$POTFILE"
+    status_bad "Potfile not present, will create $POTFILE"
     touch "$POTFILE"
 fi
 if [ "$COUNTER" -gt 0 ]; then
-    echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
+    status_error "Not all mandatory requirements are met. Please fix and try again."; exit 1
 fi
 
 # Apple macOS vs Linux
@@ -166,52 +166,52 @@ if [ "$MACHINE" == "Mac" ]; then
 elif [ "$MACHINE" == "Linux" ]; then
     source scripts/linux.sh
 else
-    echo "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
+    status_error "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
     source scripts/linux.sh
 fi
 
 echo -e "\nVariable Parameters:" 
 if [ "$KERNEL" = ' ' ]; then
-    echo "[-] Optimised kernels disabled"
+    status_bad "Optimised kernels disabled"
 else
-    echo "[+] Optimised kernels enabled"
+    status_ok "Optimised kernels enabled"
     KERNEL='-O'
 fi
 
 if [ "$LOOPBACK" = ' ' ]; then
-    echo "[-] Loopback disabled"
+    status_bad "Loopback disabled"
 else
-    echo "[+] Loopback enabled"
+    status_ok "Loopback enabled"
     LOOPBACK='--loopback'
 fi
 
 if [ "$HWMON" = ' ' ]; then
-    echo "[+] Hardware monitoring enabled"
+    status_ok "Hardware monitoring enabled"
 else
-    echo "[-] Hardware monitoring disabled"
+    status_bad "Hardware monitoring disabled"
     HWMON='--hwmon-disable'
 fi
 
 if [ "$SHOWCRACKED" = ' ' ]; then
-    echo "[-] STDOUT cracked hashes disabled"
+    status_bad "STDOUT cracked hashes disabled"
     SHOWCRACKED='-o /dev/null'
 else
-    echo "[+] STDOUT cracked hashes enabled"
+    status_ok "STDOUT cracked hashes enabled"
 fi
 
 if [ "$DRYRUN" = ' ' ]; then
-    echo "[+] Dry-run enabled (hashcat commands will be printed only)"
+    status_ok "Dry-run enabled (hashcat commands will be printed only)"
 else
-    echo "[-] Dry-run disabled"
+    status_bad "Dry-run disabled"
 fi
 
 echo -e "\nStatic parameters:"
-echo "[+] Potfile:" "$POTFILE"
-echo "[+] Hashlist:" "$HASHLIST"
+status_ok "Potfile: $POTFILE"
+status_ok "Hashlist: $HASHLIST"
 if [ -n "$HASHTYPE_DISPLAY" ]; then
-    echo "[+] Hashtype:" "$HASHTYPE_DISPLAY"
+    status_ok "Hashtype: $HASHTYPE_DISPLAY"
 else
-    echo "[+] Hashtype:" "$HASHTYPE"
+    status_ok "Hashtype: $HASHTYPE"
 fi
-echo "[+] Wordlist 1:" "$WORDLIST"
-echo "[+] Wordlist 2:" "$WORDLIST2"
+status_ok "Wordlist 1: $WORDLIST"
+status_ok "Wordlist 2: $WORDLIST2"
