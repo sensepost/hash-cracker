@@ -24,7 +24,7 @@ fi
 
 source scripts/selectors/wordlist.sh
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$WORDLIST" -r analysis.rule $LOOPBACK
+hashcat_base "$WORDLIST" -r analysis.rule $LOOPBACK
 if ! dry_run_enabled; then
     rm -f -- analysis.rule "$tmp"
 fi

@@ -30,7 +30,7 @@ else
     fi
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" -a 3 "$tmp3"
+hashcat_base -a 3 "$tmp3"
 if ! dry_run_enabled; then
     rm -f -- "$tmp" "$tmp2" "$tmp3"
 fi

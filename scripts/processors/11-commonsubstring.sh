@@ -28,7 +28,7 @@ else
     fi
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" -a1 "$tmp4" "$tmp4"
+hashcat_base -a1 "$tmp4" "$tmp4"
 if ! dry_run_enabled; then
     rm -f -- "$tmp4"
 fi

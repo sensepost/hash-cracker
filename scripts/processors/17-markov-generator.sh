@@ -53,13 +53,13 @@ read -p "Use rules? (y/n): " USERULES
 
 if [[ $USERULES =~ ^[Yy]$ ]]; then
     for RULE in "${RULELIST[@]}"; do
-        $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2" -r "$RULE" $LOOPBACK
+        hashcat_base "$tmp2" -r "$RULE" $LOOPBACK
     done
     if ! dry_run_enabled; then
         rm -f -- "$tmp2"
     fi
 elif [[ $USERULES =~ ^[Nn]$ ]]; then
-    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2"
+    hashcat_base "$tmp2"
     if ! dry_run_enabled; then
         rm -f -- "$tmp2"
     fi
