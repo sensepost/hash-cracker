@@ -48,7 +48,7 @@ These are only needed for specific menu options.
 
 #### macOS
 
-- `scripts/extensions/cewl/cewl.rb`
+- `cewl` command in PATH, or `scripts/extensions/cewl/cewl.rb`
   - Needed for option `18`
 - `scripts/extensions/common-substr-mac`
   - Needed for options `10` and `11`
@@ -131,6 +131,18 @@ Search the local hash type list:
 ./hash-cracker.sh --search ntlm
 ```
 
+Run in dry-run mode:
+
+```bash
+./hash-cracker.sh --dry-run
+```
+
+Run non-interactive health checks:
+
+```bash
+./hash-cracker.sh --self-test
+```
+
 ## Flags
 
 By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.
@@ -141,6 +153,8 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `-m`, `--module-info` - print descriptions of the available modules and exit
 - `-s [hash-name]`, `--search [hash-name]` - search the local hash type database and exit
 - `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
+- `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
+- `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
 
@@ -173,7 +187,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
 
 - Options `2`, `3`, `6`, `7`, and `20` ask whether to use a single wordlist or multiple wordlists.
 - Option `8` uses `WORDLIST` and `WORDLIST2` from the config file.
-- Options `15` and `22` ask for a directory containing multiple wordlists.
+- Options `15` and `22` accept either a directory of wordlists or a single wordlist file.
 - Options `4` and `5` prompt for a custom word or company name.
 - Option `16` expects an NTDS-style input file and extracts usernames from `HASHLIST`.
 - Option `17` can generate candidates from either the potfile or a selected wordlist.
@@ -193,6 +207,24 @@ For large public datasets, see [Have I Been Pwned Passwords](https://haveibeenpw
 ## Version Log
 
 See [VERSION.md](VERSION.md).
+
+## Maintainer Quality Checks
+
+These checks are maintainer-only and are not required for end users running `hash-cracker`.
+
+```bash
+make lint
+make format-check
+make format
+make qa
+make test-smoke
+```
+
+- `make lint` runs `shellcheck` on project shell scripts.
+- `make format-check` verifies formatting with `shfmt`.
+- `make format` applies `shfmt` formatting changes.
+- `make test-smoke` runs non-interactive menu and dry-run smoke checks.
+- CI runs `make lint`, `make format-check`, and `make test-smoke` automatically on push and pull request.
 
 ## License
 

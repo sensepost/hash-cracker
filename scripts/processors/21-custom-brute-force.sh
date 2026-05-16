@@ -3,33 +3,28 @@
 
 RESTART="source scripts/processors/21-custom-brute-force.sh"
 
-# CTRL-C catch
-function clean_up {
-    source hash-cracker.sh
-}
-
-trap clean_up SIGINT SIGTERM
+# Interrupt handling
+trap 'processor_interrupt' INT TERM
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Logic
 read -p "Heavy lifting? How much chars are we going to brute-force? (1-99): " CHARS
 TARGET=''
 [ -n "$CHARS" ] && [ "$CHARS" -eq "$CHARS" ] 2>/dev/null
 if [ $? -ne 0 ]; then
-    echo $CHARS is not a number.; $RESTART
-elif [[ "$CHARS" < 1 ]]; then
-        echo NO!; $RESTART
-    else
-        for i in $(seq 1 $CHARS); do
-            TARGET+="?a"
-        done
+    echo $CHARS is not a number.
+    $RESTART
+elif [ "$CHARS" -lt 1 ]; then
+    echo NO!
+    $RESTART
+else
+    COUNT="$CHARS"
+    while [ "$COUNT" -gt 0 ]; do
+        TARGET+="?a"
+        COUNT=$((COUNT - 1))
+    done
 fi
 
 read -p "Enable increment? (y/n) " INCREMENT
@@ -42,6 +37,6 @@ else
     $RESTART
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a3 $TARGET $INCREMENT
+hashcat_base -a3 $TARGET $INCREMENT
 
 echo -e "\nCustom Brute Force Processing Done\n"

@@ -11,6 +11,8 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-m / --module-info\n\t\t Display information around modules/options"
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
     echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
+    echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
+    echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
@@ -38,108 +40,188 @@ elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     exit 1
 elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
     TYPELIST="scripts/extensions/hashtypes"
-    grep -i $2 $TYPELIST | sort
+    if [ -z "$2" ]; then
+        echo "Please provide a search value, e.g. '--search ntlm'"
+        exit 1
+    fi
+    grep -i -- "$2" "$TYPELIST" | sort
     exit 1
 fi
 
 # Dynamic Parameters
+# shellcheck disable=SC2034
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -n|--no-limit) KERNEL=' ' ;;
-        -l|--no-loopback) LOOPBACK=' ' ;;
-        --hwmon-enable) HWMON=' ';;
-        -d|--disable-cracked) SHOWCRACKED=' ' ;;
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
+        -n | --no-limit) KERNEL=' ' ;;
+        -l | --no-loopback) LOOPBACK=' ' ;;
+        --hwmon-enable) HWMON=' ' ;;
+        -d | --disable-cracked) SHOWCRACKED=' ' ;;
+        --dry-run) DRYRUN=' ' ;;
+        --self-test | --doctor) SELFTEST=' ' ;;
+        *)
+            status_error "Unknown parameter passed: $1"
+            exit 1
+            ;;
     esac
     shift
 done
 
 CONFIGFILE="hash-cracker.conf"
+# shellcheck disable=SC2034
 STATICCONFIG=true
+COUNTER=0
 
 if [ ! -f "$CONFIGFILE" ]; then
-    echo "Missing required configuration file: $CONFIGFILE"
+    status_error "Missing required configuration file: $CONFIGFILE"
     exit 1
 fi
 
-hash-cracker
-
+# shellcheck source=/dev/null
 source "$CONFIGFILE"
 
 REQUIRED_CONFIG_VARS=(HASHCAT HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
 for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
     if [ -z "${!REQUIRED_CONFIG_VAR}" ]; then
-        echo "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
+        status_error "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
         exit 1
     fi
 done
 
-# Logic
-echo -e "\nMandatory modules:" 
-if ! [ -x "$(command -v $HASHCAT)" ]; then
-    echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
+# Use a single execution wrapper for every hashcat invocation in processors.
+# Processors call "$HASHCAT ...", so we point HASHCAT to this function name.
+HASHCAT_BIN="$HASHCAT"
+run_hashcat() {
+    local cmd_line
+    local rc
+
+    printf -v cmd_line '%q ' "$HASHCAT_BIN" "$@"
+
+    if [ "$DRYRUN" = ' ' ]; then
+        printf '[DRY-RUN] '
+        printf '%s\n' "$cmd_line"
+        return 0
+    fi
+
+    "$HASHCAT_BIN" "$@"
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "[hash-cracker] hashcat command failed with exit code $rc" >&2
+    fi
+    return $rc
+}
+HASHCAT='run_hashcat'
+
+HASHTYPE_DISPLAY=$(
+    awk -F'\\|' -v mode="$HASHTYPE" '
+        {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+            if ($1 == mode) {
+                print $1 " " $2
+                exit
+            }
+        }
+    ' scripts/extensions/hashtypes
+)
+
+if [ -n "$HASHTYPE_DISPLAY" ]; then
+    HASHTYPE_MODE="${HASHTYPE_DISPLAY%% *}"
+    HASHTYPE_NAME="${HASHTYPE_DISPLAY#* }"
+    if [ -n "$HASHTYPE_NAME" ] && [ "$HASHTYPE_NAME" != "$HASHTYPE_MODE" ]; then
+        BANNER_STATUS_VALUE="cracking $HASHTYPE_NAME ($HASHTYPE_MODE)"
+    else
+        BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+    fi
 else
-    echo '[+] Hashcat is executable'
+    BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+fi
+# shellcheck disable=SC2034
+BANNER_STATUS="$BANNER_STATUS_VALUE"
+
+hash-cracker
+
+# Logic
+echo -e "\nMandatory modules:"
+if [ "$DRYRUN" = ' ' ]; then
+    status_ok "Hashcat executable check skipped (dry-run mode)"
+elif ! [ -x "$(command -v "$HASHCAT_BIN")" ]; then
+    status_bad "Hashcat is not available/executable"
+    ((COUNTER = COUNTER + 1))
+else
+    status_ok "Hashcat is executable"
 fi
 if test -f "$POTFILE"; then
-    echo '[+] Potfile' $POTFILE 'present'
+    status_ok "Potfile $POTFILE present"
+elif [ "$DRYRUN" = ' ' ]; then
+    status_bad "Potfile not present, dry-run would create $POTFILE"
 else
-    echo '[-] Potfile not present, will create' $POTFILE
-    touch $POTFILE
+    status_bad "Potfile not present, will create $POTFILE"
+    touch "$POTFILE"
 fi
-if [ "$COUNTER" \> 0 ]; then
-    echo -e "\nNot all mandatory requirements are met. Please fix and try again."; exit 1
+if [ "$COUNTER" -gt 0 ]; then
+    status_error "Not all mandatory requirements are met. Please fix and try again."
+    exit 1
 fi
 
 # Apple macOS vs Linux
 UNAMEOUT="$(uname -s)"
 case "${UNAMEOUT}" in
-    Linux*)     MACHINE=Linux;;
-    Darwin*)    MACHINE=Mac;;
-    *)          MACHINE="UNKNOWN:${UNAMEOUT}"
+    Linux*) MACHINE=Linux ;;
+    Darwin*) MACHINE=Mac ;;
+    *) MACHINE="UNKNOWN:${UNAMEOUT}" ;;
 esac
 
 if [ "$MACHINE" == "Mac" ]; then
     source scripts/mac.sh
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+elif [ "$MACHINE" == "Linux" ]; then
     source scripts/linux.sh
 else
-    echo "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
+    status_error "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
     source scripts/linux.sh
 fi
 
-echo -e "\nVariable Parameters:" 
+echo -e "\nVariable Parameters:"
 if [ "$KERNEL" = ' ' ]; then
-    echo "[-] Optimised kernels disabled"
+    status_bad "Optimised kernels disabled"
 else
-    echo "[+] Optimised kernels enabled"
+    status_ok "Optimised kernels enabled"
     KERNEL='-O'
 fi
 
 if [ "$LOOPBACK" = ' ' ]; then
-    echo "[-] Loopback disabled"
+    status_bad "Loopback disabled"
 else
-    echo "[+] Loopback enabled"
+    status_ok "Loopback enabled"
     LOOPBACK='--loopback'
 fi
 
 if [ "$HWMON" = ' ' ]; then
-    echo "[+] Hardware monitoring enabled"
+    status_ok "Hardware monitoring enabled"
 else
-    echo "[-] Hardware monitoring disabled"
+    status_bad "Hardware monitoring disabled"
     HWMON='--hwmon-disable'
 fi
 
 if [ "$SHOWCRACKED" = ' ' ]; then
-    echo "[-] STDOUT cracked hashes disabled"
+    status_bad "STDOUT cracked hashes disabled"
     SHOWCRACKED='-o /dev/null'
 else
-    echo "[+] STDOUT cracked hashes enabled"
+    status_ok "STDOUT cracked hashes enabled"
+fi
+
+if [ "$DRYRUN" = ' ' ]; then
+    status_ok "Dry-run enabled (hashcat commands will be printed only)"
+else
+    status_bad "Dry-run disabled"
 fi
 
 echo -e "\nStatic parameters:"
-echo "[+] Potfile:" $POTFILE
-echo "[+] Hashlist:" $HASHLIST
-echo "[+] Hashtype:" $HASHTYPE
-echo "[+] Wordlist 1:" $WORDLIST
-echo "[+] Wordlist 2:" $WORDLIST2
+status_ok "Potfile: $POTFILE"
+status_ok "Hashlist: $HASHLIST"
+if [ -n "$HASHTYPE_DISPLAY" ]; then
+    status_ok "Hashtype: $HASHTYPE_DISPLAY"
+else
+    status_ok "Hashtype: $HASHTYPE"
+fi
+status_ok "Wordlist 1: $WORDLIST"
+status_ok "Wordlist 2: $WORDLIST2"

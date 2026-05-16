@@ -1,20 +1,11 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch
-function clean_up {
-    source hash-cracker.sh
-}
-
-trap clean_up SIGINT SIGTERM
+# Interrupt handling
+trap 'processor_interrupt' INT TERM
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Single or multiple wordlist
 read -p "Single or Multiple wordlist mode? S/M: " MODE
@@ -27,11 +18,11 @@ fi
 
 # Rules
 source scripts/rules/rules.config
-RULELIST=($rule3 $fbtop $toprules2020 $digits1 $digits2 $hob064 $leetspeak $toggles1 $toggles2 $OUTD)
+RULELIST=("$rule3" "$fbtop" "$toprules2020" "$digits1" "$digits2" "$hob064" "$leetspeak" "$toggles1" "$toggles2" "$OUTD")
 
 # Logic
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $stacking58 -r $stacking58 $LOOPBACK
-for RULE in ${RULELIST[*]}; do
-    $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST $WORDLIST -r $stacking58 -r $RULE $LOOPBACK
+hashcat_base $WORDLIST -r $stacking58 -r $stacking58 $LOOPBACK
+for RULE in "${RULELIST[@]}"; do
+    hashcat_base $WORDLIST -r $stacking58 -r $RULE $LOOPBACK
 done
 echo -e "\nStacking with light rules done\n"

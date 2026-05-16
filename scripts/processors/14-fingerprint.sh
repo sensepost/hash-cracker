@@ -1,34 +1,34 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch + cleanup of temp files
-function clean_up {
-    rm $tmp $tmp2 2>/dev/null
-    source hash-cracker.sh
-}
-
-trap clean_up SIGINT SIGTERM
-
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Temporary Files
-tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
-tmp2=$(mktemp /tmp/hash-cracker-tmp.XXXX)
-cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
+tmp=$(dryrun_tempfile fingerprint)
+tmp2=$(dryrun_tempfile fingerprint)
+trap 'processor_interrupt "$tmp" "$tmp2"' INT TERM
+trap 'processor_cleanup "$tmp" "$tmp2"' EXIT
 
 # Logic
-if [ "$MACHINE" == "Mac" ]; then
-    ./scripts/extensions/hashcat-utils-mac/bin/expander.bin < $tmp | iconv -f ISO-8859-1 -t UTF-8//TRANSLIT | sort -u > $tmp2 && rm $tmp
+if dry_run_enabled; then
+    dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
+    if [ "$MACHINE" == "Mac" ]; then
+        dryrun_note "would run hashcat-utils-mac expander.bin to produce $tmp2"
+    else
+        dryrun_note "would run hashcat-utils-linux expander.bin to produce $tmp2"
+    fi
 else
-    ./scripts/extensions/hashcat-utils-linux/bin/expander.bin < $tmp | sort -u > $tmp2 && rm $tmp
+    cat $POTFILE | awk -F: '{print $NF}' | sort -u | tee $tmp &>/dev/null
+    if [ "$MACHINE" == "Mac" ]; then
+        ./scripts/extensions/hashcat-utils-mac/bin/expander.bin <$tmp | iconv -f ISO-8859-1 -t UTF-8//TRANSLIT | sort -u >$tmp2 && rm $tmp
+    else
+        ./scripts/extensions/hashcat-utils-linux/bin/expander.bin <$tmp | sort -u >$tmp2 && rm $tmp
+    fi
 fi
 
-$HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST -a 1 $tmp2 $tmp2
-rm $tmp2
+hashcat_base -a 1 $tmp2 $tmp2
+if ! dry_run_enabled; then
+    rm $tmp2
+fi
 echo -e "\nFingerprint attack done\n"
