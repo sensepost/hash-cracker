@@ -147,7 +147,7 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `-m`, `--module-info` - print descriptions of the available modules and exit
 - `-s [hash-name]`, `--search [hash-name]` - search the local hash type database and exit
 - `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
-- `--dry-run` - print the resolved hashcat commands without executing them
+- `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options

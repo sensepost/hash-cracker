@@ -19,14 +19,17 @@ else
 fi
 
 # Temporary Files
-tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
-cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
+tmp=$(dryrun_tempfile packrule)
 
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
     echo "This option is currently unavailable on Mac."
     exit 0
+elif dry_run_enabled; then
+    dryrun_note "would extract plaintexts from $POTFILE to $tmp"
+    dryrun_note "would run python2 scripts/extensions/pack-linux/rulegen.py $tmp"
 else
+    cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
     python2 scripts/extensions/pack-linux/rulegen.py "$tmp"
     rm -f -- analysis-sorted.word analysis.word analysis-sorted.rule
 fi
@@ -34,5 +37,7 @@ fi
 source scripts/selectors/wordlist.sh
 
 $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$WORDLIST" -r analysis.rule $LOOPBACK
-rm -f -- analysis.rule "$tmp"
+if ! dry_run_enabled; then
+    rm -f -- analysis.rule "$tmp"
+fi
 echo -e "\nPACK rule processing done\n"

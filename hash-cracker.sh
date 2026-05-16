@@ -221,6 +221,23 @@ function hashcat_base() {
     "$HASHCAT" $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST "$@"
 }
 
+function dry_run_enabled() {
+    [ "$DRYRUN" = ' ' ]
+}
+
+function dryrun_note() {
+    printf '[DRY-RUN] %s\n' "$*"
+}
+
+function dryrun_tempfile() {
+    local tag="${1:-tmp}"
+    if dry_run_enabled; then
+        printf '/tmp/hash-cracker-dryrun-%s-%d-%d' "$tag" "$BASHPID" "$RANDOM"
+    else
+        mktemp /tmp/hash-cracker-tmp.XXXX
+    fi
+}
+
 function run_self_test() {
     local failures=0
     local option_id option_text processor

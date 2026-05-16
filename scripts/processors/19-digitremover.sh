@@ -23,11 +23,15 @@ source scripts/rules/rules.config
 RULELIST=("$fbfull" "$ORTRTS" "$NSAKEYv2" "$techtrip2")
 
 # Temporary Files
-tmp=$(mktemp /tmp/hash-cracker-tmp.XXXX)
+tmp=$(dryrun_tempfile digitremover)
 
 # Digitfilter
-cat $POTFILE | cut -d: -f2- | grep -v '^\$HEX\[' | sed 's/[0-9]//g' | tee $tmp &>/dev/null
-cat $POTFILE | cut -d: -f2- | grep '^\$HEX\[' | sed "s/\$HEX\[\(.*\)\]/\10a/" | xxd -r -ps | LC_ALL=C sed 's/[0-9]//g' | LC_ALL=C tee -a $tmp &>/dev/null
+if dry_run_enabled; then
+    dryrun_note "would generate digit-stripped candidate list from $POTFILE into $tmp"
+else
+    cat $POTFILE | cut -d: -f2- | grep -v '^\$HEX\[' | sed 's/[0-9]//g' | tee $tmp &>/dev/null
+    cat $POTFILE | cut -d: -f2- | grep '^\$HEX\[' | sed "s/\$HEX\[\(.*\)\]/\10a/" | xxd -r -ps | LC_ALL=C sed 's/[0-9]//g' | LC_ALL=C tee -a $tmp &>/dev/null
+fi
 
 # Logic
 hashcat_base -a6 $tmp -j c '?s?d?d?d?d' --increment
@@ -40,5 +44,7 @@ hashcat_base -a6 $tmp '?a?a' --increment
 for RULE in "${RULELIST[@]}"; do
     hashcat_base $tmp -r $RULE
 done
-rm $tmp
+if ! dry_run_enabled; then
+    rm $tmp
+fi
 echo -e "\nDigit removal / Hybrid processing done\n"

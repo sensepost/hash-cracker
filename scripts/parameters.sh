@@ -152,6 +152,8 @@ else
 fi
 if test -f "$POTFILE"; then
     status_ok "Potfile $POTFILE present"
+elif [ "$DRYRUN" = ' ' ]; then
+    status_bad "Potfile not present, dry-run would create $POTFILE"
 else
     status_bad "Potfile not present, will create $POTFILE"
     touch "$POTFILE"
