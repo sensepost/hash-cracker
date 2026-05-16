@@ -7,13 +7,7 @@ RESTART="source scripts/processors/21-custom-brute-force.sh"
 trap 'processor_interrupt' INT TERM
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-    source scripts/runtime-overrides.sh
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Logic
 read -p "Heavy lifting? How much chars are we going to brute-force? (1-99): " CHARS

@@ -4,13 +4,7 @@
 RESTART="source scripts/processors/17-markov-generator.sh"
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-    source scripts/runtime-overrides.sh
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Rules
 source scripts/rules/rules.config

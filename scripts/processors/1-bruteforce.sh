@@ -5,13 +5,7 @@
 trap 'processor_interrupt' INT TERM
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-    source scripts/runtime-overrides.sh
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Logic
 hashcat_base -a3 '?a?a?a?a?a' --increment

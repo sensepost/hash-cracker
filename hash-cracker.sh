@@ -221,6 +221,16 @@ function hashcat_base() {
     "$HASHCAT" $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST "$@"
 }
 
+function processor_bootstrap() {
+    if [[ "$STATICCONFIG" = true ]]; then
+        source hash-cracker.conf
+        source scripts/runtime-overrides.sh
+    else
+        source scripts/selectors/hashtype.sh
+        source scripts/selectors/hashlist.sh
+    fi
+}
+
 function processor_cleanup() {
     local path
     for path in "$@"; do

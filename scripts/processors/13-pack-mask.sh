@@ -2,13 +2,7 @@
 # Author: crypt0rr - https://github.com/crypt0rr/
 
 # Requirements
-if [[ "$STATICCONFIG" = true ]]; then
-    source hash-cracker.conf
-    source scripts/runtime-overrides.sh
-else
-    source scripts/selectors/hashtype.sh
-    source scripts/selectors/hashlist.sh
-fi
+processor_bootstrap
 
 # Temporary Files
 tmp=$(dryrun_tempfile packmask)
