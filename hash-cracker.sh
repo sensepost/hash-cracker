@@ -106,7 +106,7 @@ function menu () {
         while IFS='|' read -r option_id option_text processor; do
             echo "$option_id. $option_text"
         done < <(menu_entries)
-        echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
+        echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} /// hashlist=$HASHLIST"
 
         read -r -p "Select job [0-22] or type exit: " START
         START="${START#"${START%%[![:space:]]*}"}"
