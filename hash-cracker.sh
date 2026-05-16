@@ -330,6 +330,7 @@ function refresh_session_stats() {
     SESSION_POT_BYTES_CUR=$(count_file_bytes "$POTFILE")
 
     if [ "$SESSION_POT_LINES_CUR" -ne "$SESSION_POT_LINES_LAST" ] || [ "$SESSION_POT_BYTES_CUR" -ne "$SESSION_POT_BYTES_LAST" ]; then
+        status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
         SESSION_POT_UNIQUE_CUR=$(count_potfile_unique_plaintexts)
         SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
         SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
