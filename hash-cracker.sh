@@ -196,6 +196,7 @@ function menu () {
             echo "$option_id. $option_text"
         done < <(menu_entries)
         echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
+        echo
 
         if [ "$DRYRUN" = ' ' ]; then
             read -r -p "Select job [0-22] or type exit [DRY-RUN MODE]: " START
