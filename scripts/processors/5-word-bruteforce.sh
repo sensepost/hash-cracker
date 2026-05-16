@@ -10,6 +10,7 @@ function clean_up {
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
+    source scripts/runtime-overrides.sh
 else
     source scripts/selectors/hashtype.sh
     source scripts/selectors/hashlist.sh

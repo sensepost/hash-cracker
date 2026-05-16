@@ -1,25 +1,15 @@
 #!/bin/bash
 
-echo -e "\nOptional Modules:" 
-if [[ -x "scripts/extensions/common-substr-linux" ]]; then
-    echo '[+] common-substr-linux is executable'
-else
-    echo '[-] common-substr-linux is not available/executable (option 10 / 11)'
-fi
-if [[ -x "$(command -v python2)" ]]; then
-    echo '[+] Python2 is executable'
-else
-    echo '[-] Python2 is not available/executable (option 12 / 13)'
-fi
-if [[ -x "scripts/extensions/hashcat-utils-linux/bin/expander.bin" ]]; then
-    echo '[+] Expander is executable'
-else
-    echo '[-] Expander is not available/executable (option 14)'
-fi
-if [[ -x "$(command -v cewl)" ]]; then
-    echo '[+] CeWL is executable'
+# Optional dependencies are validated per selected menu option in hash-cracker.sh.
+# shellcheck disable=SC2034
+COMMON_SUBSTR_BIN="scripts/extensions/common-substr-linux"
+# shellcheck disable=SC2034
+EXPANDER_BIN="scripts/extensions/hashcat-utils-linux/bin/expander.bin"
+
+if command -v cewl >/dev/null 2>&1; then
     # shellcheck disable=SC2034
     CEWL=$(command -v cewl)
 else
-    echo '[-] CeWL is not available/executable (option 18)'
+    # shellcheck disable=SC2034
+    CEWL=''
 fi

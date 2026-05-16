@@ -75,6 +75,95 @@ function menu_entries () {
 EOF
 }
 
+function dependency_fail () {
+    echo "[!] $1"
+    echo "    Fix: $2"
+    return 1
+}
+
+function check_job_dependencies () {
+    local selected="$1"
+    local common_substr_bin
+    local expander_bin
+    local python_bin
+    local statsgen
+    local maskgen
+
+    case "$selected" in
+        10|11)
+            common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
+            if [ ! -x "$common_substr_bin" ]; then
+                dependency_fail \
+                    "Option $selected requires '$common_substr_bin'." \
+                    "install/build common-substr and make it executable (e.g. chmod +x '$common_substr_bin')."
+                return 1
+            fi
+            ;;
+        12)
+            if [ "$MACHINE" == "Mac" ]; then
+                dependency_fail \
+                    "Option 12 (PACK rulegen) is unavailable on macOS in this tool." \
+                    "run option 12 on Linux with python2 installed."
+                return 1
+            fi
+            if ! command -v python2 >/dev/null 2>&1; then
+                dependency_fail \
+                    "Option 12 requires 'python2'." \
+                    "install python2 and ensure 'python2' is in PATH."
+                return 1
+            fi
+            if [ ! -f "scripts/extensions/pack-linux/rulegen.py" ]; then
+                dependency_fail \
+                    "Option 12 requires 'scripts/extensions/pack-linux/rulegen.py'." \
+                    "restore the bundled PACK files in scripts/extensions/pack-linux/."
+                return 1
+            fi
+            ;;
+        13)
+            if [ "$MACHINE" == "Mac" ]; then
+                python_bin="python3"
+                statsgen="scripts/extensions/pack-mac/statsgen.py"
+                maskgen="scripts/extensions/pack-mac/maskgen.py"
+            else
+                python_bin="python2"
+                statsgen="scripts/extensions/pack-linux/statsgen.py"
+                maskgen="scripts/extensions/pack-linux/maskgen.py"
+            fi
+            if ! command -v "$python_bin" >/dev/null 2>&1; then
+                dependency_fail \
+                    "Option 13 requires '$python_bin'." \
+                    "install $python_bin and ensure it is in PATH."
+                return 1
+            fi
+            if [ ! -f "$statsgen" ] || [ ! -f "$maskgen" ]; then
+                dependency_fail \
+                    "Option 13 requires PACK files '$statsgen' and '$maskgen'." \
+                    "restore the bundled PACK files under scripts/extensions/."
+                return 1
+            fi
+            ;;
+        14)
+            expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-linux/bin/expander.bin}"
+            if [ ! -x "$expander_bin" ]; then
+                dependency_fail \
+                    "Option 14 requires '$expander_bin'." \
+                    "restore/build hashcat-utils expander and make it executable (chmod +x '$expander_bin')."
+                return 1
+            fi
+            ;;
+        18)
+            if [ -z "$CEWL" ] || [ ! -x "$CEWL" ]; then
+                dependency_fail \
+                    "Option 18 requires CeWL executable." \
+                    "install CeWL (e.g. 'brew install cewl' or 'sudo apt install cewl') or provide executable at scripts/extensions/cewl/cewl.rb."
+                return 1
+            fi
+            ;;
+    esac
+
+    return 0
+}
+
 function run_processor () {
     local selected="$1"
     local option_id option_text processor
@@ -106,9 +195,13 @@ function menu () {
         while IFS='|' read -r option_id option_text processor; do
             echo "$option_id. $option_text"
         done < <(menu_entries)
-        echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} /// hashlist=$HASHLIST"
+        echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
 
-        read -r -p "Select job [0-22] or type exit: " START
+        if [ "$DRYRUN" = ' ' ]; then
+            read -r -p "Select job [0-22] or type exit [DRY-RUN MODE]: " START
+        else
+            read -r -p "Select job [0-22] or type exit: " START
+        fi
         START="${START#"${START%%[![:space:]]*}"}"
         START="${START%"${START##*[![:space:]]}"}"
 
@@ -122,6 +215,11 @@ function menu () {
                 exit 0
                 ;;
         esac
+
+        if ! check_job_dependencies "$START"; then
+            echo
+            continue
+        fi
 
         if ! run_processor "$START"; then
             echo -e "Not valid, try again\n"
