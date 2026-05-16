@@ -4,7 +4,7 @@
 # CTRL-C catch + cleanup of temp files
 function clean_up {
     rm -f -- "$tmp" analysis.rule 2>/dev/null
-    source hash-cracker.sh
+    exit 0
 }
 
 trap clean_up SIGINT SIGTERM
@@ -24,7 +24,7 @@ cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
 # Logic
 if [ "$MACHINE" == "Mac" ]; then
     echo "This option is currently unavailable on Mac."
-    source hash-cracker.sh
+    exit 0
 else
     python2 scripts/extensions/pack-linux/rulegen.py "$tmp"
     rm -f -- analysis-sorted.word analysis.word analysis-sorted.rule

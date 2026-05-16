@@ -3,7 +3,7 @@
 
 # CTRL-C catch + cleanup of temp files
 function clean_up {
-    source hash-cracker.sh
+    exit 0
     rm $tmp 2>/dev/null
 }
 

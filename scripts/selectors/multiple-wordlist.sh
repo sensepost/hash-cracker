@@ -3,11 +3,13 @@
 RESTART="source scripts/selectors/multiple-wordlist.sh"
 
 if ! [[ $START = '8' ]]; then
-    read -e -p "Enter path to directory containing multiple wordlists: " WORDLIST
+    read -e -p "Enter path to a wordlist directory or a single wordlist file: " WORDLIST
     if [ -d "$WORDLIST" ] && [ -n "$(find "$WORDLIST" -mindepth 1 -print -quit 2>/dev/null)" ]; then
-    echo "Directory" "$WORDLIST" "selected."
+        echo "Directory" "$WORDLIST" "selected."
+    elif [ -f "$WORDLIST" ]; then
+        echo "Wordlist file" "$WORDLIST" "selected."
     else
-        echo "Directory does not exist or is empty, try again."; $RESTART
+        echo "Input must be a non-empty directory or an existing file, try again."; $RESTART
     fi
 fi
 

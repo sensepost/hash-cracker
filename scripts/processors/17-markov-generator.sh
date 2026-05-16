@@ -6,7 +6,7 @@ RESTART="source scripts/processors/17-markov-generator.sh"
 # CTRL-C catch + cleanup of temp files
 function clean_up {
     rm -f -- "$tmp" "$tmp2" 2>/dev/null
-    source hash-cracker.sh
+    exit 0
 }
 
 trap clean_up SIGINT SIGTERM
@@ -36,7 +36,7 @@ elif [ "$LIST" == 'w' ]; then
     source scripts/selectors/wordlist.sh
     LIST=$WORDLIST
 else
-    echo -e "Try again...\n"; $RESTART; return 0 2>/dev/null || exit 0
+    echo -e "Try again...\n"; $RESTART; exit 0
 fi
 
 read -p "Minimum password (length) character limit: " NGRAM
@@ -61,7 +61,7 @@ elif [[ $USERULES =~ ^[Nn]$ ]]; then
     $HASHCAT $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path="$POTFILE" -m"$HASHTYPE" "$HASHLIST" "$tmp2"
     rm -f -- "$tmp2"
 else
-    echo -e "Try again...\n"; $RESTART; return 0 2>/dev/null || exit 0
+    echo -e "Try again...\n"; $RESTART; exit 0
 fi
 
 echo -e "\nMarkov-chain processing done\n"

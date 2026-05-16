@@ -3,7 +3,7 @@
 
 # CTRL-C catch
 function clean_up {
-    source hash-cracker.sh
+    exit 0
 }
 
 trap clean_up SIGINT SIGTERM

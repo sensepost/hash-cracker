@@ -4,7 +4,7 @@
 # CTRL-C catch + cleanup of temp files
 function clean_up {
     rm $tmp $tmp2 2>/dev/null
-    source hash-cracker.sh
+    exit 0
 }
 
 trap clean_up SIGINT SIGTERM
