@@ -81,6 +81,30 @@ for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
     fi
 done
 
+# Use a single execution wrapper for every hashcat invocation in processors.
+# Processors call "$HASHCAT ...", so we point HASHCAT to this function name.
+HASHCAT_BIN="$HASHCAT"
+run_hashcat() {
+    local cmd_line
+    local rc
+
+    printf -v cmd_line '%q ' "$HASHCAT_BIN" "$@"
+
+    if [ "$DRYRUN" = ' ' ]; then
+        printf '[DRY-RUN] '
+        printf '%s\n' "$cmd_line"
+        return 0
+    fi
+
+    "$HASHCAT_BIN" "$@"
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        echo "[hash-cracker] hashcat command failed with exit code $rc" >&2
+    fi
+    return $rc
+}
+HASHCAT='run_hashcat'
+
 HASHTYPE_DISPLAY=$(
     awk -F'\\|' -v mode="$HASHTYPE" '
         {
@@ -114,7 +138,7 @@ hash-cracker
 echo -e "\nMandatory modules:" 
 if [ "$DRYRUN" = ' ' ]; then
     echo '[+] Hashcat executable check skipped (dry-run mode)'
-elif ! [ -x "$(command -v "$HASHCAT")" ]; then
+elif ! [ -x "$(command -v "$HASHCAT_BIN")" ]; then
     echo '[-] Hashcat is not available/executable'; ((COUNTER=COUNTER + 1))
 else
     echo '[+] Hashcat is executable'
@@ -177,13 +201,6 @@ fi
 
 if [ "$DRYRUN" = ' ' ]; then
     echo "[+] Dry-run enabled (hashcat commands will be printed only)"
-    HASHCAT_BIN="$HASHCAT"
-    dry_run_hashcat() {
-        printf '[DRY-RUN] '
-        printf '%q ' "$HASHCAT_BIN" "$@"
-        printf '\n'
-    }
-    HASHCAT='dry_run_hashcat'
 else
     echo "[-] Dry-run disabled"
 fi
