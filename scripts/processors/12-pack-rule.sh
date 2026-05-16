@@ -1,14 +1,6 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch + cleanup of temp files
-function clean_up {
-    rm -f -- "$tmp" analysis.rule 2>/dev/null
-    exit 0
-}
-
-trap clean_up SIGINT SIGTERM
-
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
@@ -20,6 +12,8 @@ fi
 
 # Temporary Files
 tmp=$(dryrun_tempfile packrule)
+trap 'processor_interrupt "$tmp" analysis.rule' INT TERM
+trap 'processor_cleanup "$tmp" analysis.rule' EXIT
 
 # Logic
 if [ "$MACHINE" == "Mac" ]; then

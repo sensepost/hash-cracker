@@ -1,12 +1,8 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch
-function clean_up {
-    exit 0
-}
-
-trap clean_up SIGINT SIGTERM
+# Interrupt handling
+trap 'processor_interrupt' INT TERM
 
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then

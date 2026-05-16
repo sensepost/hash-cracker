@@ -3,14 +3,6 @@
 
 RESTART="source scripts/processors/17-markov-generator.sh"
 
-# CTRL-C catch + cleanup of temp files
-function clean_up {
-    rm -f -- "$tmp" "$tmp2" 2>/dev/null
-    exit 0
-}
-
-trap clean_up SIGINT SIGTERM
-
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
@@ -27,6 +19,8 @@ RULELIST=("$rule3" "$rockyou30000" "$ORTRTS" "$fbfull" "$pantag" "$OUTD" "$techt
 # Temporary Files
 tmp=$(dryrun_tempfile markov)
 tmp2=$(dryrun_tempfile markov)
+trap 'processor_interrupt "$tmp" "$tmp2"' INT TERM
+trap 'processor_cleanup "$tmp" "$tmp2"' EXIT
 
 # Logic
 read -p "Use potfile (p) or wordlist (w): " LIST

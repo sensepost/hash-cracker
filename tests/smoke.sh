@@ -5,7 +5,25 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 TMP_DIR="$(mktemp -d /tmp/hash-cracker-smoke.XXXX)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+CONFIG_PATH="$REPO_ROOT/hash-cracker.conf"
+CONFIG_BACKUP="$TMP_DIR/hash-cracker.conf.backup"
+
+if [ -f "$CONFIG_PATH" ]; then
+    cp "$CONFIG_PATH" "$CONFIG_BACKUP"
+fi
+
+restore_config() {
+    if [ -f "$CONFIG_BACKUP" ]; then
+        cp "$CONFIG_BACKUP" "$CONFIG_PATH"
+    fi
+}
+
+cleanup() {
+    restore_config
+    rm -rf "$TMP_DIR"
+}
+
+trap cleanup EXIT
 
 LAST_LOG=""
 LAST_RC=0
@@ -37,6 +55,14 @@ assert_contains() {
         cat "$LAST_LOG"
         exit 1
     fi
+}
+
+fail_with_log() {
+    local message="$1"
+    local log_file="$2"
+    echo "[FAIL] $message"
+    [ -f "$log_file" ] && cat "$log_file"
+    exit 1
 }
 
 echo "[smoke] help output includes self-test flag"
@@ -77,5 +103,74 @@ if ! grep -Eq "Self-test (passed|failed)" "$LAST_LOG"; then
     cat "$LAST_LOG"
     exit 1
 fi
+
+echo "[smoke] ctrl+c during a running job does not trigger menu spin"
+CTRL_LOG="$TMP_DIR/ctrlc.log"
+CTRL_FIFO="$TMP_DIR/ctrlc.in"
+FAKE_PID_FILE="$TMP_DIR/fake-hashcat.pid"
+FAKE_HASHCAT="$TMP_DIR/fake-hashcat.sh"
+
+cat >"$FAKE_HASHCAT" <<EOF
+#!/usr/bin/env bash
+trap 'exit 130' INT TERM
+printf '%s' "\$\$" > "$FAKE_PID_FILE"
+sleep 30
+EOF
+chmod +x "$FAKE_HASHCAT"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($FAKE_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=input
+POTFILE=hash-cracker.pot
+WORDLIST=wordlists/ignis-1M.txt
+WORDLIST2=wordlists/ignis-1K.txt
+EOF
+
+rm -f "$CTRL_FIFO" "$CTRL_LOG" "$FAKE_PID_FILE"
+mkfifo "$CTRL_FIFO"
+
+(
+    ./hash-cracker.sh <"$CTRL_FIFO" >"$CTRL_LOG" 2>&1
+) &
+CTRL_MAIN_PID=$!
+
+exec 3>"$CTRL_FIFO"
+printf '4\nsmokectrlc\n' >&3
+
+CTRL_STARTED=0
+for _ in $(seq 1 80); do
+    if [ -s "$FAKE_PID_FILE" ]; then
+        CTRL_STARTED=1
+        break
+    fi
+    sleep 0.05
+done
+
+if [ "$CTRL_STARTED" -ne 1 ]; then
+    exec 3>&-
+    kill -TERM "$CTRL_MAIN_PID" 2>/dev/null || true
+    wait "$CTRL_MAIN_PID" 2>/dev/null || true
+    fail_with_log "ctrl+c smoke setup failed (job did not start)" "$CTRL_LOG"
+fi
+
+CTRL_JOB_PID="$(cat "$FAKE_PID_FILE")"
+kill -INT "$CTRL_JOB_PID" 2>/dev/null || true
+kill -INT "$CTRL_MAIN_PID" 2>/dev/null || true
+exec 3>&-
+
+sleep 1
+CTRL_MENU_COUNT="$(grep -c '^0\. Exit$' "$CTRL_LOG" || true)"
+if [ "$CTRL_MENU_COUNT" -gt 3 ]; then
+    kill -TERM "$CTRL_MAIN_PID" 2>/dev/null || true
+    wait "$CTRL_MAIN_PID" 2>/dev/null || true
+    fail_with_log "menu appears to spin after ctrl+c (0. Exit count: $CTRL_MENU_COUNT)" "$CTRL_LOG"
+fi
+
+kill -TERM "$CTRL_MAIN_PID" 2>/dev/null || true
+wait "$CTRL_MAIN_PID" 2>/dev/null || true
+
+restore_config
 
 echo "[smoke] all smoke tests passed"

@@ -3,12 +3,8 @@
 
 RESTART="source scripts/processors/21-custom-brute-force.sh"
 
-# CTRL-C catch
-function clean_up {
-    exit 0
-}
-
-trap clean_up SIGINT SIGTERM
+# Interrupt handling
+trap 'processor_interrupt' INT TERM
 
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then

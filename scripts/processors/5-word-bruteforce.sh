@@ -1,12 +1,6 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch + cleanup of temp files
-function clean_up {
-    exit 0
-    rm $tmp 2>/dev/null
-}
-
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
@@ -18,6 +12,8 @@ fi
 
 # Temporary Files
 tmp=$(dryrun_tempfile word)
+trap 'processor_interrupt "$tmp"' INT TERM
+trap 'processor_cleanup "$tmp"' EXIT
 
 # Logic
 read -p "Enter a word (e.g. company name): " WORD

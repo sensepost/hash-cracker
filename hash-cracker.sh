@@ -221,6 +221,20 @@ function hashcat_base() {
     "$HASHCAT" $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST "$@"
 }
 
+function processor_cleanup() {
+    local path
+    for path in "$@"; do
+        if [ -n "$path" ]; then
+            rm -f -- "$path" 2>/dev/null || true
+        fi
+    done
+}
+
+function processor_interrupt() {
+    processor_cleanup "$@"
+    exit 0
+}
+
 function dry_run_enabled() {
     [ "$DRYRUN" = ' ' ]
 }

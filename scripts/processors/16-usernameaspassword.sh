@@ -1,14 +1,6 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-# CTRL-C catch + cleanup of temp files
-function clean_up {
-    rm $tmp 2>/dev/null
-    exit 0
-}
-
-trap clean_up SIGINT SIGTERM
-
 # Requirements
 if [[ "$STATICCONFIG" = true ]]; then
     source hash-cracker.conf
@@ -24,6 +16,8 @@ RULELIST=("$big" "$fbfull" "$d3ad0ne" "$d3adhob0" "$digits1" "$digits2" "$digits
 
 # Temporary Files
 tmp=$(dryrun_tempfile usernames)
+trap 'processor_interrupt "$tmp"' INT TERM
+trap 'processor_cleanup "$tmp"' EXIT
 
 # Logic
 if dry_run_enabled; then
