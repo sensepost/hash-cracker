@@ -462,6 +462,7 @@ function menu() {
 
 init_colors
 source scripts/parameters.sh "$@"
+status_heading "Preparing session stats (counting potfile and input hashes)..."
 init_session_stats
 
 if [ "$SELFTEST" = ' ' ]; then
