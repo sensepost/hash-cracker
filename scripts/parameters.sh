@@ -104,6 +104,7 @@ run_hashcat() {
 
     "$HASHCAT_BIN" "$@"
     rc=$?
+
     if [ $rc -ne 0 ]; then
         echo "[hash-cracker] hashcat command failed with exit code $rc" >&2
     fi

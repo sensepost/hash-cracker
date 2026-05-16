@@ -262,6 +262,96 @@ function dryrun_tempfile() {
     fi
 }
 
+function count_file_lines() {
+    local path="$1"
+    if [ -f "$path" ]; then
+        wc -l <"$path" | tr -d '[:space:]'
+    else
+        echo 0
+    fi
+}
+
+function count_file_bytes() {
+    local path="$1"
+    if [ -f "$path" ]; then
+        wc -c <"$path" | tr -d '[:space:]'
+    else
+        echo 0
+    fi
+}
+
+function count_potfile_unique_plaintexts() {
+    if [ -f "$POTFILE" ]; then
+        awk -F: 'NF {print $NF}' "$POTFILE" | sort -u | wc -l | tr -d '[:space:]'
+    else
+        echo 0
+    fi
+}
+
+function count_hashlist_unique_entries() {
+    if [ -f "$HASHLIST" ]; then
+        awk 'NF {print}' "$HASHLIST" | sort -u | wc -l | tr -d '[:space:]'
+    else
+        echo 0
+    fi
+}
+
+function signed_num() {
+    local value="$1"
+    if [ "$value" -ge 0 ]; then
+        printf '+%s' "$value"
+    else
+        printf '%s' "$value"
+    fi
+}
+
+function init_session_stats() {
+    SESSION_POT_LINES_BASE=$(count_file_lines "$POTFILE")
+    SESSION_POT_BYTES_BASE=$(count_file_bytes "$POTFILE")
+    SESSION_POT_UNIQUE_BASE=$(count_potfile_unique_plaintexts)
+
+    SESSION_POT_LINES_CUR="$SESSION_POT_LINES_BASE"
+    SESSION_POT_BYTES_CUR="$SESSION_POT_BYTES_BASE"
+    SESSION_POT_UNIQUE_CUR="$SESSION_POT_UNIQUE_BASE"
+
+    SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
+    SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
+
+    SESSION_NEW_CRACKS=0
+    SESSION_NEW_UNIQUE=0
+    SESSION_GROWTH_BYTES=0
+
+    SESSION_HASHLIST_PATH_LAST="$HASHLIST"
+    SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
+}
+
+function refresh_session_stats() {
+    SESSION_POT_LINES_CUR=$(count_file_lines "$POTFILE")
+    SESSION_POT_BYTES_CUR=$(count_file_bytes "$POTFILE")
+
+    if [ "$SESSION_POT_LINES_CUR" -ne "$SESSION_POT_LINES_LAST" ] || [ "$SESSION_POT_BYTES_CUR" -ne "$SESSION_POT_BYTES_LAST" ]; then
+        SESSION_POT_UNIQUE_CUR=$(count_potfile_unique_plaintexts)
+        SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
+        SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
+    fi
+
+    SESSION_NEW_CRACKS=$((SESSION_POT_LINES_CUR - SESSION_POT_LINES_BASE))
+    SESSION_NEW_UNIQUE=$((SESSION_POT_UNIQUE_CUR - SESSION_POT_UNIQUE_BASE))
+    SESSION_GROWTH_BYTES=$((SESSION_POT_BYTES_CUR - SESSION_POT_BYTES_BASE))
+
+    if [ "$SESSION_NEW_CRACKS" -lt 0 ]; then
+        SESSION_NEW_CRACKS=0
+    fi
+    if [ "$SESSION_NEW_UNIQUE" -lt 0 ]; then
+        SESSION_NEW_UNIQUE=0
+    fi
+
+    if [ "$HASHLIST" != "$SESSION_HASHLIST_PATH_LAST" ]; then
+        SESSION_HASHLIST_PATH_LAST="$HASHLIST"
+        SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
+    fi
+}
+
 function run_self_test() {
     local failures=0
     local option_id option_text processor
@@ -328,11 +418,13 @@ function menu() {
     local option_id option_text processor
 
     while true; do
+        refresh_session_stats
         echo -e "\n0. Exit"
         while IFS='|' read -r option_id option_text processor; do
             echo "$option_id. $option_text"
         done < <(menu_entries)
         echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
+        echo "Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
         echo
 
         if [ "$DRYRUN" = ' ' ]; then
@@ -370,6 +462,7 @@ function menu() {
 
 init_colors
 source scripts/parameters.sh "$@"
+init_session_stats
 
 if [ "$SELFTEST" = ' ' ]; then
     run_self_test
