@@ -1,6 +1,6 @@
 SHELL_SOURCES := $(shell find . -type f -name '*.sh' ! -path './.git/*' ! -path './scripts/extensions/*' | sort)
 
-.PHONY: lint format-check format qa
+.PHONY: lint format-check format qa test-smoke
 
 lint:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
@@ -27,3 +27,7 @@ format:
 	@shfmt -i 4 -ci -bn -w $(SHELL_SOURCES)
 
 qa: lint format-check
+
+test-smoke:
+	@echo "Running smoke tests..."
+	@bash tests/smoke.sh

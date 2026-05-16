@@ -21,3 +21,6 @@ jobs:
 
       - name: Run format check
         run: make format-check
+
+      - name: Run smoke tests
+        run: make test-smoke

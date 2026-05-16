@@ -211,12 +211,14 @@ make lint
 make format-check
 make format
 make qa
+make test-smoke
 ```
 
 - `make lint` runs `shellcheck` on project shell scripts.
 - `make format-check` verifies formatting with `shfmt`.
 - `make format` applies `shfmt` formatting changes.
-- CI runs `make lint` and `make format-check` automatically on push and pull request.
+- `make test-smoke` runs non-interactive menu and dry-run smoke checks.
+- CI runs `make lint`, `make format-check`, and `make test-smoke` automatically on push and pull request.
 
 ## License
 
