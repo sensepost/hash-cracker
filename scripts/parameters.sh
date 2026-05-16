@@ -68,8 +68,6 @@ if [ ! -f "$CONFIGFILE" ]; then
     exit 1
 fi
 
-hash-cracker
-
 # shellcheck source=/dev/null
 source "$CONFIGFILE"
 
@@ -80,6 +78,35 @@ for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
         exit 1
     fi
 done
+
+HASHTYPE_DISPLAY=$(
+    awk -F'\\|' -v mode="$HASHTYPE" '
+        {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+            if ($1 == mode) {
+                print $1 " " $2
+                exit
+            }
+        }
+    ' scripts/extensions/hashtypes
+)
+
+if [ -n "$HASHTYPE_DISPLAY" ]; then
+    HASHTYPE_MODE="${HASHTYPE_DISPLAY%% *}"
+    HASHTYPE_NAME="${HASHTYPE_DISPLAY#* }"
+    if [ -n "$HASHTYPE_NAME" ] && [ "$HASHTYPE_NAME" != "$HASHTYPE_MODE" ]; then
+        BANNER_STATUS_VALUE="cracking $HASHTYPE_NAME ($HASHTYPE_MODE)"
+    else
+        BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+    fi
+else
+    BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+fi
+# shellcheck disable=SC2034
+BANNER_STATUS="$BANNER_STATUS_VALUE"
+
+hash-cracker
 
 # Logic
 echo -e "\nMandatory modules:" 
@@ -147,18 +174,6 @@ fi
 echo -e "\nStatic parameters:"
 echo "[+] Potfile:" "$POTFILE"
 echo "[+] Hashlist:" "$HASHLIST"
-HASHTYPE_DISPLAY=$(
-    awk -F'\\|' -v mode="$HASHTYPE" '
-        {
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $1)
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
-            if ($1 == mode) {
-                print $1 " " $2
-                exit
-            }
-        }
-    ' scripts/extensions/hashtypes
-)
 if [ -n "$HASHTYPE_DISPLAY" ]; then
     echo "[+] Hashtype:" "$HASHTYPE_DISPLAY"
 else

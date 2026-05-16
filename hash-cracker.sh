@@ -1,8 +1,51 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+function banner_center_line () {
+    local text="$1"
+    local inner_width=91
+    local clipped
+    local text_len
+    local total_pad
+    local pad_left
+    local pad_right
+
+    clipped="${text:0:$inner_width}"
+    text_len=${#clipped}
+    total_pad=$((inner_width - text_len))
+    pad_left=$((total_pad / 2))
+    pad_right=$((total_pad - pad_left))
+
+    printf '│ %*s%s%*s │\n' "$pad_left" '' "$clipped" "$pad_right" ''
+}
+
 function hash-cracker () {
-    echo -e "\nhash-cracker v5.0 by crypt0rr (https://github.com/crypt0rr)"
+    local status_text
+    local version_text
+    local progress_text
+
+    status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
+    version_text="v5.0"
+    progress_text="[██████████████████░░░░] 82%"
+
+    cat <<'EOF'
+
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ██╗  ██╗ █████╗ ███████╗██╗  ██╗     ██████╗██████╗  █████╗  ██████╗██╗  ██╗███████╗██████╗ │
+│ ██║  ██║██╔══██╗██╔════╝██║  ██║    ██╔════╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗│
+│ ███████║███████║███████╗███████║    ██║     ██████╔╝███████║██║     █████╔╝ █████╗  ██████╔╝│
+│ ██╔══██║██╔══██║╚════██║██╔══██║    ██║     ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔══╝  ██╔══██╗│
+│ ██║  ██║██║  ██║███████║██║  ██║    ╚██████╗██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║  ██║│
+│ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝│
+│                                                                                             │
+EOF
+    banner_center_line "$version_text"
+    banner_center_line "$progress_text"
+    banner_center_line "$status_text"
+    cat <<'EOF'
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+EOF
 }
 
 function menu_entries () {
