@@ -1,5 +1,26 @@
 # Version log
 
+## v5.1.1 - Iron Pulse
+
+### Highlights
+
+- Added timestamped session-stats logging for menu visibility and audit trail.
+
+### Added
+
+- Session-stats log file output:
+  - Every rendered `Session stats: ...` line is now appended with a timestamp.
+  - Applies at startup and on each menu return after jobs.
+- Default log target:
+  - `logs/session-YYYYmmdd-HHMMSS-PID.log`
+  - `logs/latest.log` points to the current session log.
+- Optional log target override:
+  - Set `SESSION_STATS_LOGFILE` to write to a custom path.
+
+### Changed
+
+- Banner version updated to `v5.1.1 "Iron Pulse"`.
+
 ## v5.1 - Iron Pulse
 
 ### Highlights

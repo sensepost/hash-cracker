@@ -55,7 +55,7 @@ function hash-cracker() {
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.1 "Iron Pulse"'
+    version_text='v5.1.1 "Iron Pulse"'
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -305,6 +305,39 @@ function signed_num() {
     fi
 }
 
+function timestamp_now() {
+    date '+%Y-%m-%d %H:%M:%S%z'
+}
+
+function init_session_stats_logfile() {
+    local logs_dir='logs'
+    local log_dir
+    local session_stamp
+
+    if [ -n "${SESSION_STATS_LOGFILE:-}" ]; then
+        log_dir=$(dirname "$SESSION_STATS_LOGFILE")
+        if [ -n "$log_dir" ] && [ "$log_dir" != "." ]; then
+            mkdir -p "$log_dir" 2>/dev/null || true
+        fi
+        return 0
+    fi
+
+    session_stamp=$(date '+%Y%m%d-%H%M%S')
+    SESSION_STATS_LOGFILE="$logs_dir/session-${session_stamp}-${BASHPID}.log"
+
+    mkdir -p "$logs_dir" 2>/dev/null || true
+    ln -sfn "$(basename "$SESSION_STATS_LOGFILE")" "$logs_dir/latest.log" 2>/dev/null || true
+}
+
+function log_session_stats_line() {
+    local line="$1"
+    if [ -z "${SESSION_STATS_LOGFILE:-}" ]; then
+        return 0
+    fi
+
+    printf '[%s] %s\n' "$(timestamp_now)" "$line" >>"$SESSION_STATS_LOGFILE" 2>/dev/null || true
+}
+
 function init_session_stats() {
     SESSION_POT_LINES_BASE=$(count_file_lines "$POTFILE")
     SESSION_POT_BYTES_BASE=$(count_file_bytes "$POTFILE")
@@ -323,6 +356,7 @@ function init_session_stats() {
 
     SESSION_HASHLIST_PATH_LAST="$HASHLIST"
     SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
+    init_session_stats_logfile
 }
 
 function refresh_session_stats() {
@@ -417,6 +451,7 @@ function run_self_test() {
 
 function menu() {
     local option_id option_text processor
+    local session_stats_line
 
     while true; do
         refresh_session_stats
@@ -426,7 +461,9 @@ function menu() {
         done < <(menu_entries)
         echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
         echo
-        echo "Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
+        session_stats_line="Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
+        echo "$session_stats_line"
+        log_session_stats_line "$session_stats_line"
         echo
 
         if [ "$DRYRUN" = ' ' ]; then
