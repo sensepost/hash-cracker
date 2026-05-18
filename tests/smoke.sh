@@ -74,13 +74,19 @@ echo "[smoke] dry-run menu exits cleanly"
 run_case menu_exit bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
 assert_contains "0. Exit"
-assert_contains "Current setup: hashtype="
+assert_contains "99. Session stats dashboard"
 assert_contains "Bye..."
 
 echo "[smoke] invalid option recovers back to menu"
-run_case invalid_option bash -lc "printf '99\n0\n' | ./hash-cracker.sh --dry-run"
+run_case invalid_option bash -lc "printf '999\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
 assert_contains "Not valid, try again"
+assert_contains "Bye..."
+
+echo "[smoke] stats dashboard option renders"
+run_case stats_dashboard bash -lc "printf '99\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Session Stats Dashboard"
 assert_contains "Bye..."
 
 echo "[smoke] dry-run combinator path prints command"

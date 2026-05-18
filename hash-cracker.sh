@@ -55,7 +55,7 @@ function hash-cracker() {
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.1.2 "Iron Pulse"'
+    version_text='v5.1.3 "Iron Pulse"'
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -311,7 +311,7 @@ function timestamp_now() {
 
 function session_log_keep_count() {
     case "${SESSION_LOG_KEEP:-}" in
-        '' | *[!0-9]*) echo 50 ;;
+        '' | *[!0-9]*) echo 0 ;;
         *) echo "$SESSION_LOG_KEEP" ;;
     esac
 }
@@ -324,7 +324,7 @@ function prune_session_logs() {
     local prune_count
 
     case "$keep_count" in
-        '' | *[!0-9]*) keep_count=50 ;;
+        '' | *[!0-9]*) keep_count=0 ;;
     esac
 
     if [ "$keep_count" -eq 0 ]; then
@@ -383,6 +383,50 @@ function log_session_stats_line() {
     fi
 
     printf '[%s] %s\n' "$(timestamp_now)" "$line" >>"$SESSION_STATS_LOGFILE" 2>/dev/null || true
+}
+
+function dashboard_line() {
+    local label="$1"
+    local value="$2"
+    printf '| %-36s | %-54s |\n' "$label" "$value"
+}
+
+function show_session_stats_dashboard() {
+    local session_stats_line
+    local log_state
+    local keep_count
+    local log_path
+    local release_text='hash-cracker v5.1.3 "Iron Pulse"'
+
+    if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
+        log_state="disabled"
+    else
+        log_state="enabled"
+    fi
+
+    keep_count=$(session_log_keep_count)
+    log_path="${SESSION_STATS_LOGFILE:-n/a}"
+    session_stats_line="new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes"
+
+    echo
+    echo "+--------------------------------------+--------------------------------------------------------+"
+    echo "| Session Stats Dashboard              | hash-cracker v5.1.3 \"Iron Pulse\"                      |"
+    echo "+--------------------------------------+--------------------------------------------------------+"
+    dashboard_line "Generated at" "$(timestamp_now)"
+    dashboard_line "Release" "$release_text"
+    dashboard_line "Hashtype" "${HASHTYPE_DISPLAY:-$HASHTYPE}"
+    dashboard_line "Hashlist" "$HASHLIST"
+    dashboard_line "Potfile" "$POTFILE"
+    dashboard_line "Session delta" "$session_stats_line"
+    dashboard_line "Total cracked lines in potfile" "$SESSION_POT_LINES_CUR"
+    dashboard_line "Total unique plaintexts in potfile" "$SESSION_POT_UNIQUE_CUR"
+    dashboard_line "Total potfile bytes" "$SESSION_POT_BYTES_CUR"
+    dashboard_line "Unique input hashes" "$SESSION_HASHLIST_INPUT_UNIQUE"
+    dashboard_line "Session logging" "$log_state"
+    dashboard_line "Session log keep" "$keep_count"
+    dashboard_line "Session log file" "$log_path"
+    echo "+--------------------------------------+--------------------------------------------------------+"
+    echo
 }
 
 function init_session_stats() {
@@ -506,17 +550,15 @@ function menu() {
         while IFS='|' read -r option_id option_text processor; do
             echo "$option_id. $option_text"
         done < <(menu_entries)
-        echo -e "\nCurrent setup: hashtype=${HASHTYPE_DISPLAY:-$HASHTYPE} hashlist=$HASHLIST"
+        echo "99. Session stats dashboard"
         echo
         session_stats_line="Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
-        echo "$session_stats_line"
         log_session_stats_line "$session_stats_line"
-        echo
 
         if [ "$DRYRUN" = ' ' ]; then
-            read -r -p "Select job [0-22] or type exit [DRY-RUN MODE]: " START
+            read -r -p "Select job [0-22,99] or type exit [DRY-RUN MODE]: " START
         else
-            read -r -p "Select job [0-22] or type exit: " START
+            read -r -p "Select job [0-22,99] or type exit: " START
         fi
         START="${START#"${START%%[![:space:]]*}"}"
         START="${START%"${START##*[![:space:]]}"}"
@@ -529,6 +571,10 @@ function menu() {
             0 | exit | quit | q)
                 echo "Bye..."
                 exit 0
+                ;;
+            99)
+                show_session_stats_dashboard
+                continue
                 ;;
         esac
 

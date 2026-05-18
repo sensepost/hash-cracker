@@ -13,7 +13,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
     echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
     echo -e "\t--no-session-log\n\t\t Disable session stats logging to file"
-    echo -e "\t--session-log-keep [N]\n\t\t Keep last N auto-created session logs in logs/ (default: 50, 0 disables pruning)"
+    echo -e "\t--session-log-keep [N]\n\t\t Keep last N auto-created session logs in logs/ (default: 0, no pruning)"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -153,12 +153,12 @@ if [ -n "$HASHTYPE_DISPLAY" ]; then
     HASHTYPE_MODE="${HASHTYPE_DISPLAY%% *}"
     HASHTYPE_NAME="${HASHTYPE_DISPLAY#* }"
     if [ -n "$HASHTYPE_NAME" ] && [ "$HASHTYPE_NAME" != "$HASHTYPE_MODE" ]; then
-        BANNER_STATUS_VALUE="cracking $HASHTYPE_NAME ($HASHTYPE_MODE)"
+        BANNER_STATUS_VALUE="cracking $HASHTYPE_NAME ($HASHTYPE_MODE) / hashlist $HASHLIST"
     else
-        BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+        BANNER_STATUS_VALUE="cracking mode $HASHTYPE / hashlist $HASHLIST"
     fi
 else
-    BANNER_STATUS_VALUE="cracking mode $HASHTYPE"
+    BANNER_STATUS_VALUE="cracking mode $HASHTYPE / hashlist $HASHLIST"
 fi
 # shellcheck disable=SC2034
 BANNER_STATUS="$BANNER_STATUS_VALUE"
@@ -243,8 +243,17 @@ fi
 if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
     status_bad "Session stats logging disabled"
 else
+    SESSION_LOG_KEEP_EFFECTIVE="${SESSION_LOG_KEEP:-0}"
     status_ok "Session stats logging enabled"
-    status_ok "Session log retention: keep last ${SESSION_LOG_KEEP:-50} file(s) (0 disables pruning)"
+    if [ "$SESSION_LOG_KEEP_EFFECTIVE" -eq 0 ]; then
+        if [ -z "${SESSION_LOG_KEEP+x}" ]; then
+            status_ok "Session log retention: keeping all files (default)"
+        else
+            status_ok "Session log retention: keeping all files (pruning disabled)"
+        fi
+    else
+        status_ok "Session log retention: keeping last $SESSION_LOG_KEEP_EFFECTIVE file(s)"
+    fi
 fi
 
 echo -e "\nStatic parameters:"
