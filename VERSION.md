@@ -1,5 +1,25 @@
 # Version log
 
+## v5.1.2 - Iron Pulse
+
+### Highlights
+
+- Added smarter session-log controls with opt-out and retention.
+
+### Added
+
+- New flag: `--no-session-log`
+  - Disables writing session stats lines to log files.
+- New flag: `--session-log-keep [N]` (also supports `--session-log-keep=N`)
+  - Controls retention for auto-created `logs/session-*.log` files.
+  - Default is `50`.
+  - `0` disables pruning.
+
+### Changed
+
+- Session log pruning now runs before creating each new auto log file.
+- Banner version updated to `v5.1.2 "Iron Pulse"`.
+
 ## v5.1.1 - Iron Pulse
 
 ### Highlights

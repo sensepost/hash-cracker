@@ -55,7 +55,7 @@ function hash-cracker() {
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.1.1 "Iron Pulse"'
+    version_text='v5.1.2 "Iron Pulse"'
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -309,10 +309,56 @@ function timestamp_now() {
     date '+%Y-%m-%d %H:%M:%S%z'
 }
 
+function session_log_keep_count() {
+    case "${SESSION_LOG_KEEP:-}" in
+        '' | *[!0-9]*) echo 50 ;;
+        *) echo "$SESSION_LOG_KEEP" ;;
+    esac
+}
+
+function prune_session_logs() {
+    local logs_dir="$1"
+    local keep_count="$2"
+    local files
+    local total
+    local prune_count
+
+    case "$keep_count" in
+        '' | *[!0-9]*) keep_count=50 ;;
+    esac
+
+    if [ "$keep_count" -eq 0 ]; then
+        return 0
+    fi
+
+    files=$(find "$logs_dir" -maxdepth 1 -type f -name 'session-*.log' -print | sort)
+    if [ -z "$files" ]; then
+        return 0
+    fi
+
+    total=$(printf '%s\n' "$files" | wc -l | tr -d '[:space:]')
+    prune_count=$((total - keep_count + 1))
+    if [ "$prune_count" -le 0 ]; then
+        return 0
+    fi
+
+    printf '%s\n' "$files" | head -n "$prune_count" | while IFS= read -r file; do
+        rm -f -- "$file"
+    done
+}
+
 function init_session_stats_logfile() {
     local logs_dir='logs'
     local log_dir
     local session_stamp
+    local keep_count
+
+    if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
+        SESSION_STATS_LOGFILE=''
+        return 0
+    fi
+
+    keep_count=$(session_log_keep_count)
 
     if [ -n "${SESSION_STATS_LOGFILE:-}" ]; then
         log_dir=$(dirname "$SESSION_STATS_LOGFILE")
@@ -326,6 +372,7 @@ function init_session_stats_logfile() {
     SESSION_STATS_LOGFILE="$logs_dir/session-${session_stamp}-${BASHPID}.log"
 
     mkdir -p "$logs_dir" 2>/dev/null || true
+    prune_session_logs "$logs_dir" "$keep_count"
     ln -sfn "$(basename "$SESSION_STATS_LOGFILE")" "$logs_dir/latest.log" 2>/dev/null || true
 }
 
