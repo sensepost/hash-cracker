@@ -137,6 +137,12 @@ Run in dry-run mode:
 ./hash-cracker.sh --dry-run
 ```
 
+Run with session logging disabled:
+
+```bash
+./hash-cracker.sh --no-session-log
+```
+
 Run non-interactive health checks:
 
 ```bash
@@ -154,6 +160,8 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `-s [hash-name]`, `--search [hash-name]` - search the local hash type database and exit
 - `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
 - `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
+- `--no-session-log` - disable session stats logging to file
+- `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `50`, use `0` to disable pruning)
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
@@ -207,7 +215,10 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Session stats are written to a timestamped log file:
   - Default per-session file: `logs/session-YYYYmmdd-HHMMSS-PID.log`
   - Convenience pointer: `logs/latest.log` points to the current session file
+  - Retention for auto-created logs defaults to last `50` session files
+  - Set `--session-log-keep [N]` to tune retention (`0` disables pruning)
   - Override path with `SESSION_STATS_LOGFILE`
+  - Set `--no-session-log` to disable file logging
 
 ## Example Hashes
 

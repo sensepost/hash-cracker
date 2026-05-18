@@ -12,6 +12,8 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t-s [hash-name] / --search [hash-name]\n\t\t Will search local DB for hash module. E.g. '-s ntlm'"
     echo -e "\t-d / --disable-cracked\n\t\t Will stop output cracked hashes directly on screen."
     echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
+    echo -e "\t--no-session-log\n\t\t Disable session stats logging to file"
+    echo -e "\t--session-log-keep [N]\n\t\t Keep last N auto-created session logs in logs/ (default: 50, 0 disables pruning)"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -57,6 +59,28 @@ while [[ "$#" -gt 0 ]]; do
         --hwmon-enable) HWMON=' ' ;;
         -d | --disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
+        --no-session-log) SESSION_LOG_DISABLED='1' ;;
+        --session-log-keep)
+            case "${2:-}" in
+                '' | *[!0-9]*)
+                    status_error "Invalid value for --session-log-keep. Expected a non-negative integer."
+                    exit 1
+                    ;;
+                *)
+                    SESSION_LOG_KEEP="$2"
+                    shift
+                    ;;
+            esac
+            ;;
+        --session-log-keep=*)
+            SESSION_LOG_KEEP="${1#*=}"
+            case "$SESSION_LOG_KEEP" in
+                '' | *[!0-9]*)
+                    status_error "Invalid value for --session-log-keep. Expected a non-negative integer."
+                    exit 1
+                    ;;
+            esac
+            ;;
         --self-test | --doctor) SELFTEST=' ' ;;
         *)
             status_error "Unknown parameter passed: $1"
@@ -214,6 +238,13 @@ if [ "$DRYRUN" = ' ' ]; then
     status_ok "Dry-run enabled (hashcat commands will be printed only)"
 else
     status_bad "Dry-run disabled"
+fi
+
+if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
+    status_bad "Session stats logging disabled"
+else
+    status_ok "Session stats logging enabled"
+    status_ok "Session log retention: keep last ${SESSION_LOG_KEEP:-50} file(s) (0 disables pruning)"
 fi
 
 echo -e "\nStatic parameters:"
