@@ -161,7 +161,7 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `-d`, `--disable-cracked` - suppress cracked hashes on stdout by writing them to `/dev/null`
 - `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
 - `--no-session-log` - disable session stats logging to file
-- `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `50`, use `0` to disable pruning)
+- `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `0`, no pruning)
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
@@ -190,6 +190,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
 20. Stacker
 21. Custom brute force
 22. Directory of word lists plain and then with `buka_400k`
+99. Session stats dashboard
 
 ## Module Notes
 
@@ -208,15 +209,16 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - `Preparing session stats (counting potfile and input hashes)...`
 - After a job, if the potfile changed and unique plaintext recount is needed, the tool prints:
   - `Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)...`
-- The menu session line reports:
+- Option `99` prints a dedicated ASCII dashboard with:
   - session delta (`new ... lines`, `... unique`, `... bytes`)
   - total cracked passwords in potfile (`... lines`)
   - unique input hashes from the active `HASHLIST`
+  - log status/retention/current log file
 - Session stats are written to a timestamped log file:
   - Default per-session file: `logs/session-YYYYmmdd-HHMMSS-PID.log`
   - Convenience pointer: `logs/latest.log` points to the current session file
-  - Retention for auto-created logs defaults to last `50` session files
-  - Set `--session-log-keep [N]` to tune retention (`0` disables pruning)
+  - Retention for auto-created logs defaults to `0` (no pruning)
+  - Set `--session-log-keep [N]` to tune retention
   - Override path with `SESSION_STATS_LOGFILE`
   - Set `--no-session-log` to disable file logging
 

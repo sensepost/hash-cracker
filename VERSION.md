@@ -1,5 +1,23 @@
 # Version log
 
+## v5.1.3 - Iron Pulse
+
+### Highlights
+
+- Added a dedicated stats dashboard menu option (`99`) for richer, cleaner session visibility.
+
+### Added
+
+- New menu option `99`:
+  - Displays an ASCII stats dashboard with setup, session deltas, potfile totals, input-hash totals, and logging settings.
+
+### Changed
+
+- Removed inline `Session stats:` line from the main menu.
+- Session stats continue to be logged per menu iteration.
+- Session log retention default changed to `0` (no pruning).
+- Banner version updated to `v5.1.3 "Iron Pulse"`.
+
 ## v5.1.2 - Iron Pulse
 
 ### Highlights
