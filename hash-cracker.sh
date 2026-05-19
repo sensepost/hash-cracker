@@ -49,13 +49,21 @@ function banner_center_line() {
     printf '│ %*s%s%*s │\n' "$pad_left" '' "$clipped" "$pad_right" ''
 }
 
+function release_version_text() {
+    printf '%s' 'v6.0 "Command Forge"'
+}
+
+function release_label_text() {
+    printf 'hash-cracker %s' "$(release_version_text)"
+}
+
 function hash-cracker() {
     local status_text
     local version_text
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.1.3 "Iron Pulse"'
+    version_text="$(release_version_text)"
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -103,6 +111,15 @@ function menu_entries() {
 21|Custom brute force|scripts/processors/21-custom-brute-force.sh
 22|Directory of word lists plain and then with buka_400k|scripts/processors/22-multiple-wordlists-buka.sh
 EOF
+}
+
+function print_job_list() {
+    local option_id option_text processor
+
+    while IFS='|' read -r option_id option_text processor; do
+        echo "$option_id. $option_text"
+    done < <(menu_entries)
+    echo "99. Session stats dashboard"
 }
 
 function dependency_fail() {
@@ -296,6 +313,56 @@ function count_hashlist_unique_entries() {
     fi
 }
 
+function cleanup_session_state() {
+    if [ -n "${SESSION_POT_UNIQUE_CACHE:-}" ]; then
+        rm -f -- "$SESSION_POT_UNIQUE_CACHE" 2>/dev/null || true
+    fi
+}
+
+function rebuild_unique_plaintext_cache() {
+    if [ -f "$POTFILE" ]; then
+        awk -F: 'NF {print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$SESSION_POT_UNIQUE_CACHE"
+    else
+        : >"$SESSION_POT_UNIQUE_CACHE"
+    fi
+    SESSION_POT_UNIQUE_CUR=$(wc -l <"$SESSION_POT_UNIQUE_CACHE" | tr -d '[:space:]')
+    stats_debug_note "Stats refresh mode: full recount (unique plaintext cache rebuilt: $SESSION_POT_UNIQUE_CUR)"
+}
+
+function update_unique_plaintexts_incremental() {
+    local delta_lines="$1"
+    local tmp_delta
+    local tmp_merge
+    local new_unique_lines
+
+    if [ "$delta_lines" -le 0 ]; then
+        return 0
+    fi
+
+    tmp_delta="$(mktemp /tmp/hash-cracker-unique-delta.XXXX)"
+    tmp_merge="$(mktemp /tmp/hash-cracker-unique-merge.XXXX)"
+
+    tail -n "$delta_lines" "$POTFILE" | awk -F: 'NF {print $NF}' | LC_ALL=C sort -u >"$tmp_delta"
+    if [ ! -s "$tmp_delta" ]; then
+        rm -f -- "$tmp_delta" "$tmp_merge"
+        return 0
+    fi
+
+    if [ ! -f "$SESSION_POT_UNIQUE_CACHE" ]; then
+        : >"$SESSION_POT_UNIQUE_CACHE"
+    fi
+
+    new_unique_lines=$(comm -13 "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | wc -l | tr -d '[:space:]')
+    if [ "$new_unique_lines" -gt 0 ]; then
+        cat "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | LC_ALL=C sort -u >"$tmp_merge"
+        mv "$tmp_merge" "$SESSION_POT_UNIQUE_CACHE"
+        SESSION_POT_UNIQUE_CUR=$((SESSION_POT_UNIQUE_CUR + new_unique_lines))
+    fi
+    stats_debug_note "Stats refresh mode: incremental (delta lines: $delta_lines, new unique plaintexts: $new_unique_lines)"
+
+    rm -f -- "$tmp_delta" "$tmp_merge"
+}
+
 function signed_num() {
     local value="$1"
     if [ "$value" -ge 0 ]; then
@@ -307,6 +374,171 @@ function signed_num() {
 
 function timestamp_now() {
     date '+%Y-%m-%d %H:%M:%S%z'
+}
+
+function stats_debug_enabled() {
+    [ "$STATSDEBUG" = ' ' ]
+}
+
+function stats_debug_note() {
+    if stats_debug_enabled; then
+        status_heading "$1"
+    fi
+}
+
+function json_escape() {
+    local s="$1"
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    s=${s//$'\n'/\\n}
+    s=${s//$'\r'/\\r}
+    s=${s//$'\t'/\\t}
+    printf '%s' "$s"
+}
+
+function ensure_parent_dir() {
+    local path="$1"
+    local parent
+
+    parent=$(dirname "$path")
+    if [ -n "$parent" ] && [ "$parent" != "." ]; then
+        mkdir -p "$parent" 2>/dev/null || true
+    fi
+}
+
+function stats_export_scope() {
+    local scope="${STATSEXPORT_SCOPE:-latest}"
+    case "$scope" in
+        latest | all) printf '%s' "$scope" ;;
+        *) printf 'latest' ;;
+    esac
+}
+
+function export_session_stats_history_json() {
+    local logs_dir='logs'
+    local first='1'
+    local file
+    local line
+    local timestamp
+    local message
+    local new_lines
+    local new_unique
+    local growth_bytes
+    local total_lines
+    local input_unique
+
+    printf '['
+
+    if [ -d "$logs_dir" ]; then
+        while IFS= read -r file; do
+            while IFS= read -r line; do
+                if [[ "$line" =~ ^\[([^]]+)\][[:space:]](.*)$ ]]; then
+                    timestamp="${BASH_REMATCH[1]}"
+                    message="${BASH_REMATCH[2]}"
+                else
+                    timestamp=''
+                    message="$line"
+                fi
+
+                if [ "$first" = '1' ]; then
+                    first='0'
+                else
+                    printf ','
+                fi
+
+                if [[ "$message" =~ ^Session\ stats:\ new\ ([+-]?[0-9]+)\ lines,\ ([+-]?[0-9]+)\ unique,\ ([+-]?[0-9]+)\ bytes\ \|\ total\ cracked\ passwords\ in\ potfile:\ ([0-9]+)\ lines\ \|\ input\ hashes:\ ([0-9]+)\ unique$ ]]; then
+                    new_lines="${BASH_REMATCH[1]}"
+                    new_unique="${BASH_REMATCH[2]}"
+                    growth_bytes="${BASH_REMATCH[3]}"
+                    total_lines="${BASH_REMATCH[4]}"
+                    input_unique="${BASH_REMATCH[5]}"
+                    printf '\n    { "timestamp": "%s", "source": "%s", "message": "%s", "session": { "new_cracks_lines": %s, "new_unique": %s, "growth_bytes": %s }, "potfile": { "total_cracked_lines": %s }, "input_hashes": { "unique": %s } }' \
+                        "$(json_escape "$timestamp")" \
+                        "$(json_escape "$file")" \
+                        "$(json_escape "$message")" \
+                        "$new_lines" \
+                        "$new_unique" \
+                        "$growth_bytes" \
+                        "$total_lines" \
+                        "$input_unique"
+                else
+                    printf '\n    { "timestamp": "%s", "source": "%s", "message": "%s" }' \
+                        "$(json_escape "$timestamp")" \
+                        "$(json_escape "$file")" \
+                        "$(json_escape "$message")"
+                fi
+            done <"$file"
+        done < <(find "$logs_dir" -maxdepth 1 -type f -name 'session-*.log' -print | LC_ALL=C sort)
+    fi
+
+    if [ "$first" = '0' ]; then
+        printf '\n  '
+    fi
+    printf ']'
+}
+
+function export_session_stats_json() {
+    local out_path="${STATSEXPORT:-}"
+    local tmp_path
+    local log_enabled
+    local release_label
+    local generated_at
+    local export_scope
+    local history_json
+
+    if [ -z "$out_path" ]; then
+        return 0
+    fi
+
+    ensure_parent_dir "$out_path"
+
+    if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
+        log_enabled="false"
+    else
+        log_enabled="true"
+    fi
+
+    release_label="$(release_version_text)"
+    generated_at="$(timestamp_now)"
+    export_scope="$(stats_export_scope)"
+    history_json='[]'
+    if [ "$export_scope" = 'all' ]; then
+        history_json="$(export_session_stats_history_json)"
+    fi
+    tmp_path="${out_path}.tmp.$$"
+
+    cat >"$tmp_path" <<EOF
+{
+  "schema_version": "1",
+  "generated_at": "$(json_escape "$generated_at")",
+  "export_scope": "$(json_escape "$export_scope")",
+  "release": "$(json_escape "$release_label")",
+  "hashtype": "$(json_escape "${HASHTYPE_DISPLAY:-$HASHTYPE}")",
+  "hashlist": "$(json_escape "$HASHLIST")",
+  "potfile": "$(json_escape "$POTFILE")",
+  "session": {
+    "new_cracks_lines": $SESSION_NEW_CRACKS,
+    "new_unique": $SESSION_NEW_UNIQUE,
+    "growth_bytes": $SESSION_GROWTH_BYTES
+  },
+  "potfile_totals": {
+    "lines": $SESSION_POT_LINES_CUR,
+    "unique_plaintexts": $SESSION_POT_UNIQUE_CUR,
+    "bytes": $SESSION_POT_BYTES_CUR
+  },
+  "input_hashes": {
+    "unique": $SESSION_HASHLIST_INPUT_UNIQUE
+  },
+  "logging": {
+    "enabled": $log_enabled,
+    "keep": $(session_log_keep_count),
+    "path": "$(json_escape "${SESSION_STATS_LOGFILE:-}")"
+  },
+  "history": $history_json
+}
+EOF
+
+    mv "$tmp_path" "$out_path" 2>/dev/null || true
 }
 
 function session_log_keep_count() {
@@ -396,7 +628,7 @@ function show_session_stats_dashboard() {
     local log_state
     local keep_count
     local log_path
-    local release_text='hash-cracker v5.1.3 "Iron Pulse"'
+    local release_text
 
     if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
         log_state="disabled"
@@ -406,11 +638,12 @@ function show_session_stats_dashboard() {
 
     keep_count=$(session_log_keep_count)
     log_path="${SESSION_STATS_LOGFILE:-n/a}"
+    release_text="$(release_version_text)"
     session_stats_line="new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes"
 
     echo
     echo "+--------------------------------------+--------------------------------------------------------+"
-    echo "| Session Stats Dashboard              | hash-cracker v5.1.3 \"Iron Pulse\"                      |"
+    dashboard_line "Session Stats Dashboard" "$(release_label_text)"
     echo "+--------------------------------------+--------------------------------------------------------+"
     dashboard_line "Generated at" "$(timestamp_now)"
     dashboard_line "Release" "$release_text"
@@ -420,23 +653,32 @@ function show_session_stats_dashboard() {
     dashboard_line "Session delta" "$session_stats_line"
     dashboard_line "Total cracked lines in potfile" "$SESSION_POT_LINES_CUR"
     dashboard_line "Total unique plaintexts in potfile" "$SESSION_POT_UNIQUE_CUR"
-    dashboard_line "Total potfile bytes" "$SESSION_POT_BYTES_CUR"
     dashboard_line "Unique input hashes" "$SESSION_HASHLIST_INPUT_UNIQUE"
     dashboard_line "Session logging" "$log_state"
     dashboard_line "Session log keep" "$keep_count"
     dashboard_line "Session log file" "$log_path"
+    dashboard_line "Stats export file" "${STATSEXPORT:-n/a}"
     echo "+--------------------------------------+--------------------------------------------------------+"
     echo
+}
+
+function build_session_stats_line() {
+    printf 'Session stats: new %s lines, %s unique, %s bytes | total cracked passwords in potfile: %s lines | input hashes: %s unique' \
+        "$(signed_num "$SESSION_NEW_CRACKS")" \
+        "$(signed_num "$SESSION_NEW_UNIQUE")" \
+        "$(signed_num "$SESSION_GROWTH_BYTES")" \
+        "$SESSION_POT_LINES_CUR" \
+        "$SESSION_HASHLIST_INPUT_UNIQUE"
 }
 
 function init_session_stats() {
     SESSION_POT_LINES_BASE=$(count_file_lines "$POTFILE")
     SESSION_POT_BYTES_BASE=$(count_file_bytes "$POTFILE")
-    SESSION_POT_UNIQUE_BASE=$(count_potfile_unique_plaintexts)
+    SESSION_POT_UNIQUE_BASE=0
 
     SESSION_POT_LINES_CUR="$SESSION_POT_LINES_BASE"
     SESSION_POT_BYTES_CUR="$SESSION_POT_BYTES_BASE"
-    SESSION_POT_UNIQUE_CUR="$SESSION_POT_UNIQUE_BASE"
+    SESSION_POT_UNIQUE_CUR=0
 
     SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
     SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
@@ -447,16 +689,26 @@ function init_session_stats() {
 
     SESSION_HASHLIST_PATH_LAST="$HASHLIST"
     SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
+    SESSION_POT_UNIQUE_CACHE="/tmp/hash-cracker-unique-${BASHPID}.cache"
+    rebuild_unique_plaintext_cache
+    SESSION_POT_UNIQUE_BASE="$SESSION_POT_UNIQUE_CUR"
     init_session_stats_logfile
 }
 
 function refresh_session_stats() {
+    local delta_lines
+
     SESSION_POT_LINES_CUR=$(count_file_lines "$POTFILE")
     SESSION_POT_BYTES_CUR=$(count_file_bytes "$POTFILE")
 
     if [ "$SESSION_POT_LINES_CUR" -ne "$SESSION_POT_LINES_LAST" ] || [ "$SESSION_POT_BYTES_CUR" -ne "$SESSION_POT_BYTES_LAST" ]; then
-        status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
-        SESSION_POT_UNIQUE_CUR=$(count_potfile_unique_plaintexts)
+        if [ "$SESSION_POT_LINES_CUR" -ge "$SESSION_POT_LINES_LAST" ] && [ "$SESSION_POT_BYTES_CUR" -ge "$SESSION_POT_BYTES_LAST" ]; then
+            delta_lines=$((SESSION_POT_LINES_CUR - SESSION_POT_LINES_LAST))
+            update_unique_plaintexts_incremental "$delta_lines"
+        else
+            status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
+            rebuild_unique_plaintext_cache
+        fi
         SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
         SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
     fi
@@ -540,6 +792,50 @@ function run_self_test() {
     return 0
 }
 
+function run_single_job_mode() {
+    local selected="$1"
+    local rc
+    local session_stats_line
+
+    refresh_session_stats
+    session_stats_line=$(build_session_stats_line)
+    log_session_stats_line "$session_stats_line"
+    export_session_stats_json
+
+    if [ "$selected" = "99" ]; then
+        show_session_stats_dashboard
+        return 0
+    fi
+
+    case "$selected" in
+        4 | 5 | 8 | 15 | 17 | 18 | 21 | 22)
+            if [ ! -t 0 ]; then
+                status_error "Job $selected requires interactive input and cannot run in non-interactive --job mode."
+                status_heading "Use --list-jobs and choose a non-prompting job, or run interactively."
+                return 1
+            fi
+            ;;
+    esac
+
+    if ! check_job_dependencies "$selected"; then
+        return 1
+    fi
+
+    if ! run_processor "$selected"; then
+        status_error "Invalid job selection for --job: $selected"
+        status_heading "Use --list-jobs to see available options."
+        return 1
+    fi
+    rc=$?
+
+    refresh_session_stats
+    session_stats_line=$(build_session_stats_line)
+    log_session_stats_line "$session_stats_line"
+    export_session_stats_json
+
+    return $rc
+}
+
 function menu() {
     local option_id option_text processor
     local session_stats_line
@@ -547,13 +843,11 @@ function menu() {
     while true; do
         refresh_session_stats
         echo -e "\n0. Exit"
-        while IFS='|' read -r option_id option_text processor; do
-            echo "$option_id. $option_text"
-        done < <(menu_entries)
-        echo "99. Session stats dashboard"
+        print_job_list
         echo
-        session_stats_line="Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
+        session_stats_line=$(build_session_stats_line)
         log_session_stats_line "$session_stats_line"
+        export_session_stats_json
 
         if [ "$DRYRUN" = ' ' ]; then
             read -r -p "Select job [0-22,99] or type exit [DRY-RUN MODE]: " START
@@ -593,13 +887,25 @@ function menu() {
 }
 
 init_colors
+trap cleanup_session_state EXIT
 source scripts/parameters.sh "$@"
 status_heading "Preparing session stats (counting potfile and input hashes)..."
 init_session_stats
+
+if [ "$JOBLIST" = ' ' ]; then
+    print_job_list
+    exit 0
+fi
 
 if [ "$SELFTEST" = ' ' ]; then
     run_self_test
     exit $?
 fi
 
+if [ -n "${JOBMODE:-}" ]; then
+    run_single_job_mode "$JOBMODE"
+    exit $?
+fi
+
 menu "$@"
+release_text="$(release_label_text)"

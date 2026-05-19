@@ -3,7 +3,7 @@
 
 if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "Note: flags are optional, by default hash-cracker will run with optimized kernels enabled and perform loopback actions."
-    echo -e "\nUsage: ./hash-cracker [FLAG]"
+    echo -e "\nUsage: ./hash-cracker.sh [FLAG]"
     echo -e "\nFlags:"
     echo -e "\t-l / --no-loopback\n\t\t Disable loopback functionality"
     echo -e "\t-n / --no-limit\n\t\t Disable the use of optimized kernels (un-limits password length)"
@@ -14,6 +14,11 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
     echo -e "\t--no-session-log\n\t\t Disable session stats logging to file"
     echo -e "\t--session-log-keep [N]\n\t\t Keep last N auto-created session logs in logs/ (default: 0, no pruning)"
+    echo -e "\t--stats-debug\n\t\t Print how session stats are refreshed (incremental vs full recount)"
+    echo -e "\t--stats-export [PATH]\n\t\t Export machine-readable session stats JSON to PATH"
+    echo -e "\t--stats-export-scope [latest|all]\n\t\t Export latest snapshot only or all entries from logs (default: latest)"
+    echo -e "\t--job [ID]\n\t\t Run one menu option non-interactively (supports 1-22 and 99)"
+    echo -e "\t--list-jobs\n\t\t Print available job IDs and exit"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -60,6 +65,66 @@ while [[ "$#" -gt 0 ]]; do
         -d | --disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
         --no-session-log) SESSION_LOG_DISABLED='1' ;;
+        --stats-debug) STATSDEBUG=' ' ;;
+        --stats-export)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --stats-export. Provide a file path."
+                exit 1
+            fi
+            STATSEXPORT="$2"
+            shift
+            ;;
+        --stats-export=*)
+            STATSEXPORT="${1#*=}"
+            if [ -z "$STATSEXPORT" ]; then
+                status_error "Missing value for --stats-export. Provide a file path."
+                exit 1
+            fi
+            ;;
+        --stats-export-scope)
+            case "${2:-}" in
+                latest | all)
+                    STATSEXPORT_SCOPE="$2"
+                    shift
+                    ;;
+                *)
+                    status_error "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
+                    exit 1
+                    ;;
+            esac
+            ;;
+        --stats-export-scope=*)
+            STATSEXPORT_SCOPE="${1#*=}"
+            case "$STATSEXPORT_SCOPE" in
+                latest | all) ;;
+                *)
+                    status_error "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
+                    exit 1
+                    ;;
+            esac
+            ;;
+        --job)
+            case "${2:-}" in
+                '' | *[!0-9]*)
+                    status_error "Invalid value for --job. Expected a numeric job ID."
+                    exit 1
+                    ;;
+                *)
+                    JOBMODE="$2"
+                    shift
+                    ;;
+            esac
+            ;;
+        --job=*)
+            JOBMODE="${1#*=}"
+            case "$JOBMODE" in
+                '' | *[!0-9]*)
+                    status_error "Invalid value for --job. Expected a numeric job ID."
+                    exit 1
+                    ;;
+            esac
+            ;;
+        --list-jobs) JOBLIST=' ' ;;
         --session-log-keep)
             case "${2:-}" in
                 '' | *[!0-9]*)
@@ -254,6 +319,23 @@ else
     else
         status_ok "Session log retention: keeping last $SESSION_LOG_KEEP_EFFECTIVE file(s)"
     fi
+fi
+
+if [ "$STATSDEBUG" = ' ' ]; then
+    status_ok "Stats debug output enabled"
+fi
+
+if [ -n "${STATSEXPORT:-}" ]; then
+    status_ok "Stats export enabled: $STATSEXPORT"
+    status_ok "Stats export scope: ${STATSEXPORT_SCOPE:-latest}"
+fi
+
+if [ "$JOBLIST" = ' ' ]; then
+    status_ok "Job listing mode enabled"
+fi
+
+if [ -n "${JOBMODE:-}" ]; then
+    status_ok "Non-interactive job mode enabled: job $JOBMODE"
 fi
 
 echo -e "\nStatic parameters:"

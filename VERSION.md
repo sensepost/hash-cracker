@@ -1,5 +1,34 @@
 # Version log
 
+## v6.0 - Command Forge
+
+### Highlights
+
+- Added first-class non-interactive execution for automation workflows.
+
+### Added
+
+- New flag: `--list-jobs`
+  - Prints available job IDs and descriptions, then exits.
+- New flag: `--job [ID]` (also supports `--job=ID`)
+  - Runs a single option non-interactively and exits.
+  - Supports all menu jobs `1-22` and dashboard `99`.
+- New flag: `--stats-debug`
+  - Prints whether session stats refresh used incremental update or full recount.
+- New flag: `--stats-export [PATH]` (also supports `--stats-export=PATH`)
+  - Exports machine-readable session stats as JSON on each refresh cycle.
+- New flag: `--stats-export-scope [latest|all]` (also supports `--stats-export-scope=...`)
+  - `latest` (default): exports only the current snapshot JSON.
+  - `all`: includes parsed history entries from `logs/session-*.log` in JSON output.
+
+### Changed
+
+- Startup and dashboard release label updated to `v6.0 "Command Forge"`.
+- Non-interactive job runs now reuse existing dependency validation and session-stats logging behavior.
+- Prompt-dependent jobs now fail fast in non-interactive `--job` mode with clear guidance.
+- Session stats unique-count refresh now uses incremental cache updates on append growth, with automatic full-recount fallback on non-append changes.
+- Stats export JSON now includes top-level `"schema_version": "1"` for downstream compatibility checks.
+
 ## v5.1.3 - Iron Pulse
 
 ### Highlights

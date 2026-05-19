@@ -69,6 +69,53 @@ echo "[smoke] help output includes self-test flag"
 run_case help bash -lc "./hash-cracker.sh --help"
 assert_rc_eq 1
 assert_contains "--self-test / --doctor"
+assert_contains "--stats-debug"
+assert_contains "--stats-export-scope [latest|all]"
+
+echo "[smoke] stats debug flag is accepted"
+run_case stats_debug bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-debug"
+assert_rc_eq 0
+assert_contains "Stats debug output enabled"
+assert_contains "Bye..."
+
+echo "[smoke] stats export writes JSON file"
+STATS_EXPORT_PATH="$TMP_DIR/stats-export.json"
+run_case stats_export bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_PATH\""
+assert_rc_eq 0
+if [ ! -s "$STATS_EXPORT_PATH" ]; then
+    fail_with_log "stats export file was not created" "$LAST_LOG"
+fi
+if ! grep -Fq '"generated_at"' "$STATS_EXPORT_PATH"; then
+    fail_with_log "stats export missing generated_at key" "$STATS_EXPORT_PATH"
+fi
+if ! grep -Fq '"schema_version": "1"' "$STATS_EXPORT_PATH"; then
+    fail_with_log "stats export missing schema_version" "$STATS_EXPORT_PATH"
+fi
+if ! grep -Fq '"session"' "$STATS_EXPORT_PATH"; then
+    fail_with_log "stats export missing session object" "$STATS_EXPORT_PATH"
+fi
+if ! grep -Fq '"potfile_totals"' "$STATS_EXPORT_PATH"; then
+    fail_with_log "stats export missing potfile_totals object" "$STATS_EXPORT_PATH"
+fi
+
+echo "[smoke] stats export scope all includes history entries"
+STATS_EXPORT_ALL_PATH="$TMP_DIR/stats-export-all.json"
+run_case stats_export_all bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_ALL_PATH\" --stats-export-scope all"
+assert_rc_eq 0
+if ! grep -Fq '"export_scope": "all"' "$STATS_EXPORT_ALL_PATH"; then
+    fail_with_log "stats export scope all missing export_scope marker" "$STATS_EXPORT_ALL_PATH"
+fi
+if ! grep -Fq '"history": [' "$STATS_EXPORT_ALL_PATH"; then
+    fail_with_log "stats export scope all missing history array" "$STATS_EXPORT_ALL_PATH"
+fi
+if ! grep -Fq '"message": "Session stats:' "$STATS_EXPORT_ALL_PATH"; then
+    fail_with_log "stats export scope all missing parsed session stats message entries" "$STATS_EXPORT_ALL_PATH"
+fi
+
+echo "[smoke] invalid stats export scope fails clearly"
+run_case stats_export_scope_invalid bash -lc "./hash-cracker.sh --stats-export \"$TMP_DIR/invalid-scope.json\" --stats-export-scope nope"
+assert_rc_eq 1
+assert_contains "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
 
 echo "[smoke] dry-run menu exits cleanly"
 run_case menu_exit bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run"
@@ -76,6 +123,27 @@ assert_rc_eq 0
 assert_contains "0. Exit"
 assert_contains "99. Session stats dashboard"
 assert_contains "Bye..."
+
+echo "[smoke] list-jobs mode prints options and exits"
+run_case list_jobs bash -lc "./hash-cracker.sh --dry-run --list-jobs"
+assert_rc_eq 0
+assert_contains "1. Brute force"
+assert_contains "99. Session stats dashboard"
+
+echo "[smoke] non-interactive --job mode runs a job and exits"
+run_case single_job bash -lc "./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 0
+assert_contains "Brute force processing done"
+
+echo "[smoke] invalid --job selection fails clearly"
+run_case single_job_invalid bash -lc "./hash-cracker.sh --dry-run --job 999"
+assert_rc_eq 1
+assert_contains "Invalid job selection for --job: 999"
+
+echo "[smoke] prompting --job in non-interactive mode fails clearly"
+run_case single_job_prompting bash -lc "./hash-cracker.sh --dry-run --job 8"
+assert_rc_eq 1
+assert_contains "requires interactive input and cannot run in non-interactive --job mode"
 
 echo "[smoke] invalid option recovers back to menu"
 run_case invalid_option bash -lc "printf '999\n0\n' | ./hash-cracker.sh --dry-run"

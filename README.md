@@ -137,10 +137,34 @@ Run in dry-run mode:
 ./hash-cracker.sh --dry-run
 ```
 
+List available jobs and exit:
+
+```bash
+./hash-cracker.sh --list-jobs
+```
+
+Run one job non-interactively:
+
+```bash
+./hash-cracker.sh --job 8
+```
+
 Run with session logging disabled:
 
 ```bash
 ./hash-cracker.sh --no-session-log
+```
+
+Export stats JSON to a file:
+
+```bash
+./hash-cracker.sh --stats-export /tmp/hash-cracker-stats.json
+```
+
+Export stats JSON with full log history:
+
+```bash
+./hash-cracker.sh --stats-export /tmp/hash-cracker-stats.json --stats-export-scope all
 ```
 
 Run non-interactive health checks:
@@ -162,6 +186,11 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
 - `--no-session-log` - disable session stats logging to file
 - `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `0`, no pruning)
+- `--stats-debug` - print whether stats refresh used incremental update or full recount
+- `--stats-export [PATH]`, `--stats-export=PATH` - export machine-readable session stats JSON to `PATH`
+- `--stats-export-scope [latest|all]`, `--stats-export-scope=...` - export latest snapshot only (`latest`, default) or include all parsed entries from `logs/session-*.log` (`all`)
+- `--job [ID]`, `--job=ID` - run one menu option non-interactively and exit (supports `1-22` and `99`)
+- `--list-jobs` - print available job IDs and exit
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
@@ -202,6 +231,8 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Option `17` can generate candidates from either the potfile or a selected wordlist.
 - Option `18` prompts for a URL, output wordlist name, spider depth, and minimum word length.
 - Option `21` prompts for brute-force length and whether increment mode should be enabled.
+- `--job` mode runs selected options directly without entering the interactive menu.
+- In non-interactive contexts, prompt-dependent jobs (for example `4`, `5`, `8`, `15`, `17`, `18`, `21`, `22`) fail fast with a clear message.
 
 ## Runtime Status Output
 
@@ -221,6 +252,11 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Set `--session-log-keep [N]` to tune retention
   - Override path with `SESSION_STATS_LOGFILE`
   - Set `--no-session-log` to disable file logging
+- With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).
+- With `--stats-export`, current stats are written as JSON on each refresh cycle.
+- Exported JSON includes a top-level `"schema_version"` for stable downstream parsing.
+- With `--stats-export-scope latest` (default), JSON contains the latest snapshot only.
+- With `--stats-export-scope all`, JSON also includes parsed history from `logs/session-*.log`.
 
 ## Example Hashes
 
