@@ -155,6 +155,18 @@ Run with session logging disabled:
 ./hash-cracker.sh --no-session-log
 ```
 
+Export stats JSON to a file:
+
+```bash
+./hash-cracker.sh --stats-export /tmp/hash-cracker-stats.json
+```
+
+Export stats JSON with full log history:
+
+```bash
+./hash-cracker.sh --stats-export /tmp/hash-cracker-stats.json --stats-export-scope all
+```
+
 Run non-interactive health checks:
 
 ```bash
@@ -175,6 +187,8 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--no-session-log` - disable session stats logging to file
 - `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `0`, no pruning)
 - `--stats-debug` - print whether stats refresh used incremental update or full recount
+- `--stats-export [PATH]`, `--stats-export=PATH` - export machine-readable session stats JSON to `PATH`
+- `--stats-export-scope [latest|all]`, `--stats-export-scope=...` - export latest snapshot only (`latest`, default) or include all parsed entries from `logs/session-*.log` (`all`)
 - `--job [ID]`, `--job=ID` - run one menu option non-interactively and exit (supports `1-22` and `99`)
 - `--list-jobs` - print available job IDs and exit
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
@@ -239,6 +253,9 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Override path with `SESSION_STATS_LOGFILE`
   - Set `--no-session-log` to disable file logging
 - With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).
+- With `--stats-export`, current stats are written as JSON on each refresh cycle.
+- With `--stats-export-scope latest` (default), JSON contains the latest snapshot only.
+- With `--stats-export-scope all`, JSON also includes parsed history from `logs/session-*.log`.
 
 ## Example Hashes
 

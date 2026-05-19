@@ -15,6 +15,11 @@
   - Supports all menu jobs `1-22` and dashboard `99`.
 - New flag: `--stats-debug`
   - Prints whether session stats refresh used incremental update or full recount.
+- New flag: `--stats-export [PATH]` (also supports `--stats-export=PATH`)
+  - Exports machine-readable session stats as JSON on each refresh cycle.
+- New flag: `--stats-export-scope [latest|all]` (also supports `--stats-export-scope=...`)
+  - `latest` (default): exports only the current snapshot JSON.
+  - `all`: includes parsed history entries from `logs/session-*.log` in JSON output.
 
 ### Changed
 
