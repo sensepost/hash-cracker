@@ -3,7 +3,7 @@
 
 if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "Note: flags are optional, by default hash-cracker will run with optimized kernels enabled and perform loopback actions."
-    echo -e "\nUsage: ./hash-cracker [FLAG]"
+    echo -e "\nUsage: ./hash-cracker.sh [FLAG]"
     echo -e "\nFlags:"
     echo -e "\t-l / --no-loopback\n\t\t Disable loopback functionality"
     echo -e "\t-n / --no-limit\n\t\t Disable the use of optimized kernels (un-limits password length)"
