@@ -27,6 +27,7 @@
 - Non-interactive job runs now reuse existing dependency validation and session-stats logging behavior.
 - Prompt-dependent jobs now fail fast in non-interactive `--job` mode with clear guidance.
 - Session stats unique-count refresh now uses incremental cache updates on append growth, with automatic full-recount fallback on non-append changes.
+- Stats export JSON now includes top-level `"schema_version": "1"` for downstream compatibility checks.
 
 ## v5.1.3 - Iron Pulse
 

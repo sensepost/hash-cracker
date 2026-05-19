@@ -88,6 +88,9 @@ fi
 if ! grep -Fq '"generated_at"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing generated_at key" "$STATS_EXPORT_PATH"
 fi
+if ! grep -Fq '"schema_version": "1"' "$STATS_EXPORT_PATH"; then
+    fail_with_log "stats export missing schema_version" "$STATS_EXPORT_PATH"
+fi
 if ! grep -Fq '"session"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing session object" "$STATS_EXPORT_PATH"
 fi

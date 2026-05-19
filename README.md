@@ -254,6 +254,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Set `--no-session-log` to disable file logging
 - With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).
 - With `--stats-export`, current stats are written as JSON on each refresh cycle.
+- Exported JSON includes a top-level `"schema_version"` for stable downstream parsing.
 - With `--stats-export-scope latest` (default), JSON contains the latest snapshot only.
 - With `--stats-export-scope all`, JSON also includes parsed history from `logs/session-*.log`.
 

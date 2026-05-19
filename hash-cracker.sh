@@ -509,6 +509,7 @@ function export_session_stats_json() {
 
     cat >"$tmp_path" <<EOF
 {
+  "schema_version": "1",
   "generated_at": "$(json_escape "$generated_at")",
   "export_scope": "$(json_escape "$export_scope")",
   "release": "$(json_escape "$release_label")",
