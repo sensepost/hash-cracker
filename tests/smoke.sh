@@ -77,6 +77,27 @@ assert_contains "0. Exit"
 assert_contains "99. Session stats dashboard"
 assert_contains "Bye..."
 
+echo "[smoke] list-jobs mode prints options and exits"
+run_case list_jobs bash -lc "./hash-cracker.sh --dry-run --list-jobs"
+assert_rc_eq 0
+assert_contains "1. Brute force"
+assert_contains "99. Session stats dashboard"
+
+echo "[smoke] non-interactive --job mode runs a job and exits"
+run_case single_job bash -lc "./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 0
+assert_contains "Brute force processing done"
+
+echo "[smoke] invalid --job selection fails clearly"
+run_case single_job_invalid bash -lc "./hash-cracker.sh --dry-run --job 999"
+assert_rc_eq 1
+assert_contains "Invalid job selection for --job: 999"
+
+echo "[smoke] prompting --job in non-interactive mode fails clearly"
+run_case single_job_prompting bash -lc "./hash-cracker.sh --dry-run --job 8"
+assert_rc_eq 1
+assert_contains "requires interactive input and cannot run in non-interactive --job mode"
+
 echo "[smoke] invalid option recovers back to menu"
 run_case invalid_option bash -lc "printf '999\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0

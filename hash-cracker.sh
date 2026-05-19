@@ -49,13 +49,21 @@ function banner_center_line() {
     printf '│ %*s%s%*s │\n' "$pad_left" '' "$clipped" "$pad_right" ''
 }
 
+function release_version_text() {
+    printf '%s' 'v6.0 "Command Forge"'
+}
+
+function release_label_text() {
+    printf 'hash-cracker %s' "$(release_version_text)"
+}
+
 function hash-cracker() {
     local status_text
     local version_text
     local progress_text
 
     status_text="status: ${BANNER_STATUS:-cracking salted secrets}"
-    version_text='v5.1.3 "Iron Pulse"'
+    version_text="$(release_version_text)"
     progress_text="[██████████████████░░░░] 82%"
 
     cat <<'EOF'
@@ -103,6 +111,15 @@ function menu_entries() {
 21|Custom brute force|scripts/processors/21-custom-brute-force.sh
 22|Directory of word lists plain and then with buka_400k|scripts/processors/22-multiple-wordlists-buka.sh
 EOF
+}
+
+function print_job_list() {
+    local option_id option_text processor
+
+    while IFS='|' read -r option_id option_text processor; do
+        echo "$option_id. $option_text"
+    done < <(menu_entries)
+    echo "99. Session stats dashboard"
 }
 
 function dependency_fail() {
@@ -396,7 +413,7 @@ function show_session_stats_dashboard() {
     local log_state
     local keep_count
     local log_path
-    local release_text='hash-cracker v5.1.3 "Iron Pulse"'
+    local release_text
 
     if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
         log_state="disabled"
@@ -406,11 +423,12 @@ function show_session_stats_dashboard() {
 
     keep_count=$(session_log_keep_count)
     log_path="${SESSION_STATS_LOGFILE:-n/a}"
+    release_text="$(release_label_text)"
     session_stats_line="new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes"
 
     echo
     echo "+--------------------------------------+--------------------------------------------------------+"
-    echo "| Session Stats Dashboard              | hash-cracker v5.1.3 \"Iron Pulse\"                      |"
+    dashboard_line "Session Stats Dashboard" "$(release_label_text)"
     echo "+--------------------------------------+--------------------------------------------------------+"
     dashboard_line "Generated at" "$(timestamp_now)"
     dashboard_line "Release" "$release_text"
@@ -427,6 +445,15 @@ function show_session_stats_dashboard() {
     dashboard_line "Session log file" "$log_path"
     echo "+--------------------------------------+--------------------------------------------------------+"
     echo
+}
+
+function build_session_stats_line() {
+    printf 'Session stats: new %s lines, %s unique, %s bytes | total cracked passwords in potfile: %s lines | input hashes: %s unique' \
+        "$(signed_num "$SESSION_NEW_CRACKS")" \
+        "$(signed_num "$SESSION_NEW_UNIQUE")" \
+        "$(signed_num "$SESSION_GROWTH_BYTES")" \
+        "$SESSION_POT_LINES_CUR" \
+        "$SESSION_HASHLIST_INPUT_UNIQUE"
 }
 
 function init_session_stats() {
@@ -540,6 +567,48 @@ function run_self_test() {
     return 0
 }
 
+function run_single_job_mode() {
+    local selected="$1"
+    local rc
+    local session_stats_line
+
+    refresh_session_stats
+    session_stats_line=$(build_session_stats_line)
+    log_session_stats_line "$session_stats_line"
+
+    if [ "$selected" = "99" ]; then
+        show_session_stats_dashboard
+        return 0
+    fi
+
+    case "$selected" in
+        4 | 5 | 8 | 15 | 17 | 18 | 21 | 22)
+            if [ ! -t 0 ]; then
+                status_error "Job $selected requires interactive input and cannot run in non-interactive --job mode."
+                status_heading "Use --list-jobs and choose a non-prompting job, or run interactively."
+                return 1
+            fi
+            ;;
+    esac
+
+    if ! check_job_dependencies "$selected"; then
+        return 1
+    fi
+
+    if ! run_processor "$selected"; then
+        status_error "Invalid job selection for --job: $selected"
+        status_heading "Use --list-jobs to see available options."
+        return 1
+    fi
+    rc=$?
+
+    refresh_session_stats
+    session_stats_line=$(build_session_stats_line)
+    log_session_stats_line "$session_stats_line"
+
+    return $rc
+}
+
 function menu() {
     local option_id option_text processor
     local session_stats_line
@@ -547,12 +616,9 @@ function menu() {
     while true; do
         refresh_session_stats
         echo -e "\n0. Exit"
-        while IFS='|' read -r option_id option_text processor; do
-            echo "$option_id. $option_text"
-        done < <(menu_entries)
-        echo "99. Session stats dashboard"
+        print_job_list
         echo
-        session_stats_line="Session stats: new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes | total cracked passwords in potfile: $SESSION_POT_LINES_CUR lines | input hashes: $SESSION_HASHLIST_INPUT_UNIQUE unique"
+        session_stats_line=$(build_session_stats_line)
         log_session_stats_line "$session_stats_line"
 
         if [ "$DRYRUN" = ' ' ]; then
@@ -597,9 +663,20 @@ source scripts/parameters.sh "$@"
 status_heading "Preparing session stats (counting potfile and input hashes)..."
 init_session_stats
 
+if [ "$JOBLIST" = ' ' ]; then
+    print_job_list
+    exit 0
+fi
+
 if [ "$SELFTEST" = ' ' ]; then
     run_self_test
     exit $?
 fi
 
+if [ -n "${JOBMODE:-}" ]; then
+    run_single_job_mode "$JOBMODE"
+    exit $?
+fi
+
 menu "$@"
+release_text="$(release_label_text)"

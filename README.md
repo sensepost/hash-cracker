@@ -137,6 +137,18 @@ Run in dry-run mode:
 ./hash-cracker.sh --dry-run
 ```
 
+List available jobs and exit:
+
+```bash
+./hash-cracker.sh --list-jobs
+```
+
+Run one job non-interactively:
+
+```bash
+./hash-cracker.sh --job 8
+```
+
 Run with session logging disabled:
 
 ```bash
@@ -162,6 +174,8 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
 - `--no-session-log` - disable session stats logging to file
 - `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `0`, no pruning)
+- `--job [ID]`, `--job=ID` - run one menu option non-interactively and exit (supports `1-22` and `99`)
+- `--list-jobs` - print available job IDs and exit
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Menu Options
@@ -202,6 +216,8 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Option `17` can generate candidates from either the potfile or a selected wordlist.
 - Option `18` prompts for a URL, output wordlist name, spider depth, and minimum word length.
 - Option `21` prompts for brute-force length and whether increment mode should be enabled.
+- `--job` mode runs selected options directly without entering the interactive menu.
+- In non-interactive contexts, prompt-dependent jobs (for example `4`, `5`, `8`, `15`, `17`, `18`, `21`, `22`) fail fast with a clear message.
 
 ## Runtime Status Output
 

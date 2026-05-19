@@ -1,5 +1,25 @@
 # Version log
 
+## v6.0 - Command Forge
+
+### Highlights
+
+- Added first-class non-interactive execution for automation workflows.
+
+### Added
+
+- New flag: `--list-jobs`
+  - Prints available job IDs and descriptions, then exits.
+- New flag: `--job [ID]` (also supports `--job=ID`)
+  - Runs a single option non-interactively and exits.
+  - Supports all menu jobs `1-22` and dashboard `99`.
+
+### Changed
+
+- Startup and dashboard release label updated to `v6.0 "Command Forge"`.
+- Non-interactive job runs now reuse existing dependency validation and session-stats logging behavior.
+- Prompt-dependent jobs now fail fast in non-interactive `--job` mode with clear guidance.
+
 ## v5.1.3 - Iron Pulse
 
 ### Highlights
