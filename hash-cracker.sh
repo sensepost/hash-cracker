@@ -313,6 +313,56 @@ function count_hashlist_unique_entries() {
     fi
 }
 
+function cleanup_session_state() {
+    if [ -n "${SESSION_POT_UNIQUE_CACHE:-}" ]; then
+        rm -f -- "$SESSION_POT_UNIQUE_CACHE" 2>/dev/null || true
+    fi
+}
+
+function rebuild_unique_plaintext_cache() {
+    if [ -f "$POTFILE" ]; then
+        awk -F: 'NF {print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$SESSION_POT_UNIQUE_CACHE"
+    else
+        : >"$SESSION_POT_UNIQUE_CACHE"
+    fi
+    SESSION_POT_UNIQUE_CUR=$(wc -l <"$SESSION_POT_UNIQUE_CACHE" | tr -d '[:space:]')
+    stats_debug_note "Stats refresh mode: full recount (unique plaintext cache rebuilt: $SESSION_POT_UNIQUE_CUR)"
+}
+
+function update_unique_plaintexts_incremental() {
+    local delta_lines="$1"
+    local tmp_delta
+    local tmp_merge
+    local new_unique_lines
+
+    if [ "$delta_lines" -le 0 ]; then
+        return 0
+    fi
+
+    tmp_delta="$(mktemp /tmp/hash-cracker-unique-delta.XXXX)"
+    tmp_merge="$(mktemp /tmp/hash-cracker-unique-merge.XXXX)"
+
+    tail -n "$delta_lines" "$POTFILE" | awk -F: 'NF {print $NF}' | LC_ALL=C sort -u >"$tmp_delta"
+    if [ ! -s "$tmp_delta" ]; then
+        rm -f -- "$tmp_delta" "$tmp_merge"
+        return 0
+    fi
+
+    if [ ! -f "$SESSION_POT_UNIQUE_CACHE" ]; then
+        : >"$SESSION_POT_UNIQUE_CACHE"
+    fi
+
+    new_unique_lines=$(comm -13 "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | wc -l | tr -d '[:space:]')
+    if [ "$new_unique_lines" -gt 0 ]; then
+        cat "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | LC_ALL=C sort -u >"$tmp_merge"
+        mv "$tmp_merge" "$SESSION_POT_UNIQUE_CACHE"
+        SESSION_POT_UNIQUE_CUR=$((SESSION_POT_UNIQUE_CUR + new_unique_lines))
+    fi
+    stats_debug_note "Stats refresh mode: incremental (delta lines: $delta_lines, new unique plaintexts: $new_unique_lines)"
+
+    rm -f -- "$tmp_delta" "$tmp_merge"
+}
+
 function signed_num() {
     local value="$1"
     if [ "$value" -ge 0 ]; then
@@ -324,6 +374,16 @@ function signed_num() {
 
 function timestamp_now() {
     date '+%Y-%m-%d %H:%M:%S%z'
+}
+
+function stats_debug_enabled() {
+    [ "$STATSDEBUG" = ' ' ]
+}
+
+function stats_debug_note() {
+    if stats_debug_enabled; then
+        status_heading "$1"
+    fi
 }
 
 function session_log_keep_count() {
@@ -423,7 +483,7 @@ function show_session_stats_dashboard() {
 
     keep_count=$(session_log_keep_count)
     log_path="${SESSION_STATS_LOGFILE:-n/a}"
-    release_text="$(release_label_text)"
+    release_text="$(release_version_text)"
     session_stats_line="new $(signed_num "$SESSION_NEW_CRACKS") lines, $(signed_num "$SESSION_NEW_UNIQUE") unique, $(signed_num "$SESSION_GROWTH_BYTES") bytes"
 
     echo
@@ -438,7 +498,6 @@ function show_session_stats_dashboard() {
     dashboard_line "Session delta" "$session_stats_line"
     dashboard_line "Total cracked lines in potfile" "$SESSION_POT_LINES_CUR"
     dashboard_line "Total unique plaintexts in potfile" "$SESSION_POT_UNIQUE_CUR"
-    dashboard_line "Total potfile bytes" "$SESSION_POT_BYTES_CUR"
     dashboard_line "Unique input hashes" "$SESSION_HASHLIST_INPUT_UNIQUE"
     dashboard_line "Session logging" "$log_state"
     dashboard_line "Session log keep" "$keep_count"
@@ -459,11 +518,11 @@ function build_session_stats_line() {
 function init_session_stats() {
     SESSION_POT_LINES_BASE=$(count_file_lines "$POTFILE")
     SESSION_POT_BYTES_BASE=$(count_file_bytes "$POTFILE")
-    SESSION_POT_UNIQUE_BASE=$(count_potfile_unique_plaintexts)
+    SESSION_POT_UNIQUE_BASE=0
 
     SESSION_POT_LINES_CUR="$SESSION_POT_LINES_BASE"
     SESSION_POT_BYTES_CUR="$SESSION_POT_BYTES_BASE"
-    SESSION_POT_UNIQUE_CUR="$SESSION_POT_UNIQUE_BASE"
+    SESSION_POT_UNIQUE_CUR=0
 
     SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
     SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
@@ -474,16 +533,26 @@ function init_session_stats() {
 
     SESSION_HASHLIST_PATH_LAST="$HASHLIST"
     SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
+    SESSION_POT_UNIQUE_CACHE="/tmp/hash-cracker-unique-${BASHPID}.cache"
+    rebuild_unique_plaintext_cache
+    SESSION_POT_UNIQUE_BASE="$SESSION_POT_UNIQUE_CUR"
     init_session_stats_logfile
 }
 
 function refresh_session_stats() {
+    local delta_lines
+
     SESSION_POT_LINES_CUR=$(count_file_lines "$POTFILE")
     SESSION_POT_BYTES_CUR=$(count_file_bytes "$POTFILE")
 
     if [ "$SESSION_POT_LINES_CUR" -ne "$SESSION_POT_LINES_LAST" ] || [ "$SESSION_POT_BYTES_CUR" -ne "$SESSION_POT_BYTES_LAST" ]; then
-        status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
-        SESSION_POT_UNIQUE_CUR=$(count_potfile_unique_plaintexts)
+        if [ "$SESSION_POT_LINES_CUR" -ge "$SESSION_POT_LINES_LAST" ] && [ "$SESSION_POT_BYTES_CUR" -ge "$SESSION_POT_BYTES_LAST" ]; then
+            delta_lines=$((SESSION_POT_LINES_CUR - SESSION_POT_LINES_LAST))
+            update_unique_plaintexts_incremental "$delta_lines"
+        else
+            status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
+            rebuild_unique_plaintext_cache
+        fi
         SESSION_POT_LINES_LAST="$SESSION_POT_LINES_CUR"
         SESSION_POT_BYTES_LAST="$SESSION_POT_BYTES_CUR"
     fi
@@ -659,6 +728,7 @@ function menu() {
 }
 
 init_colors
+trap cleanup_session_state EXIT
 source scripts/parameters.sh "$@"
 status_heading "Preparing session stats (counting potfile and input hashes)..."
 init_session_stats

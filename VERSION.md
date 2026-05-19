@@ -13,12 +13,15 @@
 - New flag: `--job [ID]` (also supports `--job=ID`)
   - Runs a single option non-interactively and exits.
   - Supports all menu jobs `1-22` and dashboard `99`.
+- New flag: `--stats-debug`
+  - Prints whether session stats refresh used incremental update or full recount.
 
 ### Changed
 
 - Startup and dashboard release label updated to `v6.0 "Command Forge"`.
 - Non-interactive job runs now reuse existing dependency validation and session-stats logging behavior.
 - Prompt-dependent jobs now fail fast in non-interactive `--job` mode with clear guidance.
+- Session stats unique-count refresh now uses incremental cache updates on append growth, with automatic full-recount fallback on non-append changes.
 
 ## v5.1.3 - Iron Pulse
 

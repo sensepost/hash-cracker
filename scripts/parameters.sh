@@ -14,6 +14,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--dry-run\n\t\t Print hashcat commands without executing them"
     echo -e "\t--no-session-log\n\t\t Disable session stats logging to file"
     echo -e "\t--session-log-keep [N]\n\t\t Keep last N auto-created session logs in logs/ (default: 0, no pruning)"
+    echo -e "\t--stats-debug\n\t\t Print how session stats are refreshed (incremental vs full recount)"
     echo -e "\t--job [ID]\n\t\t Run one menu option non-interactively (supports 1-22 and 99)"
     echo -e "\t--list-jobs\n\t\t Print available job IDs and exit"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
@@ -62,6 +63,7 @@ while [[ "$#" -gt 0 ]]; do
         -d | --disable-cracked) SHOWCRACKED=' ' ;;
         --dry-run) DRYRUN=' ' ;;
         --no-session-log) SESSION_LOG_DISABLED='1' ;;
+        --stats-debug) STATSDEBUG=' ' ;;
         --job)
             case "${2:-}" in
                 '' | *[!0-9]*)
@@ -278,6 +280,10 @@ else
     else
         status_ok "Session log retention: keeping last $SESSION_LOG_KEEP_EFFECTIVE file(s)"
     fi
+fi
+
+if [ "$STATSDEBUG" = ' ' ]; then
+    status_ok "Stats debug output enabled"
 fi
 
 if [ "$JOBLIST" = ' ' ]; then

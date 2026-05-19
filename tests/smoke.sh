@@ -69,6 +69,13 @@ echo "[smoke] help output includes self-test flag"
 run_case help bash -lc "./hash-cracker.sh --help"
 assert_rc_eq 1
 assert_contains "--self-test / --doctor"
+assert_contains "--stats-debug"
+
+echo "[smoke] stats debug flag is accepted"
+run_case stats_debug bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-debug"
+assert_rc_eq 0
+assert_contains "Stats debug output enabled"
+assert_contains "Bye..."
 
 echo "[smoke] dry-run menu exits cleanly"
 run_case menu_exit bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run"

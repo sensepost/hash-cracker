@@ -174,6 +174,7 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--dry-run` - print the resolved hashcat commands without executing them; preprocessor file/tool actions are reported and skipped
 - `--no-session-log` - disable session stats logging to file
 - `--session-log-keep [N]`, `--session-log-keep=N` - keep last `N` auto-created session logs in `logs/` (default: `0`, no pruning)
+- `--stats-debug` - print whether stats refresh used incremental update or full recount
 - `--job [ID]`, `--job=ID` - run one menu option non-interactively and exit (supports `1-22` and `99`)
 - `--list-jobs` - print available job IDs and exit
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
@@ -237,6 +238,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Set `--session-log-keep [N]` to tune retention
   - Override path with `SESSION_STATS_LOGFILE`
   - Set `--no-session-log` to disable file logging
+- With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).
 
 ## Example Hashes
 
