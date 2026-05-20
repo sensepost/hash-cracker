@@ -997,17 +997,25 @@ class RuleGen:
         print("[*] Analyzing passwords file: %s:" % passwords_file)
         print("[*] Press Ctrl-C to end execution and generate statistical analysis.")
 
+        # On macOS Python 3 defaults to "spawn", which requires pickling the
+        # bound RuleGen instance and can fail for local/lambda attributes.
+        # Prefer "fork" when available (same behavior as packv2) to keep
+        # compatibility with existing worker implementation.
+        mpctx = multiprocessing
+        if "fork" in multiprocessing.get_all_start_methods():
+            mpctx = multiprocessing.get_context("fork")
+
         # Setup queues
-        passwords_queue = multiprocessing.Queue(self.threads)
-        rules_queue = multiprocessing.Queue()
-        words_queue = multiprocessing.Queue()
+        passwords_queue = mpctx.Queue(self.threads)
+        rules_queue = mpctx.Queue()
+        words_queue = mpctx.Queue()
 
         # Start workers
         for i in range(self.threads):
-            multiprocessing.Process(target=self.password_worker,
-                                    args=(i, passwords_queue, rules_queue, words_queue)).start()
-        multiprocessing.Process(target=self.rule_worker, args=(rules_queue, "%s.rule" % self.basename)).start()
-        multiprocessing.Process(target=self.word_worker, args=(words_queue, "%s.word" % self.basename)).start()
+            mpctx.Process(target=self.password_worker,
+                          args=(i, passwords_queue, rules_queue, words_queue)).start()
+        mpctx.Process(target=self.rule_worker, args=(rules_queue, "%s.rule" % self.basename)).start()
+        mpctx.Process(target=self.word_worker, args=(words_queue, "%s.word" % self.basename)).start()
 
         # Continue with the main thread
         password_count = 0
