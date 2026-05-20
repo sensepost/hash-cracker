@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.0 "Command Forge"'
+    printf '%s' 'v6.1 "Command Forge"'
 }
 
 function release_label_text() {

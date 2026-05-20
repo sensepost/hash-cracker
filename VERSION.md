@@ -11,6 +11,7 @@
 - Option `12` (PACK rulegen) now requires `python3` and `pyenchant` on Linux.
 - Option `13` (PACK mask) now runs with `python3` on Linux.
 - Bundled Linux PACK scripts under `scripts/extensions/pack-linux` were refreshed from `packv2`.
+- Runtime release label/banner now reports `v6.1 "Command Forge"`.
 
 ## v6.0 - Command Forge
 
