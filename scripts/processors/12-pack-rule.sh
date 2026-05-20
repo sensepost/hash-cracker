@@ -8,17 +8,18 @@ processor_bootstrap
 tmp=$(dryrun_tempfile packrule)
 trap 'processor_interrupt "$tmp" analysis.rule' INT TERM
 trap 'processor_cleanup "$tmp" analysis.rule' EXIT
+rulegen_path="scripts/extensions/pack-linux/rulegen.py"
+if [ "$MACHINE" == "Mac" ]; then
+    rulegen_path="scripts/extensions/pack-mac/rulegen.py"
+fi
 
 # Logic
-if [ "$MACHINE" == "Mac" ]; then
-    echo "This option is currently unavailable on Mac."
-    exit 0
-elif dry_run_enabled; then
+if dry_run_enabled; then
     dryrun_note "would extract plaintexts from $POTFILE to $tmp"
-    dryrun_note "would run python3 scripts/extensions/pack-linux/rulegen.py $tmp"
+    dryrun_note "would run python3 $rulegen_path $tmp"
 else
     cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
-    python3 scripts/extensions/pack-linux/rulegen.py "$tmp"
+    python3 "$rulegen_path" "$tmp"
     rm -f -- analysis-sorted.word analysis.word analysis-sorted.rule
 fi
 
