@@ -44,8 +44,6 @@ These are only needed for specific menu options.
   - Needed for option `18`
 - `scripts/extensions/common-substr-linux`
   - Needed for options `10` and `11`
-- `scripts/extensions/hashcat-utils-linux/bin/expander.bin`
-  - Needed for option `14`
 
 #### macOS
 
@@ -57,8 +55,6 @@ These are only needed for specific menu options.
   - Needed for option `18`
 - `scripts/extensions/common-substr-mac`
   - Needed for options `10` and `11`
-- `scripts/extensions/hashcat-utils-mac/bin/expander.bin`
-  - Needed for option `14`
 
 Notes:
 
@@ -233,6 +229,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Option `17` can generate candidates from either the potfile or a selected wordlist.
 - Option `18` prompts for a URL, output wordlist name, spider depth, and minimum word length.
 - Option `21` prompts for brute-force length and whether increment mode should be enabled.
+- Option `14` generates fingerprint fragments internally from the potfile. Set `FINGERPRINT_SEGMENT_MAX` to tune the fragment length limit; default is `8`, producing combinator candidates up to `16` characters.
 - `--job` mode runs selected options directly without entering the interactive menu.
 - In non-interactive contexts, prompt-dependent jobs (for example `4`, `5`, `8`, `15`, `17`, `18`, `21`, `22`) fail fast with a clear message.
 

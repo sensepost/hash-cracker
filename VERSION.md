@@ -1,5 +1,14 @@
 # Version log
 
+## v6.2 - Long Reach
+
+### Changed
+
+- Option `14` (Fingerprint attack) now generates fingerprint fragments internally instead of relying on bundled `expander.bin`.
+- Option `14` default fragment length increased to `8`, producing combinator candidates up to `16` characters.
+- Added `FINGERPRINT_SEGMENT_MAX` to tune option `14` fragment length.
+- Runtime release label/banner now reports `v6.2 "Long Reach"`.
+
 ## v6.1 - Command Forge
 
 ### Highlights

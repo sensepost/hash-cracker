@@ -164,6 +164,53 @@ assert_contains "[DRY-RUN]"
 assert_contains "-a1"
 assert_contains "Combinator processing done"
 
+echo "[smoke] dry-run fingerprint path uses internal generator"
+run_case fingerprint bash -lc "printf '14\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "would generate fingerprint fragments up to 8 chars"
+assert_contains "producing combinator candidates up to 16 chars"
+assert_contains "-a 1"
+assert_contains "Fingerprint attack done"
+
+echo "[smoke] fingerprint generator emits longer fragments"
+FINGERPRINT_FAKE_HASHCAT="$TMP_DIR/fingerprint-fake-hashcat.sh"
+FINGERPRINT_MAX_FILE="$TMP_DIR/fingerprint-max-len.txt"
+FINGERPRINT_ARGS_FILE="$TMP_DIR/fingerprint-args.txt"
+FINGERPRINT_POTFILE="$TMP_DIR/fingerprint.pot"
+FINGERPRINT_HASHLIST="$TMP_DIR/fingerprint.hashes"
+
+cat >"$FINGERPRINT_FAKE_HASHCAT" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" > "$FINGERPRINT_ARGS_FILE"
+for candidate_file do :; done
+awk '{ if (length(\$0) > max) max = length(\$0) } END { print max + 0 }' "\$candidate_file" > "$FINGERPRINT_MAX_FILE"
+EOF
+chmod +x "$FINGERPRINT_FAKE_HASHCAT"
+printf 'hash:abcdefghijklmno\n' >"$FINGERPRINT_POTFILE"
+printf 'hash\n' >"$FINGERPRINT_HASHLIST"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($FINGERPRINT_FAKE_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$FINGERPRINT_HASHLIST
+POTFILE=$FINGERPRINT_POTFILE
+WORDLIST=wordlists/ignis-1M.txt
+WORDLIST2=wordlists/ignis-1K.txt
+FINGERPRINT_SEGMENT_MAX=8
+EOF
+
+run_case fingerprint_generator bash -lc "printf '14\n0\n' | ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Fingerprint attack done"
+if [ "$(cat "$FINGERPRINT_MAX_FILE")" -ne 8 ]; then
+    fail_with_log "fingerprint generator did not emit 8-character fragments" "$LAST_LOG"
+fi
+if ! grep -Fq -- "-a 1" "$FINGERPRINT_ARGS_FILE"; then
+    fail_with_log "fingerprint hashcat command did not use combinator mode" "$FINGERPRINT_ARGS_FILE"
+fi
+restore_config
+
 echo "[smoke] dry-run pack mask path uses python3"
 run_case pack_mask_python3 bash -lc "printf '13\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0

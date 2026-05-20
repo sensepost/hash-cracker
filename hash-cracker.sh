@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.1 "Command Forge"'
+    printf '%s' 'v6.2 "Long Reach"'
 }
 
 function release_label_text() {
@@ -131,7 +131,6 @@ function dependency_fail() {
 function check_job_dependencies() {
     local selected="$1"
     local common_substr_bin
-    local expander_bin
     local python_bin
     local statsgen
     local maskgen
@@ -195,19 +194,6 @@ function check_job_dependencies() {
                 dependency_fail \
                     "Option 13 requires PACK files '$statsgen' and '$maskgen'." \
                     "restore the bundled PACK files under scripts/extensions/."
-                return 1
-            fi
-            ;;
-        14)
-            if [ "$MACHINE" == "Mac" ]; then
-                expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-mac/bin/expander.bin}"
-            else
-                expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-linux/bin/expander.bin}"
-            fi
-            if [ ! -x "$expander_bin" ]; then
-                dependency_fail \
-                    "Option 14 requires '$expander_bin'." \
-                    "restore/build hashcat-utils expander and make it executable (chmod +x '$expander_bin')."
                 return 1
             fi
             ;;
