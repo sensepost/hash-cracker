@@ -15,10 +15,10 @@ if [ "$MACHINE" == "Mac" ]; then
     exit 0
 elif dry_run_enabled; then
     dryrun_note "would extract plaintexts from $POTFILE to $tmp"
-    dryrun_note "would run python2 scripts/extensions/pack-linux/rulegen.py $tmp"
+    dryrun_note "would run python3 scripts/extensions/pack-linux/rulegen.py $tmp"
 else
     cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null
-    python2 scripts/extensions/pack-linux/rulegen.py "$tmp"
+    python3 scripts/extensions/pack-linux/rulegen.py "$tmp"
     rm -f -- analysis-sorted.word analysis.word analysis-sorted.rule
 fi
 

@@ -36,9 +36,10 @@ These are only needed for specific menu options.
 
 #### Linux
 
-- `python2`
+- `python3`
   - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
-  - The tool text recommends `python2 -m pip install pyenchant==3.0.0a1` for option `12`
+  - Option `12` requires `pyenchant`:
+  - `python3 -m pip install pyenchant==3.3.0`
 - `cewl`
   - Needed for option `18`
 - `scripts/extensions/common-substr-linux`

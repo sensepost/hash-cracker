@@ -17,7 +17,7 @@ if dry_run_enabled; then
     if [ "$MACHINE" == "Mac" ]; then
         dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
     else
-        dryrun_note "would run python2 statsgen/maskgen to produce $tmp3"
+        dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
     fi
 else
     cat "$POTFILE" | awk -F: '{print $NF}' | sort -u | tee "$tmp" &>/dev/null
@@ -25,8 +25,8 @@ else
         python3 scripts/extensions/pack-mac/statsgen.py "$tmp" -o "$tmp2"
         python3 scripts/extensions/pack-mac/maskgen.py "$tmp2" --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o "$tmp3"
     else
-        python2 scripts/extensions/pack-linux/statsgen.py "$tmp" -o "$tmp2"
-        python2 scripts/extensions/pack-linux/maskgen.py "$tmp2" --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o "$tmp3"
+        python3 scripts/extensions/pack-linux/statsgen.py "$tmp" -o "$tmp2"
+        python3 scripts/extensions/pack-linux/maskgen.py "$tmp2" --targettime 1000 --optindex -q --pps 14000000000 --minlength=2 -o "$tmp3"
     fi
 fi
 

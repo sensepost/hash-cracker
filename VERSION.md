@@ -1,5 +1,17 @@
 # Version log
 
+## v6.1 - Command Forge
+
+### Highlights
+
+- Removed Linux Python 2 dependency from PACK workflows by migrating bundled PACK scripts to Python 3.
+
+### Changed
+
+- Option `12` (PACK rulegen) now requires `python3` and `pyenchant` on Linux.
+- Option `13` (PACK mask) now runs with `python3` on Linux.
+- Bundled Linux PACK scripts under `scripts/extensions/pack-linux` were refreshed from `packv2`.
+
 ## v6.0 - Command Forge
 
 ### Highlights

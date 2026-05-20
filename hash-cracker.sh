@@ -150,19 +150,25 @@ function check_job_dependencies() {
             if [ "$MACHINE" == "Mac" ]; then
                 dependency_fail \
                     "Option 12 (PACK rulegen) is unavailable on macOS in this tool." \
-                    "run option 12 on Linux with python2 installed."
+                    "run option 12 on Linux with python3 and pyenchant installed."
                 return 1
             fi
-            if ! command -v python2 >/dev/null 2>&1; then
+            if ! command -v python3 >/dev/null 2>&1; then
                 dependency_fail \
-                    "Option 12 requires 'python2'." \
-                    "install python2 and ensure 'python2' is in PATH."
+                    "Option 12 requires 'python3'." \
+                    "install python3 and ensure 'python3' is in PATH."
                 return 1
             fi
             if [ ! -f "scripts/extensions/pack-linux/rulegen.py" ]; then
                 dependency_fail \
                     "Option 12 requires 'scripts/extensions/pack-linux/rulegen.py'." \
                     "restore the bundled PACK files in scripts/extensions/pack-linux/."
+                return 1
+            fi
+            if ! python3 -c 'import enchant' >/dev/null 2>&1; then
+                dependency_fail \
+                    "Option 12 requires Python package 'pyenchant'." \
+                    "install with 'python3 -m pip install pyenchant==3.3.0' and ensure enchant dictionaries are available."
                 return 1
             fi
             ;;
@@ -172,7 +178,7 @@ function check_job_dependencies() {
                 statsgen="scripts/extensions/pack-mac/statsgen.py"
                 maskgen="scripts/extensions/pack-mac/maskgen.py"
             else
-                python_bin="python2"
+                python_bin="python3"
                 statsgen="scripts/extensions/pack-linux/statsgen.py"
                 maskgen="scripts/extensions/pack-linux/maskgen.py"
             fi

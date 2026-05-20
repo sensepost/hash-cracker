@@ -164,6 +164,12 @@ assert_contains "[DRY-RUN]"
 assert_contains "-a1"
 assert_contains "Combinator processing done"
 
+echo "[smoke] dry-run pack mask path uses python3"
+run_case pack_mask_python3 bash -lc "printf '13\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "would run python3 statsgen/maskgen to produce"
+assert_contains "PACK mask processing done"
+
 echo "[smoke] self-test mode runs to completion"
 run_case self_test bash -lc "./hash-cracker.sh --self-test --dry-run"
 if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then
