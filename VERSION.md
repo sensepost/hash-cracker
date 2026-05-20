@@ -1,5 +1,21 @@
 # Version log
 
+## v6.1 - Command Forge
+
+### Highlights
+
+- Removed Linux Python 2 dependency from PACK workflows by migrating bundled PACK scripts to Python 3.
+
+### Changed
+
+- Option `12` (PACK rulegen) now requires `python3` and `pyenchant` on Linux.
+- Option `13` (PACK mask) now runs with `python3` on Linux.
+- Bundled Linux PACK scripts under `scripts/extensions/pack-linux` were refreshed from `packv2`.
+- Runtime release label/banner now reports `v6.1 "Command Forge"`.
+- Option `12` (PACK rulegen) is now enabled on macOS with `python3` + `pyenchant`.
+- Option `12` macOS rulegen multiprocessing now prefers `fork` context to avoid Python `spawn` pickling failures.
+- Job-specific dependency checks now correctly select macOS/Linux binaries for options `10`, `11`, and `14`.
+
 ## v6.0 - Command Forge
 
 ### Highlights

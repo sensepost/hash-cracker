@@ -34,7 +34,7 @@ elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "9. Iterate results: Iterate gathered results from a previous performed job, advise to run this multiple times after completing other tasks"
     echo "10. Prefix suffix: Will take the already cracked hashes, take the prefix and suffix and put them together in variations"
     echo "11. Common substring: Will take the common substrings out of the already cracked hashes and create new variations"
-    echo "12. PACK rulegen will take the already cracked plaintext passwords and create a new rule, the rule is then used with the wordlist of your choise. Requires pyenchant (pip3 install pyenchant==3.0.0a1) - Currently not working on Apple Silicon"
+    echo "12. PACK rulegen will take the already cracked plaintext passwords and create a new rule, the rule is then used with the wordlist of your choise. Requires pyenchant (python3 -m pip install pyenchant==3.3.0)"
     echo "13. PACK maskgen will craft pattern-based mask attacks."
     echo "14. Fingerprint attack, disassembling cracked plaintext passwords into all its possible mutations. Using as new input and afterwards running with some rules"
     echo "15. Takes all wordlists in a folder, for example the 'wordlists'. Goes thru them plaintext and then again with OneRuleToRuleThemAll."
