@@ -173,8 +173,8 @@ assert_contains "PACK mask processing done"
 echo "[smoke] dry-run pack rule path uses python3"
 run_case pack_rule_python3 bash -lc "printf '12\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
-if grep -Fq "would run python3 scripts/extensions/pack-linux/rulegen.py" "$LAST_LOG" || \
-   grep -Fq "would run python3 scripts/extensions/pack-mac/rulegen.py" "$LAST_LOG"; then
+if grep -Fq "would run python3 scripts/extensions/pack-linux/rulegen.py" "$LAST_LOG" \
+    || grep -Fq "would run python3 scripts/extensions/pack-mac/rulegen.py" "$LAST_LOG"; then
     if ! grep -Fq "PACK rule processing done" "$LAST_LOG"; then
         fail_with_log "pack rule dry-run command printed but completion marker missing" "$LAST_LOG"
     fi

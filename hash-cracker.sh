@@ -138,7 +138,11 @@ function check_job_dependencies() {
 
     case "$selected" in
         10 | 11)
-            common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
+            if [ "$MACHINE" == "Mac" ]; then
+                common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-mac}"
+            else
+                common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
+            fi
             if [ ! -x "$common_substr_bin" ]; then
                 dependency_fail \
                     "Option $selected requires '$common_substr_bin'." \
@@ -195,7 +199,11 @@ function check_job_dependencies() {
             fi
             ;;
         14)
-            expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-linux/bin/expander.bin}"
+            if [ "$MACHINE" == "Mac" ]; then
+                expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-mac/bin/expander.bin}"
+            else
+                expander_bin="${EXPANDER_BIN:-scripts/extensions/hashcat-utils-linux/bin/expander.bin}"
+            fi
             if [ ! -x "$expander_bin" ]; then
                 dependency_fail \
                     "Option 14 requires '$expander_bin'." \
@@ -913,4 +921,3 @@ if [ -n "${JOBMODE:-}" ]; then
 fi
 
 menu "$@"
-release_text="$(release_label_text)"
