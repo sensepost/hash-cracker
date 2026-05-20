@@ -211,6 +211,26 @@ if ! grep -Fq -- "-a 1" "$FINGERPRINT_ARGS_FILE"; then
 fi
 restore_config
 
+echo "[smoke] dry-run pack mask path uses python3"
+run_case pack_mask_python3 bash -lc "printf '13\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "would run python3 statsgen/maskgen to produce"
+assert_contains "PACK mask processing done"
+
+echo "[smoke] dry-run pack rule path uses python3"
+run_case pack_rule_python3 bash -lc "printf '12\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+if grep -Fq "would run python3 scripts/extensions/pack-linux/rulegen.py" "$LAST_LOG" \
+    || grep -Fq "would run python3 scripts/extensions/pack-mac/rulegen.py" "$LAST_LOG"; then
+    if ! grep -Fq "PACK rule processing done" "$LAST_LOG"; then
+        fail_with_log "pack rule dry-run command printed but completion marker missing" "$LAST_LOG"
+    fi
+elif grep -Fq "Option 12 requires Python package 'pyenchant'." "$LAST_LOG"; then
+    :
+else
+    fail_with_log "unexpected pack rule output: expected dry-run command or pyenchant dependency message" "$LAST_LOG"
+fi
+
 echo "[smoke] self-test mode runs to completion"
 run_case self_test bash -lc "./hash-cracker.sh --self-test --dry-run"
 if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then

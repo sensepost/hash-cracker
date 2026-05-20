@@ -36,9 +36,10 @@ These are only needed for specific menu options.
 
 #### Linux
 
-- `python2`
+- `python3`
   - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
-  - The tool text recommends `python2 -m pip install pyenchant==3.0.0a1` for option `12`
+  - Option `12` requires `pyenchant`:
+  - `python3 -m pip install pyenchant==3.3.0`
 - `cewl`
   - Needed for option `18`
 - `scripts/extensions/common-substr-linux`
@@ -46,16 +47,17 @@ These are only needed for specific menu options.
 
 #### macOS
 
+- `python3`
+  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - Option `12` requires `pyenchant`:
+  - `python3 -m pip install pyenchant==3.3.0`
 - `cewl` command in PATH, or `scripts/extensions/cewl/cewl.rb`
   - Needed for option `18`
 - `scripts/extensions/common-substr-mac`
   - Needed for options `10` and `11`
-- `python3`
-  - Used by option `13` (PACK mask)
 
 Notes:
 
-- Option `12` is currently unavailable on macOS.
 - Option `13` uses the bundled PACK scripts and generates masks from the existing potfile.
 
 ## Configuration

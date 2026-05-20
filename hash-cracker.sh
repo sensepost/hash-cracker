@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.0 "Command Forge"'
+    printf '%s' 'v6.2 "Long Reach"'
 }
 
 function release_label_text() {
@@ -137,7 +137,11 @@ function check_job_dependencies() {
 
     case "$selected" in
         10 | 11)
-            common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
+            if [ "$MACHINE" == "Mac" ]; then
+                common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-mac}"
+            else
+                common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
+            fi
             if [ ! -x "$common_substr_bin" ]; then
                 dependency_fail \
                     "Option $selected requires '$common_substr_bin'." \
@@ -147,21 +151,26 @@ function check_job_dependencies() {
             ;;
         12)
             if [ "$MACHINE" == "Mac" ]; then
+                statsgen="scripts/extensions/pack-mac/rulegen.py"
+            else
+                statsgen="scripts/extensions/pack-linux/rulegen.py"
+            fi
+            if ! command -v python3 >/dev/null 2>&1; then
                 dependency_fail \
-                    "Option 12 (PACK rulegen) is unavailable on macOS in this tool." \
-                    "run option 12 on Linux with python2 installed."
+                    "Option 12 requires 'python3'." \
+                    "install python3 and ensure 'python3' is in PATH."
                 return 1
             fi
-            if ! command -v python2 >/dev/null 2>&1; then
+            if [ ! -f "$statsgen" ]; then
                 dependency_fail \
-                    "Option 12 requires 'python2'." \
-                    "install python2 and ensure 'python2' is in PATH."
+                    "Option 12 requires '$statsgen'." \
+                    "restore the bundled PACK files under scripts/extensions/."
                 return 1
             fi
-            if [ ! -f "scripts/extensions/pack-linux/rulegen.py" ]; then
+            if ! python3 -c 'import enchant' >/dev/null 2>&1; then
                 dependency_fail \
-                    "Option 12 requires 'scripts/extensions/pack-linux/rulegen.py'." \
-                    "restore the bundled PACK files in scripts/extensions/pack-linux/."
+                    "Option 12 requires Python package 'pyenchant'." \
+                    "install with 'python3 -m pip install pyenchant==3.3.0' and ensure enchant dictionaries are available."
                 return 1
             fi
             ;;
@@ -171,7 +180,7 @@ function check_job_dependencies() {
                 statsgen="scripts/extensions/pack-mac/statsgen.py"
                 maskgen="scripts/extensions/pack-mac/maskgen.py"
             else
-                python_bin="python2"
+                python_bin="python3"
                 statsgen="scripts/extensions/pack-linux/statsgen.py"
                 maskgen="scripts/extensions/pack-linux/maskgen.py"
             fi
@@ -898,4 +907,3 @@ if [ -n "${JOBMODE:-}" ]; then
 fi
 
 menu "$@"
-release_text="$(release_label_text)"

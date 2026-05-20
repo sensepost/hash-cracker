@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # PolicyGen - Analyze and Generate password masks according to a password policy
 #
 # This tool is part of PACK (Password Analysis and Cracking Kit)
@@ -45,7 +45,7 @@ class PolicyGen:
             elif char == "d": count *= 10
             elif char == "s": count *= 33
             elif char == "a": count *= 95
-            else: print "[!] Error, unknown mask ?%s in a mask %s" % (char,mask)
+            else: print("[!] Error, unknown mask ?%s in a mask %s" % (char,mask))
 
         return count
    
@@ -61,8 +61,8 @@ class PolicyGen:
         sample_complexity = 0
 
         # TODO: Randomize or even statistically arrange matching masks
-        for length in xrange(self.minlength, self.maxlength+1):
-            print "[*] Generating %d character password masks." % length
+        for length in range(self.minlength, self.maxlength+1):
+            print("[*] Generating %d character password masks." % length)
             total_length_count = 0
             sample_length_count = 0
 
@@ -107,9 +107,9 @@ class PolicyGen:
                     sample_length_complexity += mask_complexity
 
                     if self.showmasks:
-                        mask_time = mask_complexity/self.pps      
+                        mask_time = mask_complexity//self.pps
                         time_human = ">1 year" if mask_time > 60*60*24*365 else str(datetime.timedelta(seconds=mask_time))
-                        print "[{:>2}] {:<30} [l:{:>2} u:{:>2} d:{:>2} s:{:>2}] [{:>8}]  ".format(length, mask, lowercount,uppercount,digitcount,specialcount, time_human)
+                        print("[{:>2}] {:<30} [l:{:>2} u:{:>2} d:{:>2} s:{:>2}] [{:>8}]  ".format(length, mask, lowercount,uppercount,digitcount,specialcount, time_human))
 
                     if self.output_file:
                         self.output_file.write("%s\n" % mask)
@@ -121,13 +121,13 @@ class PolicyGen:
             sample_complexity += sample_length_complexity
 
 
-        total_time = total_complexity/self.pps
+        total_time = total_complexity//self.pps
         total_time_human = ">1 year" if total_time > 60*60*24*365 else str(datetime.timedelta(seconds=total_time))
-        print "[*] Total Masks:  %d Time: %s" % (total_count, total_time_human)
+        print("[*] Total Masks:  %d Time: %s" % (total_count, total_time_human))
 
-        sample_time = sample_complexity/self.pps
+        sample_time = sample_complexity//self.pps
         sample_time_human = ">1 year" if sample_time > 60*60*24*365 else str(datetime.timedelta(seconds=sample_time))
-        print "[*] Policy Masks: %d Time: %s" % (sample_count, sample_time_human)
+        print("[*] Policy Masks: %d Time: %s" % (sample_count, sample_time_human))
 
 
 if __name__ == "__main__":
@@ -168,13 +168,13 @@ if __name__ == "__main__":
 
     # Print program header
     if not options.quiet:
-        print header
+        print(header)
 
     policygen = PolicyGen()
 
     # Settings    
     if options.output_masks:
-        print "[*] Saving generated masks to [%s]" % options.output_masks
+        print("[*] Saving generated masks to [%s]" % options.output_masks)
         policygen.output_file = open(options.output_masks, 'w')
 
 
@@ -194,13 +194,13 @@ if __name__ == "__main__":
     if options.pps: policygen.pps = options.pps
     if options.showmasks: policygen.showmasks = options.showmasks
 
-    print "[*] Using {:,d} keys/sec for calculations.".format(policygen.pps)
+    print("[*] Using {:,d} keys/sec for calculations.".format(policygen.pps))
 
     # Print current password policy
-    print "[*] Password policy:"
-    print "    Pass Lengths: min:%d max:%d" % (policygen.minlength, policygen.maxlength)
-    print "    Min strength: l:%s u:%s d:%s s:%s" % (policygen.minlower, policygen.minupper, policygen.mindigit, policygen.minspecial)
-    print "    Max strength: l:%s u:%s d:%s s:%s" % (policygen.maxlower, policygen.maxupper, policygen.maxdigit, policygen.maxspecial)
+    print("[*] Password policy:")
+    print("    Pass Lengths: min:%d max:%d" % (policygen.minlength, policygen.maxlength))
+    print("    Min strength: l:%s u:%s d:%s s:%s" % (policygen.minlower, policygen.minupper, policygen.mindigit, policygen.minspecial))
+    print("    Max strength: l:%s u:%s d:%s s:%s" % (policygen.maxlower, policygen.maxupper, policygen.maxdigit, policygen.maxspecial))
 
-    print "[*] Generating [%s] masks." % ("compliant" if not options.noncompliant else "non-compliant")
+    print("[*] Generating [%s] masks." % ("compliant" if not options.noncompliant else "non-compliant"))
     policygen.generate_masks(options.noncompliant)
