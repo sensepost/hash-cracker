@@ -147,6 +147,18 @@ Run one job non-interactively:
 ./hash-cracker.sh --job 8
 ```
 
+List built-in presets:
+
+```bash
+./hash-cracker.sh --list-presets
+```
+
+Run a built-in preset:
+
+```bash
+./hash-cracker.sh --preset quick
+```
+
 Run with session logging disabled:
 
 ```bash
@@ -189,7 +201,18 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--stats-export-scope [latest|all]`, `--stats-export-scope=...` - export latest snapshot only (`latest`, default) or include all parsed entries from `logs/session-*.log` (`all`)
 - `--job [ID]`, `--job=ID` - run one menu option non-interactively and exit (supports `1-22` and `99`)
 - `--list-jobs` - print available job IDs and exit
+- `--preset [NAME]`, `--preset=NAME` - run a built-in non-interactive job preset and exit
+- `--list-presets` - print available built-in presets and exit
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
+
+## Built-In Presets
+
+Presets run safe non-interactive jobs in sequence and stop on the first failed job.
+
+- `quick` - baseline and iteration coverage (`1,9`)
+- `quick-plus` - quick coverage plus common substring pass (`1,9,11`)
+- `deep` - baseline, iteration, prefix/suffix, substring, and digit-remover coverage (`1,9,10,11,19`)
+- `deep-plus` - extended potfile-driven coverage with prefix/suffix and substring passes (`1,9,10,11,14,19,9`)
 
 ## Menu Options
 

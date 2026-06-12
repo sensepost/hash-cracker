@@ -1,5 +1,24 @@
 # Version log
 
+## v6.3 - Preset Rail
+
+### Added
+
+- New flag: `--list-presets`
+  - Prints available built-in preset names, descriptions, and job sequences.
+- New flag: `--preset [NAME]` (also supports `--preset=NAME`)
+  - Runs a built-in non-interactive job preset and exits.
+- Built-in presets:
+  - `quick`: baseline and iteration coverage with jobs `1,9`.
+  - `quick-plus`: quick coverage plus common substring pass with jobs `1,9,11`.
+  - `deep`: baseline, iteration, prefix/suffix, substring, and digit-remover coverage with jobs `1,9,10,11,19`.
+  - `deep-plus`: extended potfile-driven coverage with jobs `1,9,10,11,14,19,9`.
+
+### Changed
+
+- Runtime release label/banner now reports `v6.3 "Preset Rail"`.
+- Preset runs stop on the first failed job and report the preset name, job ID, and job label.
+
 ## v6.2 - Long Reach
 
 ### Changed
