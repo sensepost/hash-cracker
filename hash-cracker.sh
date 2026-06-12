@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.2 "Long Reach"'
+    printf '%s' 'v6.3 "Preset Rail"'
 }
 
 function release_label_text() {
@@ -120,6 +120,75 @@ function print_job_list() {
         echo "$option_id. $option_text"
     done < <(menu_entries)
     echo "99. Session stats dashboard"
+}
+
+function preset_entries() {
+    cat <<'EOF'
+quick|Quick baseline and iteration coverage|1,9
+quick-plus|Quick coverage plus common substring pass|1,9,11
+deep|Baseline, iteration, prefix/suffix, substring, and digit-remover coverage|1,9,10,11,19
+deep-plus|Extended potfile-driven coverage with prefix/suffix and substring passes|1,9,10,11,14,19,9
+EOF
+}
+
+function print_preset_list() {
+    local preset_name preset_text preset_jobs
+
+    while IFS='|' read -r preset_name preset_text preset_jobs; do
+        printf '%s - %s (jobs: %s)\n' "$preset_name" "$preset_text" "$preset_jobs"
+    done < <(preset_entries)
+}
+
+function run_early_list_mode() {
+    local arg
+
+    for arg in "$@"; do
+        case "$arg" in
+            --list-jobs)
+                print_job_list
+                exit 0
+                ;;
+            --list-presets)
+                print_preset_list
+                exit 0
+                ;;
+        esac
+    done
+}
+
+function get_preset_jobs() {
+    local selected="$1"
+    local preset_name preset_text preset_jobs
+
+    while IFS='|' read -r preset_name preset_text preset_jobs; do
+        if [[ "$selected" == "$preset_name" ]]; then
+            printf '%s' "$preset_jobs"
+            return 0
+        fi
+    done < <(preset_entries)
+
+    return 1
+}
+
+function job_text_by_id() {
+    local selected="$1"
+    local option_id option_text processor
+
+    while IFS='|' read -r option_id option_text processor; do
+        if [[ "$selected" == "$option_id" ]]; then
+            printf '%s' "$option_text"
+            return 0
+        fi
+    done < <(menu_entries)
+
+    return 1
+}
+
+function preset_job_supported() {
+    case "$1" in
+        1 | 9 | 10 | 11 | 12 | 13 | 14 | 16 | 19) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 function dependency_fail() {
@@ -835,6 +904,67 @@ function run_single_job_mode() {
     return $rc
 }
 
+function run_preset_mode() {
+    local preset_name="$1"
+    local preset_jobs
+    local job_id
+    local job_text
+    local rc
+    local session_stats_line
+    local -a preset_job_ids
+
+    if ! preset_jobs="$(get_preset_jobs "$preset_name")"; then
+        status_error "Invalid preset: $preset_name"
+        status_heading "Use --list-presets to see available presets."
+        return 1
+    fi
+
+    IFS=',' read -ra preset_job_ids <<<"$preset_jobs"
+    for job_id in "${preset_job_ids[@]}"; do
+        if ! preset_job_supported "$job_id"; then
+            status_error "Preset '$preset_name' contains unsupported non-interactive job: $job_id"
+            status_heading "Presets currently support jobs 1, 9, 10, 11, 12, 13, 14, 16, and 19."
+            return 1
+        fi
+        if ! job_text="$(job_text_by_id "$job_id")"; then
+            status_error "Preset '$preset_name' contains unknown job: $job_id"
+            status_heading "Use --list-jobs to see available jobs."
+            return 1
+        fi
+    done
+
+    refresh_session_stats
+    session_stats_line=$(build_session_stats_line)
+    log_session_stats_line "$session_stats_line"
+    export_session_stats_json
+
+    status_heading "Running preset '$preset_name' (jobs: $preset_jobs)"
+    for job_id in "${preset_job_ids[@]}"; do
+        job_text="$(job_text_by_id "$job_id")"
+        status_heading "Preset '$preset_name': running job $job_id ($job_text)"
+
+        if ! check_job_dependencies "$job_id"; then
+            status_error "Preset '$preset_name' failed before job $job_id ($job_text): missing dependency."
+            return 1
+        fi
+
+        run_processor "$job_id"
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            status_error "Preset '$preset_name' failed at job $job_id ($job_text)."
+            return "$rc"
+        fi
+
+        refresh_session_stats
+        session_stats_line=$(build_session_stats_line)
+        log_session_stats_line "$session_stats_line"
+        export_session_stats_json
+    done
+
+    status_ok "Preset '$preset_name' completed."
+    return 0
+}
+
 function menu() {
     local option_id option_text processor
     local session_stats_line
@@ -885,6 +1015,7 @@ function menu() {
     done
 }
 
+run_early_list_mode "$@"
 init_colors
 trap cleanup_session_state EXIT
 source scripts/parameters.sh "$@"
@@ -896,8 +1027,23 @@ if [ "$JOBLIST" = ' ' ]; then
     exit 0
 fi
 
+if [ "$PRESETLIST" = ' ' ]; then
+    print_preset_list
+    exit 0
+fi
+
 if [ "$SELFTEST" = ' ' ]; then
     run_self_test
+    exit $?
+fi
+
+if [ -n "${PRESETMODE:-}" ] && [ -n "${JOBMODE:-}" ]; then
+    status_error "Use either --preset or --job, not both."
+    exit 1
+fi
+
+if [ -n "${PRESETMODE:-}" ]; then
+    run_preset_mode "$PRESETMODE"
     exit $?
 fi
 

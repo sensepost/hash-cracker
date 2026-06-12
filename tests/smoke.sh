@@ -57,6 +57,15 @@ assert_contains() {
     fi
 }
 
+assert_not_contains() {
+    local needle="$1"
+    if grep -Fq -- "$needle" "$LAST_LOG"; then
+        echo "[FAIL] expected output not to contain: $needle"
+        cat "$LAST_LOG"
+        exit 1
+    fi
+}
+
 fail_with_log() {
     local message="$1"
     local log_file="$2"
@@ -71,6 +80,8 @@ assert_rc_eq 1
 assert_contains "--self-test / --doctor"
 assert_contains "--stats-debug"
 assert_contains "--stats-export-scope [latest|all]"
+assert_contains "--preset [NAME]"
+assert_contains "--list-presets"
 
 echo "[smoke] stats debug flag is accepted"
 run_case stats_debug bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-debug"
@@ -130,15 +141,82 @@ assert_rc_eq 0
 assert_contains "1. Brute force"
 assert_contains "99. Session stats dashboard"
 
+echo "[smoke] list-presets mode prints built-in presets and exits"
+run_case list_presets bash -lc "./hash-cracker.sh --dry-run --list-presets"
+assert_rc_eq 0
+assert_contains "quick - Quick baseline and iteration coverage (jobs: 1,9)"
+assert_contains "quick-plus - Quick coverage plus common substring pass (jobs: 1,9,11)"
+assert_contains "deep - Baseline, iteration, prefix/suffix, substring, and digit-remover coverage (jobs: 1,9,10,11,19)"
+assert_contains "deep-plus - Extended potfile-driven coverage with prefix/suffix and substring passes (jobs: 1,9,10,11,14,19,9)"
+assert_not_contains "Mandatory modules:"
+assert_not_contains "Preparing session stats"
+assert_not_contains "Static parameters:"
+
 echo "[smoke] non-interactive --job mode runs a job and exits"
 run_case single_job bash -lc "./hash-cracker.sh --dry-run --job 1"
 assert_rc_eq 0
 assert_contains "Brute force processing done"
 
+echo "[smoke] preset quick runs and exits"
+run_case preset_quick bash -lc "./hash-cracker.sh --dry-run --preset quick"
+assert_rc_eq 0
+assert_contains "Running preset 'quick' (jobs: 1,9)"
+assert_contains "Preset 'quick': running job 1 (Brute force)"
+assert_contains "Preset 'quick': running job 9 (Iterate results)"
+assert_contains "Brute force processing done"
+assert_contains "Iteration processing done"
+assert_contains "Preset 'quick' completed."
+
+echo "[smoke] preset deep-plus dry-run reaches extended jobs"
+FAKE_COMMON_SUBSTR="$TMP_DIR/fake-common-substr.sh"
+cat >"$FAKE_COMMON_SUBSTR" <<EOF
+#!/usr/bin/env bash
+cat >/dev/null
+printf 'preview\n'
+EOF
+chmod +x "$FAKE_COMMON_SUBSTR"
+
+echo "[smoke] preset quick-plus dry-run reaches common substring job"
+run_case preset_quick_plus bash -lc "COMMON_SUBSTR_BIN=\"$FAKE_COMMON_SUBSTR\" ./hash-cracker.sh --dry-run --preset quick-plus"
+assert_rc_eq 0
+assert_contains "Running preset 'quick-plus' (jobs: 1,9,11)"
+assert_contains "Preset 'quick-plus': running job 11 (Common substring (advise: first run steps above))"
+assert_contains "Preset 'quick-plus' completed."
+
+run_case preset_deep_plus bash -lc "COMMON_SUBSTR_BIN=\"$FAKE_COMMON_SUBSTR\" ./hash-cracker.sh --dry-run --preset deep-plus"
+assert_rc_eq 0
+assert_contains "Running preset 'deep-plus' (jobs: 1,9,10,11,14,19,9)"
+assert_contains "Preset 'deep-plus': running job 10 (Prefix suffix (advise: first run steps above))"
+assert_contains "Preset 'deep-plus': running job 11 (Common substring (advise: first run steps above))"
+assert_contains "Preset 'deep-plus' completed."
+
+echo "[smoke] invalid preset selection fails clearly"
+run_case preset_invalid bash -lc "./hash-cracker.sh --dry-run --preset nope"
+assert_rc_eq 1
+assert_contains "Invalid preset: nope"
+assert_contains "Use --list-presets to see available presets."
+
+echo "[smoke] preset mode exports stats"
+PRESET_STATS_EXPORT_PATH="$TMP_DIR/preset-stats-export.json"
+run_case preset_stats_export bash -lc "./hash-cracker.sh --dry-run --preset quick --stats-export \"$PRESET_STATS_EXPORT_PATH\""
+assert_rc_eq 0
+assert_contains "Preset 'quick' completed."
+if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
+    fail_with_log "preset stats export file was not created" "$LAST_LOG"
+fi
+if ! grep -Fq '"release": "v6.3 \"Preset Rail\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.3 release marker" "$PRESET_STATS_EXPORT_PATH"
+fi
+
 echo "[smoke] invalid --job selection fails clearly"
 run_case single_job_invalid bash -lc "./hash-cracker.sh --dry-run --job 999"
 assert_rc_eq 1
 assert_contains "Invalid job selection for --job: 999"
+
+echo "[smoke] preset and job modes are mutually exclusive"
+run_case preset_job_conflict bash -lc "./hash-cracker.sh --dry-run --preset quick --job 1"
+assert_rc_eq 1
+assert_contains "Use either --preset or --job, not both."
 
 echo "[smoke] prompting --job in non-interactive mode fails clearly"
 run_case single_job_prompting bash -lc "./hash-cracker.sh --dry-run --job 8"

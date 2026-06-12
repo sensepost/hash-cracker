@@ -19,6 +19,8 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--stats-export-scope [latest|all]\n\t\t Export latest snapshot only or all entries from logs (default: latest)"
     echo -e "\t--job [ID]\n\t\t Run one menu option non-interactively (supports 1-22 and 99)"
     echo -e "\t--list-jobs\n\t\t Print available job IDs and exit"
+    echo -e "\t--preset [NAME]\n\t\t Run a built-in non-interactive job preset"
+    echo -e "\t--list-presets\n\t\t Print available preset names and exit"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -125,6 +127,22 @@ while [[ "$#" -gt 0 ]]; do
             esac
             ;;
         --list-jobs) JOBLIST=' ' ;;
+        --preset)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --preset. Provide a preset name."
+                exit 1
+            fi
+            PRESETMODE="$2"
+            shift
+            ;;
+        --preset=*)
+            PRESETMODE="${1#*=}"
+            if [ -z "$PRESETMODE" ]; then
+                status_error "Missing value for --preset. Provide a preset name."
+                exit 1
+            fi
+            ;;
+        --list-presets) PRESETLIST=' ' ;;
         --session-log-keep)
             case "${2:-}" in
                 '' | *[!0-9]*)
@@ -330,12 +348,12 @@ if [ -n "${STATSEXPORT:-}" ]; then
     status_ok "Stats export scope: ${STATSEXPORT_SCOPE:-latest}"
 fi
 
-if [ "$JOBLIST" = ' ' ]; then
-    status_ok "Job listing mode enabled"
-fi
-
 if [ -n "${JOBMODE:-}" ]; then
     status_ok "Non-interactive job mode enabled: job $JOBMODE"
+fi
+
+if [ -n "${PRESETMODE:-}" ]; then
+    status_ok "Preset mode enabled: $PRESETMODE"
 fi
 
 echo -e "\nStatic parameters:"
