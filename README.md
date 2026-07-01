@@ -159,6 +159,8 @@ Run a built-in preset:
 ./hash-cracker.sh --preset quick
 ```
 
+Preset runs print a compact execution summary with each executed job, result, exit code, and duration.
+
 Run with session logging disabled:
 
 ```bash
@@ -207,7 +209,7 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 
 ## Built-In Presets
 
-Presets run safe non-interactive jobs in sequence and stop on the first failed job.
+Presets run safe non-interactive jobs in sequence, stop on the first failed job, and print a run summary with timings.
 
 - `quick` - baseline and iteration coverage (`1,9`)
 - `quick-plus` - quick coverage plus common substring pass (`1,9,11`)
