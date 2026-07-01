@@ -156,6 +156,7 @@ echo "[smoke] non-interactive --job mode runs a job and exits"
 run_case single_job bash -lc "./hash-cracker.sh --dry-run --job 1"
 assert_rc_eq 0
 assert_contains "Brute force processing done"
+assert_contains "Job 1 (Brute force) completed in"
 
 echo "[smoke] preset quick runs and exits"
 run_case preset_quick bash -lc "./hash-cracker.sh --dry-run --preset quick"
@@ -165,6 +166,11 @@ assert_contains "Preset 'quick': running job 1 (Brute force)"
 assert_contains "Preset 'quick': running job 9 (Iterate results)"
 assert_contains "Brute force processing done"
 assert_contains "Iteration processing done"
+assert_contains "Preset 'quick' summary"
+assert_contains "| 1      | Brute force"
+assert_contains "| 9      | Iterate results"
+assert_contains "| ok      | 0"
+assert_contains "Preset: quick | planned: 2 | completed: 2 | failed: 0 | duration:"
 assert_contains "Preset 'quick' completed."
 
 echo "[smoke] preset deep-plus dry-run reaches extended jobs"
@@ -204,8 +210,8 @@ assert_contains "Preset 'quick' completed."
 if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
     fail_with_log "preset stats export file was not created" "$LAST_LOG"
 fi
-if ! grep -Fq '"release": "v6.3 \"Preset Rail\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.3 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.4 \"Run Ledger\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.4 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"

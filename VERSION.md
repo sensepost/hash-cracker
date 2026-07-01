@@ -1,5 +1,17 @@
 # Version log
 
+## v6.4 - Run Ledger
+
+### Added
+
+- Preset runs now print a compact execution summary table with each executed job, result, exit code, and duration.
+- Non-interactive `--job` runs now print a completion or failure timing line.
+- Interactive menu jobs now print a completion or failure timing line when the selected job returns.
+
+### Changed
+
+- Runtime release label/banner now reports `v6.4 "Run Ledger"`.
+
 ## v6.3 - Preset Rail
 
 ### Added
