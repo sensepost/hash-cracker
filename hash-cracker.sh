@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.3 "Preset Rail"'
+    printf '%s' 'v6.4 "Run Ledger"'
 }
 
 function release_label_text() {
@@ -184,6 +184,69 @@ function job_text_by_id() {
     return 1
 }
 
+function current_epoch_seconds() {
+    date '+%s'
+}
+
+function format_duration() {
+    local seconds="$1"
+    local hours
+    local minutes
+    local remainder
+
+    if [ -z "$seconds" ] || [ "$seconds" -lt 0 ]; then
+        seconds=0
+    fi
+
+    hours=$((seconds / 3600))
+    remainder=$((seconds % 3600))
+    minutes=$((remainder / 60))
+    seconds=$((remainder % 60))
+
+    printf '%02d:%02d:%02d' "$hours" "$minutes" "$seconds"
+}
+
+function print_job_timing_result() {
+    local job_id="$1"
+    local job_text="$2"
+    local rc="$3"
+    local duration="$4"
+
+    if [ "$rc" -eq 0 ]; then
+        status_ok "Job $job_id ($job_text) completed in $duration"
+    else
+        status_error "Job $job_id ($job_text) failed with rc=$rc after $duration"
+    fi
+}
+
+function print_preset_summary() {
+    local preset_name="$1"
+    local planned="$2"
+    local completed="$3"
+    local failed="$4"
+    local total_duration="$5"
+    local rows="$6"
+    local job_id
+    local job_text
+    local result
+    local rc
+    local duration
+
+    echo
+    status_heading "Preset '$preset_name' summary"
+    printf '+--------+------------------------------------------------+---------+------+----------+\n'
+    printf '| %-6s | %-46s | %-7s | %-4s | %-8s |\n' "Job" "Name" "Result" "RC" "Duration"
+    printf '+--------+------------------------------------------------+---------+------+----------+\n'
+    while IFS='|' read -r job_id job_text result rc duration; do
+        [ -z "$job_id" ] && continue
+        printf '| %-6s | %-46.46s | %-7s | %-4s | %-8s |\n' "$job_id" "$job_text" "$result" "$rc" "$duration"
+    done <<<"$rows"
+    printf '+--------+------------------------------------------------+---------+------+----------+\n'
+    printf 'Preset: %s | planned: %s | completed: %s | failed: %s | duration: %s\n' \
+        "$preset_name" "$planned" "$completed" "$failed" "$total_duration"
+    echo
+}
+
 function preset_job_supported() {
     case "$1" in
         1 | 9 | 10 | 11 | 12 | 13 | 14 | 16 | 19) return 0 ;;
@@ -283,6 +346,7 @@ function run_processor() {
     local selected="$1"
     local option_id option_text processor
     local selected_processor=""
+    local rc
 
     while IFS='|' read -r option_id option_text processor; do
         if [[ "$selected" == "$option_id" ]]; then
@@ -299,7 +363,8 @@ function run_processor() {
         # shellcheck source=/dev/null
         source "$selected_processor"
     )
-    return 0
+    rc=$?
+    return "$rc"
 }
 
 function hashcat_base() {
@@ -864,6 +929,10 @@ function run_single_job_mode() {
     local selected="$1"
     local rc
     local session_stats_line
+    local job_text
+    local start_time
+    local end_time
+    local duration
 
     refresh_session_stats
     session_stats_line=$(build_session_stats_line)
@@ -889,12 +958,18 @@ function run_single_job_mode() {
         return 1
     fi
 
-    if ! run_processor "$selected"; then
+    if ! job_text="$(job_text_by_id "$selected")"; then
         status_error "Invalid job selection for --job: $selected"
         status_heading "Use --list-jobs to see available options."
         return 1
     fi
+
+    start_time=$(current_epoch_seconds)
+    run_processor "$selected"
     rc=$?
+    end_time=$(current_epoch_seconds)
+    duration=$(format_duration "$((end_time - start_time))")
+    print_job_timing_result "$selected" "$job_text" "$rc" "$duration"
 
     refresh_session_stats
     session_stats_line=$(build_session_stats_line)
@@ -911,6 +986,14 @@ function run_preset_mode() {
     local job_text
     local rc
     local session_stats_line
+    local preset_start_time
+    local preset_end_time
+    local job_start_time
+    local job_end_time
+    local duration
+    local rows=""
+    local completed=0
+    local failed=0
     local -a preset_job_ids
 
     if ! preset_jobs="$(get_preset_jobs "$preset_name")"; then
@@ -939,21 +1022,37 @@ function run_preset_mode() {
     export_session_stats_json
 
     status_heading "Running preset '$preset_name' (jobs: $preset_jobs)"
+    preset_start_time=$(current_epoch_seconds)
     for job_id in "${preset_job_ids[@]}"; do
         job_text="$(job_text_by_id "$job_id")"
         status_heading "Preset '$preset_name': running job $job_id ($job_text)"
 
         if ! check_job_dependencies "$job_id"; then
             status_error "Preset '$preset_name' failed before job $job_id ($job_text): missing dependency."
+            failed=$((failed + 1))
+            rows="${rows}${job_id}|${job_text}|failed|1|00:00:00"$'\n'
+            preset_end_time=$(current_epoch_seconds)
+            duration=$(format_duration "$((preset_end_time - preset_start_time))")
+            print_preset_summary "$preset_name" "${#preset_job_ids[@]}" "$completed" "$failed" "$duration" "$rows"
             return 1
         fi
 
+        job_start_time=$(current_epoch_seconds)
         run_processor "$job_id"
         rc=$?
+        job_end_time=$(current_epoch_seconds)
+        duration=$(format_duration "$((job_end_time - job_start_time))")
         if [ "$rc" -ne 0 ]; then
             status_error "Preset '$preset_name' failed at job $job_id ($job_text)."
+            failed=$((failed + 1))
+            rows="${rows}${job_id}|${job_text}|failed|${rc}|${duration}"$'\n'
+            preset_end_time=$(current_epoch_seconds)
+            duration=$(format_duration "$((preset_end_time - preset_start_time))")
+            print_preset_summary "$preset_name" "${#preset_job_ids[@]}" "$completed" "$failed" "$duration" "$rows"
             return "$rc"
         fi
+        completed=$((completed + 1))
+        rows="${rows}${job_id}|${job_text}|ok|${rc}|${duration}"$'\n'
 
         refresh_session_stats
         session_stats_line=$(build_session_stats_line)
@@ -961,6 +1060,9 @@ function run_preset_mode() {
         export_session_stats_json
     done
 
+    preset_end_time=$(current_epoch_seconds)
+    duration=$(format_duration "$((preset_end_time - preset_start_time))")
+    print_preset_summary "$preset_name" "${#preset_job_ids[@]}" "$completed" "$failed" "$duration" "$rows"
     status_ok "Preset '$preset_name' completed."
     return 0
 }
@@ -968,6 +1070,11 @@ function run_preset_mode() {
 function menu() {
     local option_id option_text processor
     local session_stats_line
+    local job_text
+    local start_time
+    local end_time
+    local duration
+    local rc
 
     while true; do
         refresh_session_stats
@@ -1001,12 +1108,24 @@ function menu() {
                 ;;
         esac
 
+        if ! job_text="$(job_text_by_id "$START")"; then
+            echo -e "Not valid, try again\n"
+            continue
+        fi
+
         if ! check_job_dependencies "$START"; then
             echo
             continue
         fi
 
-        if ! run_processor "$START"; then
+        start_time=$(current_epoch_seconds)
+        run_processor "$START"
+        rc=$?
+        end_time=$(current_epoch_seconds)
+        duration=$(format_duration "$((end_time - start_time))")
+        print_job_timing_result "$START" "$job_text" "$rc" "$duration"
+
+        if [ "$rc" -ne 0 ]; then
             echo -e "Not valid, try again\n"
             continue
         fi
