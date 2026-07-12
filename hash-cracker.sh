@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.4 "Run Ledger"'
+    printf '%s' 'v6.4.1 "Run Ledger"'
 }
 
 function release_label_text() {
@@ -485,7 +485,7 @@ function update_unique_plaintexts_incremental() {
         : >"$SESSION_POT_UNIQUE_CACHE"
     fi
 
-    new_unique_lines=$(comm -13 "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | wc -l | tr -d '[:space:]')
+    new_unique_lines=$(LC_ALL=C comm -13 "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | wc -l | tr -d '[:space:]')
     if [ "$new_unique_lines" -gt 0 ]; then
         cat "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | LC_ALL=C sort -u >"$tmp_merge"
         mv "$tmp_merge" "$SESSION_POT_UNIQUE_CACHE"
