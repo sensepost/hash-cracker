@@ -210,8 +210,8 @@ assert_contains "Preset 'quick' completed."
 if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
     fail_with_log "preset stats export file was not created" "$LAST_LOG"
 fi
-if ! grep -Fq '"release": "v6.4 \"Run Ledger\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.4 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.4.1 \"Run Ledger\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.4.1 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
