@@ -1,5 +1,11 @@
 # Version log
 
+## v6.4.1 - Run Ledger
+
+### Fixed
+
+- Session stats incremental refresh now runs `comm` with `LC_ALL=C`, matching the sorted plaintext cache collation and preventing false "input is not in sorted order" warnings after jobs add potfile entries.
+
 ## v6.4 - Run Ledger
 
 ### Added
