@@ -5,17 +5,46 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 TMP_DIR="$(mktemp -d /tmp/hash-cracker-smoke.XXXX)"
-CONFIG_PATH="$REPO_ROOT/hash-cracker.conf"
-CONFIG_BACKUP="$TMP_DIR/hash-cracker.conf.backup"
+CONFIG_PATH="$TMP_DIR/hash-cracker.conf"
+export HASH_CRACKER_CONFIG="$CONFIG_PATH"
+export COMMON_SUBSTR_BIN="$TMP_DIR/common-substr.sh"
+export CEWL="$TMP_DIR/cewl"
 
-if [ -f "$CONFIG_PATH" ]; then
-    cp "$CONFIG_PATH" "$CONFIG_BACKUP"
-fi
+cat >"$COMMON_SUBSTR_BIN" <<'EOF'
+#!/usr/bin/env bash
+printf 'preview\n'
+EOF
+chmod +x "$COMMON_SUBSTR_BIN"
+
+cat >"$CEWL" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$CEWL"
+
+printf 'hash:password\n' >"$TMP_DIR/input"
+: >"$TMP_DIR/hash-cracker.pot"
+printf 'password\n' >"$TMP_DIR/wordlist.txt"
+printf 'test\n' >"$TMP_DIR/wordlist2.txt"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+
+cat >"$TMP_DIR/fake-hashcat" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP_DIR/fake-hashcat"
 
 restore_config() {
-    if [ -f "$CONFIG_BACKUP" ]; then
-        cp "$CONFIG_BACKUP" "$CONFIG_PATH"
-    fi
+    return 0
 }
 
 cleanup() {
@@ -89,6 +118,22 @@ assert_rc_eq 0
 assert_contains "Stats debug output enabled"
 assert_contains "Bye..."
 
+echo "[smoke] fresh-checkout configuration failures are clear"
+run_case missing_config bash -lc "HASH_CRACKER_CONFIG='$TMP_DIR/missing.conf' ./hash-cracker.sh --dry-run"
+assert_rc_eq 1
+assert_contains "Missing required configuration file"
+
+INCOMPLETE_CONFIG="$TMP_DIR/incomplete.conf"
+printf 'HASHCAT=(%s)\n' "$TMP_DIR/fake-hashcat" >"$INCOMPLETE_CONFIG"
+run_case incomplete_config bash -lc "HASH_CRACKER_CONFIG='$INCOMPLETE_CONFIG' ./hash-cracker.sh --dry-run"
+assert_rc_eq 1
+assert_contains "Missing required setting 'HASHTYPE'"
+
+echo "[smoke] missing flag values fail before startup"
+run_case missing_flag_value bash -lc "./hash-cracker.sh --stats-export"
+assert_rc_eq 1
+assert_contains "Missing value for --stats-export"
+
 echo "[smoke] stats export writes JSON file"
 STATS_EXPORT_PATH="$TMP_DIR/stats-export.json"
 run_case stats_export bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_PATH\""
@@ -121,6 +166,24 @@ if ! grep -Fq '"history": [' "$STATS_EXPORT_ALL_PATH"; then
 fi
 if ! grep -Fq '"message": "Session stats:' "$STATS_EXPORT_ALL_PATH"; then
     fail_with_log "stats export scope all missing parsed session stats message entries" "$STATS_EXPORT_ALL_PATH"
+fi
+
+echo "[smoke] session logging controls are isolated and observable"
+NO_LOG_EXPORT="$TMP_DIR/no-log-stats.json"
+run_case no_session_log bash -lc "printf '0\n' | SESSION_LOG_DIR='$TMP_DIR/no-logs' ./hash-cracker.sh --dry-run --no-session-log --stats-export '$NO_LOG_EXPORT'"
+assert_rc_eq 0
+assert_not_contains "Session log file: logs/"
+if ! grep -Fq '"enabled": false' "$NO_LOG_EXPORT"; then
+    fail_with_log "stats export did not record disabled session logging" "$NO_LOG_EXPORT"
+fi
+
+RETENTION_LOG_DIR="$TMP_DIR/retention-logs"
+mkdir -p "$RETENTION_LOG_DIR"
+touch "$RETENTION_LOG_DIR/session-20200101-000000-1.log" "$RETENTION_LOG_DIR/session-20200102-000000-2.log"
+run_case session_log_retention bash -lc "printf '0\n' | SESSION_LOG_DIR='$RETENTION_LOG_DIR' ./hash-cracker.sh --dry-run --session-log-keep 1"
+assert_rc_eq 0
+if [ "$(find "$RETENTION_LOG_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc -l | tr -d '[:space:]')" -ne 1 ]; then
+    fail_with_log "session log retention did not keep one log" "$LAST_LOG"
 fi
 
 echo "[smoke] invalid stats export scope fails clearly"
@@ -210,8 +273,8 @@ assert_contains "Preset 'quick' completed."
 if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
     fail_with_log "preset stats export file was not created" "$LAST_LOG"
 fi
-if ! grep -Fq '"release": "v6.4.1 \"Run Ledger\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.4.1 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.5.0 \"Coverage Gate\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.5.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
@@ -314,6 +377,117 @@ elif grep -Fq "Option 12 requires Python package 'pyenchant'." "$LAST_LOG"; then
 else
     fail_with_log "unexpected pack rule output: expected dry-run command or pyenchant dependency message" "$LAST_LOG"
 fi
+
+echo "[smoke] all processors are reachable in dry-run mode"
+run_case processor_2 bash -lc "printf '2\ns\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Default processing with light rules done"
+
+run_case processor_3 bash -lc "printf '3\ns\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Default processing with heavy rules done"
+
+run_case processor_4 bash -lc "printf '4\nAcme\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Word processing done"
+
+run_case processor_5 bash -lc "printf '5\nAcme\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Word processing done"
+
+run_case processor_6 bash -lc "printf '6\ns\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Hybrid processing done"
+
+run_case processor_7 bash -lc "printf '7\ns\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Toggle processing done"
+
+run_case processor_10 bash -lc "printf '10\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Prefix suffix processing done"
+
+run_case processor_11 bash -lc "printf '11\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Substring processing done"
+
+run_case processor_15 bash -lc "printf '15\n$TMP_DIR\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Multiple wordlists done"
+
+run_case processor_16 bash -lc "./hash-cracker.sh --dry-run --job 16"
+assert_rc_eq 0
+assert_contains "Username as Password processing with rules done"
+
+run_case processor_17 bash -lc "printf '17\nw\n1\n10\nn\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Markov-chain processing done"
+
+run_case processor_18 bash -lc "printf '18\nhttps://example.test\n$TMP_DIR/cewl-list\n1\n4\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "CeWL created a wordlist named:"
+
+run_case processor_20 bash -lc "printf '20\ns\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Stacking with light rules done"
+
+run_case processor_21 bash -lc "printf '21\n2\nn\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Custom Brute Force Processing Done"
+
+run_case processor_22 bash -lc "printf '22\n$TMP_DIR\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Multiple wordlists done"
+
+echo "[smoke] CLI flag combinations reach resolved hashcat commands"
+run_case flag_combinations bash -lc "printf '1\n0\n' | ./hash-cracker.sh --dry-run --no-limit --no-loopback --hwmon-enable --disable-cracked"
+assert_rc_eq 0
+assert_contains "Optimised kernels disabled"
+assert_contains "Loopback disabled"
+assert_contains "Hardware monitoring enabled"
+assert_contains "STDOUT cracked hashes disabled"
+
+echo "[smoke] dependency failure is reported by self-test"
+MISSING_COMMON_SUBSTR="$TMP_DIR/missing-common-substr"
+run_case self_test_dependency_failure bash -lc "COMMON_SUBSTR_BIN='$MISSING_COMMON_SUBSTR' ./hash-cracker.sh --self-test --dry-run"
+if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then
+    echo "[FAIL] expected dependency self-test rc to be 0 or 1, got rc=$LAST_RC"
+    cat "$LAST_LOG"
+    exit 1
+fi
+assert_contains "Option 10 requires"
+assert_contains "Self-test failed"
+
+echo "[smoke] preset stops and reports processor failure"
+FAILING_HASHCAT="$TMP_DIR/failing-hashcat"
+cat >"$FAILING_HASHCAT" <<'EOF'
+#!/usr/bin/env bash
+exit 7
+EOF
+chmod +x "$FAILING_HASHCAT"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($FAILING_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case preset_failure bash -lc "./hash-cracker.sh --preset quick"
+assert_rc_eq 7
+assert_contains "Preset 'quick' failed at job 1"
+assert_not_contains "Preset 'quick': running job 9"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
 
 echo "[smoke] self-test mode runs to completion"
 run_case self_test bash -lc "./hash-cracker.sh --self-test --dry-run"

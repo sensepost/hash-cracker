@@ -24,3 +24,23 @@ jobs:
 
       - name: Run smoke tests
         run: make test-smoke
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install coverage tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3
+
+      - name: Run Bash coverage
+        run: make coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bash-coverage
+          path: coverage/

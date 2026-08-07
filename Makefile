@@ -1,6 +1,6 @@
-SHELL_SOURCES := $(shell find . -type f -name '*.sh' ! -path './.git/*' ! -path './scripts/extensions/*' | sort)
+SHELL_SOURCES := $(shell find . -type f -name '*.sh' ! -path './.git/*' ! -path './coverage/*' ! -path './scripts/extensions/*' | sort)
 
-.PHONY: lint format-check format qa test-smoke
+.PHONY: lint format-check format qa test-smoke coverage coverage-check
 
 lint:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
@@ -31,3 +31,9 @@ qa: lint format-check
 test-smoke:
 	@echo "Running smoke tests..."
 	@bash tests/smoke.sh
+
+coverage:
+	@echo "Running Bash coverage..."
+	@bash tests/coverage.sh
+
+coverage-check: coverage
