@@ -86,8 +86,6 @@ def measured_lines(path):
         if multiline_awk:
             if re.match(r"^['\"]\s+", stripped):
                 multiline_awk = False
-                if any(operator in stripped for operator in ("|", "&&", ";", ">")):
-                    measured.add(number)
             continue
 
         if continuation:
@@ -100,6 +98,10 @@ def measured_lines(path):
         if stripped in {"{", "}", "(", ")", "fi", "done", "esac", ";;", "then", "do"}:
             continue
         if stripped == "else" or stripped.startswith("elif "):
+            continue
+        if re.match(r"^done(?:\s+<<<|\s+<)", stripped):
+            continue
+        if stripped.endswith(";;") and stripped[:-2].rstrip().endswith(")"):
             continue
         if re.match(r"^(function\s+)?[A-Za-z_][A-Za-z0-9_-]*\s*\(\)\s*\{$", stripped):
             continue
@@ -128,6 +130,46 @@ def measured_lines(path):
         continuation = line.rstrip().endswith("\\")
 
     return measured
+
+
+def logical_line_map(path):
+    lines = path.read_text(errors="replace").splitlines()
+    line_map = {}
+    continuation_start = None
+    command_substitution_start = None
+    multiline_awk_start = None
+
+    for number, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        if continuation_start is not None:
+            line_map[number] = continuation_start
+            if not line.rstrip().endswith("\\"):
+                continuation_start = None
+            continue
+
+        if command_substitution_start is not None:
+            line_map[number] = command_substitution_start
+            if stripped == ")":
+                command_substitution_start = None
+            continue
+
+        if multiline_awk_start is not None:
+            line_map[number] = multiline_awk_start
+            if re.match(r"^['\"]\s+", stripped):
+                multiline_awk_start = None
+            continue
+
+        line_map[number] = number
+        if stripped.endswith("$("):
+            command_substitution_start = number
+        elif re.search(r"\bawk\b.*\s['\"]\s*$", line):
+            multiline_awk_start = number
+
+        if line.rstrip().endswith("\\"):
+            continuation_start = number
+
+    return line_map
 
 
 def function_ranges(path):
@@ -173,7 +215,10 @@ total_functions = 0
 total_functions_covered = 0
 for path in source_files:
     measured = measured_lines(path)
-    covered_line_numbers = covered[path] & measured
+    line_map = logical_line_map(path)
+    covered_line_numbers = {
+        line_map.get(number, number) for number in covered[path]
+    } & measured
     covered_lines = len(covered_line_numbers)
     functions = []
     for name, start, end in function_ranges(path):

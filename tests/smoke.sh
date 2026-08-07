@@ -43,6 +43,30 @@ exit 0
 EOF
 chmod +x "$TMP_DIR/fake-hashcat"
 
+TTY_TRACE_ENV="$TMP_DIR/tty-trace-env"
+cat >"$TTY_TRACE_ENV" <<'EOF'
+unset BASH_XTRACEFD
+exec 2>>"${HASH_CRACKER_TRACE_FILE:-/dev/null}"
+PS4='+${BASH_SOURCE[0]}:${LINENO}: '
+export PS4
+set -x
+EOF
+
+EDGE_AWK_BIN="$TMP_DIR/edge-awk-bin"
+mkdir -p "$EDGE_AWK_BIN"
+REAL_AWK="$(command -v awk)"
+cat >"$EDGE_AWK_BIN/awk" <<EOF
+#!/usr/bin/env bash
+for argument do
+    if [ "\$argument" = 'scripts/extensions/hashtypes' ]; then
+        printf '1000 1000\\n'
+        exit 0
+    fi
+done
+exec '$REAL_AWK' "\$@"
+EOF
+chmod +x "$EDGE_AWK_BIN/awk"
+
 restore_config() {
     return 0
 }
@@ -103,6 +127,67 @@ fail_with_log() {
     exit 1
 }
 
+echo "[smoke] sourceable helpers cover defensive branches"
+run_case helper_negative_duration bash -lc 'source ./hash-cracker.sh; [ "$(format_duration -1)" = "00:00:00" ]'
+assert_rc_eq 0
+
+HELPER_POTFILE="$TMP_DIR/helper-potfile"
+printf 'hash:first\nhash:second\nhash:first\n' >"$HELPER_POTFILE"
+run_case helper_potfile_counts bash -lc "source ./hash-cracker.sh; POTFILE='$HELPER_POTFILE'; [ \"\$(count_potfile_unique_plaintexts)\" = 2 ] && POTFILE='$TMP_DIR/missing-helper-potfile' && [ \"\$(count_potfile_unique_plaintexts)\" = 0 ]"
+assert_rc_eq 0
+
+HELPER_PRUNE_DIR="$TMP_DIR/helper-prune"
+mkdir -p "$HELPER_PRUNE_DIR"
+touch "$HELPER_PRUNE_DIR/session-20200101-000000-1.log"
+run_case helper_prune_branches bash -lc "source ./hash-cracker.sh; prune_session_logs '$HELPER_PRUNE_DIR' invalid; prune_session_logs '$HELPER_PRUNE_DIR' 5"
+assert_rc_eq 0
+
+run_case helper_invalid_processor bash -lc 'source ./hash-cracker.sh; if run_processor 999; then exit 1; else exit 0; fi'
+assert_rc_eq 0
+
+run_case helper_unsupported_preset bash -lc 'source ./hash-cracker.sh; preset_entries() { printf "invalid|Invalid fixture|2\\n"; }; if run_preset_mode invalid; then exit 1; else exit 0; fi'
+assert_rc_eq 0
+
+run_case helper_unknown_preset_job bash -lc 'source ./hash-cracker.sh; preset_entries() { printf "invalid|Invalid fixture|999\\n"; }; preset_job_supported() { return 0; }; if run_preset_mode invalid; then exit 1; else exit 0; fi'
+assert_rc_eq 0
+
+run_case helper_dynamic_bootstrap bash -lc "source ./hash-cracker.sh; STATICCONFIG=false; printf '1000\\n$TMP_DIR/input\\n' | processor_bootstrap"
+assert_rc_eq 0
+
+HELPER_INTERRUPT_FILE="$TMP_DIR/helper-interrupt"
+printf 'temporary\n' >"$HELPER_INTERRUPT_FILE"
+run_case helper_interrupt bash -lc "source ./hash-cracker.sh; processor_interrupt '$HELPER_INTERRUPT_FILE'"
+assert_rc_eq 0
+if [ -e "$HELPER_INTERRUPT_FILE" ]; then
+    fail_with_log "processor interrupt did not clean its temporary file" "$LAST_LOG"
+fi
+
+HELPER_CACHE="$TMP_DIR/helper-cache"
+run_case helper_hashlist_refresh bash -lc "source ./hash-cracker.sh; HASHLIST='$TMP_DIR/input'; POTFILE=/dev/null; SESSION_POT_UNIQUE_CACHE='$HELPER_CACHE'; SESSION_POT_LINES_LAST=0; SESSION_POT_BYTES_LAST=0; SESSION_POT_LINES_BASE=0; SESSION_POT_UNIQUE_BASE=0; SESSION_POT_BYTES_BASE=0; SESSION_POT_UNIQUE_CUR=0; SESSION_HASHLIST_PATH_LAST='$TMP_DIR/old-hashlist'; refresh_session_stats"
+assert_rc_eq 0
+
+run_case helper_missing_pack_files bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd '$TMP_DIR'; MACHINE=Linux; DRYRUN=' '; if check_job_dependencies 12; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+run_case helper_missing_pack_mask_files bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd '$TMP_DIR'; MACHINE=Linux; DRYRUN=' '; if check_job_dependencies 13; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+NO_PYTHON_PATH="$TMP_DIR/no-python-path"
+mkdir -p "$NO_PYTHON_PATH"
+run_case helper_missing_python_rulegen bash -lc "source '$REPO_ROOT/hash-cracker.sh'; MACHINE=Linux; DRYRUN=''; PATH='$NO_PYTHON_PATH'; if check_job_dependencies 12; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+run_case helper_missing_python_maskgen bash -lc "source '$REPO_ROOT/hash-cracker.sh'; MACHINE=Linux; DRYRUN=''; PATH='$NO_PYTHON_PATH'; if check_job_dependencies 13; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_self_test_hashcat_available bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN=/bin/true; HASHLIST=/dev/null; WORDLIST=/dev/null; WORDLIST2=/dev/null; MACHINE=Linux; CEWL='$CEWL'; run_self_test >/dev/null 2>&1 || true"
+assert_rc_eq 0
+run_case helper_self_test_hashcat_missing bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN='$TMP_DIR/missing-helper-hashcat'; HASHLIST=/dev/null; WORDLIST=/dev/null; WORDLIST2=/dev/null; MACHINE=Linux; CEWL='$CEWL'; run_self_test >/dev/null 2>&1 || true"
+assert_rc_eq 0
+
+run_case parameters_list_jobs_case bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh' --list-jobs"
+assert_rc_eq 0
+run_case parameters_list_presets_case bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh' --list-presets"
+assert_rc_eq 0
+
 echo "[smoke] help output includes self-test flag"
 run_case help bash -lc "./hash-cracker.sh --help"
 assert_rc_eq 1
@@ -117,6 +202,11 @@ run_case stats_debug bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stat
 assert_rc_eq 0
 assert_contains "Stats debug output enabled"
 assert_contains "Bye..."
+
+echo "[smoke] color initialization works in a terminal"
+run_case colors_tty env -u NO_COLOR BASH_ENV="$TTY_TRACE_ENV" TERM=xterm script -qec './hash-cracker.sh --dry-run --job 1' /dev/null
+assert_rc_eq 0
+assert_contains "Brute force processing done"
 
 echo "[smoke] fresh-checkout configuration failures are clear"
 run_case missing_config bash -lc "HASH_CRACKER_CONFIG='$TMP_DIR/missing.conf' ./hash-cracker.sh --dry-run"
@@ -290,6 +380,10 @@ if [ "$(find "$RETENTION_LOG_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc
     fail_with_log "session log retention did not keep one log" "$LAST_LOG"
 fi
 
+run_case session_log_retention_zero bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --session-log-keep 0"
+assert_rc_eq 0
+assert_contains "Session log retention: keeping all files (pruning disabled)"
+
 echo "[smoke] invalid stats export scope fails clearly"
 run_case stats_export_scope_invalid bash -lc "./hash-cracker.sh --stats-export \"$TMP_DIR/invalid-scope.json\" --stats-export-scope nope"
 assert_rc_eq 1
@@ -343,6 +437,39 @@ WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
 
+MISSING_HASHCAT="$TMP_DIR/missing-hashcat"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($MISSING_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case normal_missing_hashcat bash -lc "./hash-cracker.sh --job 1"
+assert_rc_eq 1
+assert_contains "Hashcat is not available/executable"
+assert_contains "Not all mandatory requirements are met"
+
+NORMAL_MISSING_POTFILE="$TMP_DIR/normal-missing-potfile"
+rm -f -- "$NORMAL_MISSING_POTFILE"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$NORMAL_MISSING_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case normal_missing_potfile bash -lc "./hash-cracker.sh --job 1"
+assert_rc_eq 0
+assert_contains "Potfile not present, will create $NORMAL_MISSING_POTFILE"
+if [ ! -f "$NORMAL_MISSING_POTFILE" ]; then
+    fail_with_log "normal execution did not create the missing potfile" "$LAST_LOG"
+fi
+
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
@@ -355,6 +482,19 @@ EOF
 run_case unknown_hashtype bash -lc "./hash-cracker.sh --dry-run --job 1"
 assert_rc_eq 0
 assert_contains "Hashtype: 999999"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case hashtype_display_fallback bash -lc "PATH='$EDGE_AWK_BIN:$PATH' ./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 0
+assert_contains "Hashtype: 1000 1000"
 
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
@@ -389,6 +529,14 @@ assert_contains "deep-plus - Extended potfile-driven coverage with prefix/suffix
 assert_not_contains "Mandatory modules:"
 assert_not_contains "Preparing session stats"
 assert_not_contains "Static parameters:"
+
+run_case environment_job_list bash -lc "JOBLIST=' ' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "1. Brute force"
+
+run_case environment_preset_list bash -lc "PRESETLIST=' ' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "quick - Quick baseline and iteration coverage (jobs: 1,9)"
 
 echo "[smoke] non-interactive --job mode runs a job and exits"
 run_case single_job bash -lc "./hash-cracker.sh --dry-run --job 1"
@@ -921,6 +1069,16 @@ run_case mac_job_17 bash -lc "printf '17\nw\n1\n10\nn\n0\n' | PATH='$PLATFORM_BI
 assert_rc_eq 0
 assert_contains "mkpass-mac"
 
+FAKE_MKPASS="$TMP_DIR/fake-mkpass"
+cat >"$FAKE_MKPASS" <<'EOF'
+#!/usr/bin/env bash
+printf 'generated\n'
+EOF
+chmod +x "$FAKE_MKPASS"
+run_case mac_job_17_normal bash -lc "printf '17\\np\\n1\\n1\\ny\\n0\\n' | PATH='$PLATFORM_BIN:$PATH' MKPASS_BIN='$FAKE_MKPASS' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Markov-chain processing done"
+
 cat >"$UNKNOWN_PLATFORM_BIN/uname" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = '-s' ]; then
@@ -952,6 +1110,10 @@ assert_contains "Substring processing done"
 run_case processor_9_normal bash -lc "./hash-cracker.sh --job 9"
 assert_rc_eq 0
 assert_contains "Iteration processing done"
+
+run_case processor_14_normal bash -lc "./hash-cracker.sh --job 14"
+assert_rc_eq 0
+assert_contains "Fingerprint attack done"
 
 run_case processor_17_normal bash -lc "printf '17\np\n1\n1\nn\n0\n' | ./hash-cracker.sh"
 assert_rc_eq 0

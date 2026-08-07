@@ -1139,6 +1139,10 @@ function menu() {
     done
 }
 
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
+
 run_early_list_mode "$@"
 init_colors
 trap cleanup_session_state EXIT

@@ -5,6 +5,11 @@ RESTART="source scripts/processors/17-markov-generator.sh"
 
 # Requirements
 processor_bootstrap
+if [ "$MACHINE" == "Mac" ]; then
+    mkpass_bin="${MKPASS_BIN:-scripts/extensions/mkpass-mac}"
+else
+    mkpass_bin="${MKPASS_BIN:-scripts/extensions/mkpass-linux}"
+fi
 
 # Rules
 source scripts/rules/rules.config
@@ -43,9 +48,9 @@ if dry_run_enabled; then
 else
     cat "$LIST" | awk -F: '{print $NF}' | sort -u | tee "$tmp" &>/dev/null
     if [ "$MACHINE" == "Mac" ]; then
-        ./scripts/extensions/mkpass-mac -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null && rm -f -- "$tmp"
+        "$mkpass_bin" -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null && rm -f -- "$tmp"
     else
-        ./scripts/extensions/mkpass-linux -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null && rm -f -- "$tmp"
+        "$mkpass_bin" -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null && rm -f -- "$tmp"
     fi
 fi
 
