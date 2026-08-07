@@ -134,6 +134,56 @@ run_case missing_flag_value bash -lc "./hash-cracker.sh --stats-export"
 assert_rc_eq 1
 assert_contains "Missing value for --stats-export"
 
+echo "[smoke] early informational and CLI validation modes are deterministic"
+run_case module_info bash -lc "./hash-cracker.sh --module-info"
+assert_rc_eq 1
+assert_contains "Information about the modules"
+assert_contains "14. Fingerprint attack"
+
+run_case search_hash_type bash -lc "./hash-cracker.sh --search ntlm"
+assert_rc_eq 1
+assert_contains "1000 | NTLM"
+
+run_case search_missing_value bash -lc "./hash-cracker.sh --search"
+assert_rc_eq 1
+assert_contains "Please provide a search value"
+
+run_case unknown_parameter bash -lc "./hash-cracker.sh --not-a-real-flag"
+assert_rc_eq 1
+assert_contains "Unknown parameter passed: --not-a-real-flag"
+
+run_case invalid_job_value bash -lc "./hash-cracker.sh --dry-run --job nope"
+assert_rc_eq 1
+assert_contains "Invalid value for --job. Expected a numeric job ID."
+
+run_case missing_job_value bash -lc "./hash-cracker.sh --dry-run --job"
+assert_rc_eq 1
+assert_contains "Invalid value for --job. Expected a numeric job ID."
+
+run_case invalid_job_equals_value bash -lc "./hash-cracker.sh --dry-run --job=oops"
+assert_rc_eq 1
+assert_contains "Invalid value for --job. Expected a numeric job ID."
+
+run_case missing_preset_value bash -lc "./hash-cracker.sh --dry-run --preset"
+assert_rc_eq 1
+assert_contains "Missing value for --preset. Provide a preset name."
+
+run_case missing_stats_scope_value bash -lc "./hash-cracker.sh --dry-run --stats-export-scope"
+assert_rc_eq 1
+assert_contains "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
+
+run_case invalid_stats_scope_equals_value bash -lc "./hash-cracker.sh --dry-run --stats-export-scope=broken"
+assert_rc_eq 1
+assert_contains "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
+
+run_case invalid_session_log_keep bash -lc "./hash-cracker.sh --dry-run --session-log-keep nope"
+assert_rc_eq 1
+assert_contains "Invalid value for --session-log-keep. Expected a non-negative integer."
+
+run_case invalid_session_log_keep_equals bash -lc "./hash-cracker.sh --dry-run --session-log-keep=-1"
+assert_rc_eq 1
+assert_contains "Invalid value for --session-log-keep. Expected a non-negative integer."
+
 echo "[smoke] stats export writes JSON file"
 STATS_EXPORT_PATH="$TMP_DIR/stats-export.json"
 run_case stats_export bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_PATH\""
@@ -190,6 +240,54 @@ echo "[smoke] invalid stats export scope fails clearly"
 run_case stats_export_scope_invalid bash -lc "./hash-cracker.sh --stats-export \"$TMP_DIR/invalid-scope.json\" --stats-export-scope nope"
 assert_rc_eq 1
 assert_contains "Invalid value for --stats-export-scope. Use 'latest' or 'all'."
+
+echo "[smoke] missing runtime data files are handled without mutation in dry-run"
+MISSING_POTFILE="$TMP_DIR/missing-potfile"
+rm -f "$MISSING_POTFILE"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$MISSING_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case missing_potfile bash -lc "./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 0
+assert_contains "Potfile not present, dry-run would create $MISSING_POTFILE"
+if [ -e "$MISSING_POTFILE" ]; then
+    fail_with_log "dry-run unexpectedly created the missing potfile" "$LAST_LOG"
+fi
+
+MISSING_HASHLIST="$TMP_DIR/missing-hashlist"
+MISSING_WORDLIST="$TMP_DIR/missing-wordlist"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$MISSING_HASHLIST
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$MISSING_WORDLIST
+WORDLIST2=$TMP_DIR/missing-wordlist2
+EOF
+run_case self_test_missing_paths bash -lc "./hash-cracker.sh --self-test --dry-run"
+assert_rc_eq 1
+assert_contains "HASHLIST missing: $MISSING_HASHLIST"
+assert_contains "WORDLIST missing: $MISSING_WORDLIST"
+assert_contains "WORDLIST2 missing: $TMP_DIR/missing-wordlist2"
+assert_contains "Self-test failed"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
 
 echo "[smoke] dry-run menu exits cleanly"
 run_case menu_exit bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run"
@@ -439,6 +537,102 @@ run_case processor_22 bash -lc "printf '22\n$TMP_DIR\n0\n' | ./hash-cracker.sh -
 assert_rc_eq 0
 assert_contains "Multiple wordlists done"
 
+echo "[smoke] processor input validation and alternate paths are exercised"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+FINGERPRINT_SEGMENT_MAX=0
+EOF
+run_case processor_14_invalid_config bash -lc "printf '14\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid FINGERPRINT_SEGMENT_MAX: 0"
+assert_contains "Not valid, try again"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case processor_17_invalid_source bash -lc "printf '17\nx\np\n1\n10\nn\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Try again"
+assert_contains "Markov-chain processing done"
+
+run_case processor_17_rules bash -lc "printf '17\np\n1\n10\ny\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Markov-chain processing done"
+
+run_case processor_18_invalid_ranges bash -lc "printf '18\nhttps://example.test\n$TMP_DIR/cewl-invalid-list\nx\n1\n0\n4\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Please only use 0-99."
+assert_contains "Please only use 1-99."
+
+run_case processor_21_invalid_number bash -lc "printf '21\nx\n2\nn\nn\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "is not a number."
+assert_contains "Custom Brute Force Processing Done"
+
+run_case processor_21_invalid_increment bash -lc "printf '21\n2\nx\n2\nn\nn\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Custom Brute Force Processing Done"
+
+echo "[smoke] dynamic selectors validate and accept interactive input"
+run_case selector_hashtype bash -lc "printf '1000\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashtype.sh'"
+assert_rc_eq 0
+assert_contains "Hashtype"
+assert_contains "1000"
+
+run_case selector_hashtype_invalid_format bash -lc "printf 'not-a-number\n1000\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashtype.sh'"
+assert_rc_eq 0
+assert_contains "Not a valid hashtype number"
+assert_contains "Hashtype"
+
+run_case selector_hashtype_invalid_value bash -lc "printf '999999\n1000\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashtype.sh'"
+assert_rc_eq 0
+assert_contains "Not a valid hashtype number"
+assert_contains "Hashtype"
+
+run_case selector_hashlist bash -lc "printf '$TMP_DIR/input\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashlist.sh'"
+assert_rc_eq 0
+assert_contains "Hashlist $TMP_DIR/input selected."
+
+run_case selector_hashlist_invalid bash -lc "printf '$TMP_DIR/no-input\n$TMP_DIR/input\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashlist.sh'"
+assert_rc_eq 0
+assert_contains "File does not exist, try again."
+assert_contains "Hashlist $TMP_DIR/input selected."
+
+run_case selector_wordlist bash -lc "printf '$TMP_DIR/wordlist.txt\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/wordlist.sh'"
+assert_rc_eq 0
+assert_contains "Wordlist $TMP_DIR/wordlist.txt selected."
+
+run_case selector_wordlist_invalid bash -lc "printf '$TMP_DIR/no-wordlist\n$TMP_DIR/wordlist.txt\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/wordlist.sh'"
+assert_rc_eq 0
+assert_contains "File does not exist, try again."
+assert_contains "Wordlist $TMP_DIR/wordlist.txt selected."
+
+run_case selector_multiple_wordlist_directory bash -lc "printf '$TMP_DIR\n' | bash -c 'START=15; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 0
+assert_contains "Directory $TMP_DIR selected."
+
+run_case selector_multiple_wordlist_invalid_directory bash -lc "printf '$TMP_DIR/not-a-directory\n$TMP_DIR\n' | bash -c 'START=15; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 0
+assert_contains "Input must be a non-empty directory or an existing file, try again."
+assert_contains "Directory $TMP_DIR selected."
+
+run_case selector_multiple_wordlist_dynamic bash -lc "printf '$TMP_DIR/wordlist.txt\n$TMP_DIR/wordlist2.txt\n' | bash -c 'START=8; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 0
+assert_contains "Wordlist $TMP_DIR/wordlist.txt selected."
+assert_contains "Wordlist $TMP_DIR/wordlist2.txt selected."
+
 echo "[smoke] CLI flag combinations reach resolved hashcat commands"
 run_case flag_combinations bash -lc "printf '1\n0\n' | ./hash-cracker.sh --dry-run --no-limit --no-loopback --hwmon-enable --disable-cracked"
 assert_rc_eq 0
@@ -446,6 +640,215 @@ assert_contains "Optimised kernels disabled"
 assert_contains "Loopback disabled"
 assert_contains "Hardware monitoring enabled"
 assert_contains "STDOUT cracked hashes disabled"
+
+echo "[smoke] Linux and macOS dependency selectors cover fallback paths"
+PLATFORM_BIN="$TMP_DIR/platform-bin"
+UNKNOWN_PLATFORM_BIN="$TMP_DIR/unknown-platform-bin"
+mkdir -p "$PLATFORM_BIN" "$UNKNOWN_PLATFORM_BIN"
+
+cat >"$PLATFORM_BIN/cewl" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$PLATFORM_BIN/cewl"
+
+run_case linux_cewl_path env CEWL= PATH="$PLATFORM_BIN:/usr/bin:/bin" /bin/bash -c 'source scripts/linux.sh; printf "%s\n" "$CEWL"'
+assert_rc_eq 0
+assert_contains "$PLATFORM_BIN/cewl"
+
+run_case linux_cewl_missing env CEWL= PATH="$TMP_DIR/no-command-path" /bin/bash -c 'source scripts/linux.sh; test -z "$CEWL"'
+assert_rc_eq 0
+
+run_case mac_cewl_path env CEWL= PATH="$PLATFORM_BIN:/usr/bin:/bin" /bin/bash -c 'source scripts/mac.sh; printf "%s\n" "$CEWL"'
+assert_rc_eq 0
+assert_contains "$PLATFORM_BIN/cewl"
+
+run_case mac_cewl_missing env CEWL= PATH="$TMP_DIR/no-command-path" /bin/bash -c 'source scripts/mac.sh; test -z "$CEWL"'
+assert_rc_eq 0
+
+cat >"$PLATFORM_BIN/uname" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-s' ]; then
+    printf 'Darwin\n'
+else
+    /usr/bin/uname "$@"
+fi
+EOF
+chmod +x "$PLATFORM_BIN/uname"
+
+run_case mac_job_10 bash -lc "PATH='$PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run --job 10"
+assert_rc_eq 0
+assert_contains "common-substr-mac prefix/suffix"
+
+run_case mac_job_11 bash -lc "PATH='$PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run --job 11"
+assert_rc_eq 0
+assert_contains "common-substr-mac generation"
+
+run_case mac_job_12 bash -lc "PATH='$PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run --job 12"
+assert_rc_eq 0
+assert_contains "pack-mac/rulegen.py"
+
+run_case mac_job_13 bash -lc "PATH='$PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run --job 13"
+assert_rc_eq 0
+assert_contains "statsgen/maskgen"
+
+run_case mac_job_17 bash -lc "printf '17\nw\n1\n10\nn\n0\n' | PATH='$PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "mkpass-mac"
+
+cat >"$UNKNOWN_PLATFORM_BIN/uname" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-s' ]; then
+    printf 'Plan9\n'
+else
+    /usr/bin/uname "$@"
+fi
+EOF
+chmod +x "$UNKNOWN_PLATFORM_BIN/uname"
+run_case unknown_machine bash -lc "PATH='$UNKNOWN_PLATFORM_BIN:$PATH' ./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 0
+assert_contains "PLEASE OPEN ISSUE with output of 'uname -s'. Fallback to Linux"
+
+echo "[smoke] normal execution uses the fake hashcat and optional helpers"
+run_case processor_10_normal bash -lc "./hash-cracker.sh --job 10"
+assert_rc_eq 0
+assert_contains "Prefix suffix processing done"
+
+run_case processor_11_normal bash -lc "./hash-cracker.sh --job 11"
+assert_rc_eq 0
+assert_contains "Substring processing done"
+
+NORMAL_BIN="$TMP_DIR/normal-bin"
+mkdir -p "$NORMAL_BIN"
+cat >"$NORMAL_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-c' ]; then
+    exit 0
+fi
+
+previous=''
+for argument do
+    if [ "$previous" = '-o' ]; then
+        : >"$argument"
+    fi
+    previous="$argument"
+done
+
+case "${1:-}" in
+    *rulegen.py) : >analysis.rule ;;
+esac
+EOF
+chmod +x "$NORMAL_BIN/python3"
+
+run_case processor_12_normal bash -lc "printf '12\n0\n' | PATH='$NORMAL_BIN:$PATH' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "PACK rule processing done"
+
+run_case processor_13_normal bash -lc "printf '13\n0\n' | PATH='$NORMAL_BIN:$PATH' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "PACK mask processing done"
+
+NORMAL_CEWL="$TMP_DIR/normal-cewl"
+cat >"$NORMAL_CEWL" <<EOF
+#!/usr/bin/env bash
+output=''
+previous=''
+for argument do
+    if [ "\$previous" = '-w' ]; then
+        output="\$argument"
+    fi
+    previous="\$argument"
+done
+[ -z "\$output" ] || printf 'generated\n' >"\$output"
+EOF
+chmod +x "$NORMAL_CEWL"
+run_case processor_18_normal bash -lc "printf '18\nhttps://example.test\n$TMP_DIR/normal-cewl-list\n1\n4\n0\n' | CEWL='$NORMAL_CEWL' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "CeWL created a wordlist named:"
+if [ ! -s "$TMP_DIR/normal-cewl-list" ]; then
+    fail_with_log "normal CeWL helper did not create its output" "$LAST_LOG"
+fi
+
+printf 'hash:pass123\nhash:\$HEX[616263313233]\n' >"$TMP_DIR/hash-cracker.pot"
+run_case processor_19_normal bash -lc "./hash-cracker.sh --job 19"
+assert_rc_eq 0
+assert_contains "Digit removal / Hybrid processing done"
+
+run_case processor_16_normal bash -lc "./hash-cracker.sh --job 16"
+assert_rc_eq 0
+assert_contains "Username as Password processing with rules done"
+
+run_case processor_21_normal bash -lc "printf '21\n2\nn\n0\n' | ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Custom Brute Force Processing Done"
+
+printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
+
+echo "[smoke] session stats distinguish incremental updates from potfile rotation"
+INCREMENTAL_HASHCAT="$TMP_DIR/incremental-hashcat"
+cat >"$INCREMENTAL_HASHCAT" <<EOF
+#!/usr/bin/env bash
+printf 'hash:new-password\n' >>"$TMP_DIR/hash-cracker.pot"
+EOF
+chmod +x "$INCREMENTAL_HASHCAT"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($INCREMENTAL_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case stats_incremental bash -lc "./hash-cracker.sh --stats-debug --job 1"
+assert_rc_eq 0
+assert_contains "Stats refresh mode: incremental"
+
+ROTATING_HASHCAT="$TMP_DIR/rotating-hashcat"
+cat >"$ROTATING_HASHCAT" <<EOF
+#!/usr/bin/env bash
+: >"$TMP_DIR/hash-cracker.pot"
+EOF
+chmod +x "$ROTATING_HASHCAT"
+printf 'hash:before-rotation\n' >"$TMP_DIR/hash-cracker.pot"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($ROTATING_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case stats_rotated_potfile bash -lc "./hash-cracker.sh --stats-debug --job 1"
+assert_rc_eq 0
+assert_contains "Refreshing session stats (recounting unique potfile plaintexts"
+assert_contains "Stats refresh mode: full recount"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
+
+MALFORMED_LOG_DIR="$TMP_DIR/malformed-logs"
+mkdir -p "$MALFORMED_LOG_DIR"
+printf 'unbracketed history line\n[2020-01-01 00:00:00+0000] ordinary history line\n' \
+    >"$MALFORMED_LOG_DIR/session-20200101-000000-1.log"
+MALFORMED_EXPORT="$TMP_DIR/malformed-history.json"
+run_case malformed_history_export bash -lc "printf '0\n' | SESSION_LOG_DIR='$MALFORMED_LOG_DIR' ./hash-cracker.sh --dry-run --no-session-log --stats-export '$MALFORMED_EXPORT' --stats-export-scope all"
+assert_rc_eq 0
+if ! grep -Fq 'unbracketed history line' "$MALFORMED_EXPORT"; then
+    fail_with_log "stats export omitted malformed history entries" "$MALFORMED_EXPORT"
+fi
+if ! grep -Fq 'ordinary history line' "$MALFORMED_EXPORT"; then
+    fail_with_log "stats export omitted rotated log entries" "$MALFORMED_EXPORT"
+fi
 
 echo "[smoke] dependency failure is reported by self-test"
 MISSING_COMMON_SUBSTR="$TMP_DIR/missing-common-substr"
@@ -457,6 +860,22 @@ if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then
 fi
 assert_contains "Option 10 requires"
 assert_contains "Self-test failed"
+
+MISSING_CEWL="$TMP_DIR/missing-cewl"
+run_case self_test_cewl_failure bash -lc "CEWL='$MISSING_CEWL' ./hash-cracker.sh --self-test --dry-run"
+if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then
+    echo "[FAIL] expected CeWL dependency self-test rc to be 0 or 1, got rc=$LAST_RC"
+    cat "$LAST_LOG"
+    exit 1
+fi
+assert_contains "Option 18 requires CeWL executable"
+assert_contains "Self-test failed"
+
+MISSING_PRESET_COMMON="$TMP_DIR/missing-preset-common"
+run_case preset_dependency_failure bash -lc "COMMON_SUBSTR_BIN='$MISSING_PRESET_COMMON' ./hash-cracker.sh --dry-run --preset quick-plus"
+assert_rc_eq 1
+assert_contains "Preset 'quick-plus' failed before job 11"
+assert_contains "Preset 'quick-plus' summary"
 
 echo "[smoke] preset stops and reports processor failure"
 FAILING_HASHCAT="$TMP_DIR/failing-hashcat"
