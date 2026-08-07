@@ -3,6 +3,7 @@
 
 # Requirements
 processor_bootstrap
+common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
 
 # Temporary Files
 tmp=$(dryrun_tempfile prefixsuffix)
@@ -23,9 +24,9 @@ if dry_run_enabled; then
 else
     cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
     if [ "$MACHINE" == "Mac" ]; then
-        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-mac -n -p -f $tmp2 >$tmp3 && ./scripts/extensions/common-substr-mac -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
+        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && "$common_substr_bin" -n -p -f $tmp2 >$tmp3 && "$common_substr_bin" -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
     else
-        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && ./scripts/extensions/common-substr-linux -n -p -f $tmp2 >$tmp3 && ./scripts/extensions/common-substr-linux -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
+        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && "$common_substr_bin" -n -p -f $tmp2 >$tmp3 && "$common_substr_bin" -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
     fi
 fi
 
