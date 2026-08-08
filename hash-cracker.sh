@@ -184,6 +184,20 @@ function job_text_by_id() {
     return 1
 }
 
+function processor_path_by_id() {
+    local selected="$1"
+    local option_id option_text processor
+
+    while IFS='|' read -r option_id option_text processor; do
+        if [[ "$selected" == "$option_id" ]]; then
+            printf '%s' "$processor"
+            return 0
+        fi
+    done < <(menu_entries)
+
+    return 1
+}
+
 function current_epoch_seconds() {
     date '+%s'
 }
@@ -368,7 +382,229 @@ function run_processor() {
         fi
     )
     rc=$?
+    if [ -n "${CAMPAIGN_INTERRUPT_MARKER:-}" ] && [ -f "$CAMPAIGN_INTERRUPT_MARKER" ]; then
+        return 130
+    fi
     return "$rc"
+}
+
+function campaign_record_command() {
+    local command_line="$1"
+    printf '%s\t%s\n' "$CAMPAIGN_CURRENT_STEP" "$command_line" >>"$CAMPAIGN_COMMAND_FILE"
+}
+
+function campaign_jobs_for_source() {
+    local source="$1"
+
+    if [[ "$source" =~ ^[0-9]+$ ]]; then
+        if ! preset_job_supported "$source"; then
+            status_error "Campaign job '$source' requires interactive input or is unsupported." >&2
+            status_heading "Campaigns support non-interactive jobs 1, 9, 10, 11, 12, 13, 14, 16, and 19." >&2
+            return 1
+        fi
+        printf '%s' "$source"
+        return 0
+    fi
+
+    if ! get_preset_jobs "$source"; then
+        status_error "Invalid campaign preset: $source" >&2
+        status_heading "Use --list-presets to see available campaign sources." >&2
+        return 1
+    fi
+}
+
+function run_campaign_plan() {
+    local source="$1"
+    local output="$2"
+    local jobs
+    local step_file
+    local command_file
+    local job_id
+    local job_text
+    local processor
+    local step_id
+    local index=1
+    local rc
+    local kind='preset'
+    local -a job_ids
+
+    if [[ "$source" =~ ^[0-9]+$ ]]; then
+        kind='job'
+    fi
+    if ! jobs="$(campaign_jobs_for_source "$source")"; then
+        return 1
+    fi
+
+    step_file=$(mktemp /tmp/hash-cracker-campaign-steps.XXXX)
+    command_file=$(mktemp /tmp/hash-cracker-campaign-commands.XXXX)
+    : >"$command_file"
+    CAMPAIGN_MODE='plan'
+    CAMPAIGN_COMMAND_FILE="$command_file"
+    status_heading "Planning campaign '$source' (jobs: $jobs)"
+
+    IFS=',' read -ra job_ids <<<"$jobs"
+    for job_id in "${job_ids[@]}"; do
+        if ! job_text="$(job_text_by_id "$job_id")" || ! processor="$(processor_path_by_id "$job_id")"; then
+            status_error "Campaign source '$source' contains unknown job: $job_id"
+            rm -f -- "$step_file" "$command_file"
+            return 1
+        fi
+
+        step_id=$(printf 'step-%03d-job-%s' "$index" "$job_id")
+        printf '%s\t%s\t%s\t%s\n' "$step_id" "$job_id" "$job_text" "$processor" >>"$step_file"
+        CAMPAIGN_CURRENT_STEP="$step_id"
+        if ! check_job_dependencies "$job_id"; then
+            status_error "Campaign '$source' cannot plan job $job_id ($job_text)."
+            rm -f -- "$step_file" "$command_file"
+            return 1
+        fi
+        run_processor "$job_id"
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            status_error "Campaign '$source' failed to plan job $job_id ($job_text)."
+            rm -f -- "$step_file" "$command_file"
+            return "$rc"
+        fi
+        index=$((index + 1))
+    done
+
+    python3 scripts/campaign.py create \
+        --output "$output" \
+        --name "$source" \
+        --kind "$kind" \
+        --release "$(release_version_text)" \
+        --steps-file "$step_file" \
+        --commands-file "$command_file" \
+        --config "$CONFIGFILE" \
+        --hashlist "$HASHLIST" \
+        --potfile "$POTFILE" \
+        --wordlist "$WORDLIST" \
+        --wordlist2 "$WORDLIST2" \
+        --hashcat "$HASHCAT_BIN" \
+        --hashtype "$HASHTYPE" \
+        --machine "$MACHINE" \
+        --kernel="$KERNEL" \
+        --loopback="$LOOPBACK" \
+        --hwmon="$HWMON" \
+        --showcracked="$SHOWCRACKED"
+    rc=$?
+    rm -f -- "$step_file" "$command_file"
+    if [ "$rc" -eq 0 ]; then
+        status_ok "Campaign plan ready: $output"
+    fi
+    return "$rc"
+}
+
+function run_campaign_execute() {
+    local manifest="$1"
+    local action="$2"
+    local next_line
+    local next_rc
+    local index
+    local step_id
+    local job_id
+    local job_text
+    local command_file
+    local interrupt_marker
+    local start_time
+    local duration
+    local rc
+    local state
+    local update_rc
+    local session_stats_line
+
+    if [ ! -f "$manifest" ]; then
+        status_error "Campaign manifest not found: $manifest"
+        return 1
+    fi
+    if ! python3 scripts/campaign.py validate \
+        --manifest "$manifest" \
+        --config "$CONFIGFILE" \
+        --hashlist "$HASHLIST" \
+        --wordlist "$WORDLIST" \
+        --wordlist2 "$WORDLIST2" \
+        --hashcat "$HASHCAT_BIN" \
+        --hashtype "$HASHTYPE" \
+        --machine "$MACHINE" \
+        --kernel="$KERNEL" \
+        --loopback="$LOOPBACK" \
+        --hwmon="$HWMON" \
+        --showcracked="$SHOWCRACKED"; then
+        return 1
+    fi
+
+    status_heading "${action^} campaign: $manifest"
+    while true; do
+        next_line="$(python3 scripts/campaign.py next --manifest "$manifest")"
+        next_rc=$?
+        if [ "$next_rc" -eq 2 ]; then
+            status_ok "Campaign has no incomplete steps: $manifest"
+            return 0
+        fi
+        if [ "$next_rc" -ne 0 ]; then
+            status_error "Unable to read the next campaign step."
+            return "$next_rc"
+        fi
+
+        IFS='|' read -r index step_id job_id job_text <<<"$next_line"
+        status_heading "Campaign step $step_id: job $job_id ($job_text)"
+        if ! python3 scripts/campaign.py mark-running \
+            --manifest "$manifest" \
+            --index "$index" \
+            --step-id "$step_id"; then
+            return 1
+        fi
+
+        command_file=$(mktemp /tmp/hash-cracker-campaign-executed.XXXX)
+        interrupt_marker="${command_file}.interrupt"
+        : >"$command_file"
+        rm -f -- "$interrupt_marker"
+        # shellcheck disable=SC2034
+        CAMPAIGN_MODE='execute'
+        CAMPAIGN_CURRENT_STEP="$step_id"
+        CAMPAIGN_COMMAND_FILE="$command_file"
+        CAMPAIGN_INTERRUPT_MARKER="$interrupt_marker"
+        start_time=$(current_epoch_seconds)
+
+        if ! check_job_dependencies "$job_id"; then
+            rc=1
+        else
+            run_processor "$job_id"
+            rc=$?
+        fi
+        duration=$(($(current_epoch_seconds) - start_time))
+        if [ "$rc" -eq 0 ]; then
+            state='completed'
+        elif [ "$rc" -eq 130 ]; then
+            state='interrupted'
+        else
+            state='failed'
+        fi
+
+        python3 scripts/campaign.py update \
+            --manifest "$manifest" \
+            --index "$index" \
+            --step-id "$step_id" \
+            --state "$state" \
+            --exit-code "$rc" \
+            --duration "$duration" \
+            --commands-file "$command_file"
+        update_rc=$?
+        rm -f -- "$command_file" "$interrupt_marker"
+        if [ "$update_rc" -ne 0 ]; then
+            return "$update_rc"
+        fi
+
+        refresh_session_stats
+        session_stats_line=$(build_session_stats_line)
+        log_session_stats_line "$session_stats_line"
+        export_session_stats_json
+
+        if [ "$rc" -ne 0 ]; then
+            status_error "Campaign '$manifest' stopped at $step_id with rc=$rc."
+            return "$rc"
+        fi
+    done
 }
 
 function hashcat_base() {
@@ -396,6 +632,9 @@ function processor_cleanup() {
 }
 
 function processor_interrupt() {
+    if [ -n "${CAMPAIGN_INTERRUPT_MARKER:-}" ]; then
+        : >"$CAMPAIGN_INTERRUPT_MARKER"
+    fi
     processor_cleanup "$@"
     exit 0
 }
@@ -1147,8 +1386,23 @@ run_early_list_mode "$@"
 init_colors
 trap cleanup_session_state EXIT
 source scripts/parameters.sh "$@"
+
+if [ -n "$CAMPAIGN_PLAN" ]; then
+    run_campaign_plan "$CAMPAIGN_PLAN" "$CAMPAIGN_OUTPUT"
+    exit $?
+fi
+
 status_heading "Preparing session stats (counting potfile and input hashes)..."
 init_session_stats
+
+if [ -n "$CAMPAIGN_EXECUTE" ] || [ -n "$CAMPAIGN_RESUME" ]; then
+    if [ -n "$CAMPAIGN_RESUME" ]; then
+        run_campaign_execute "$CAMPAIGN_RESUME" 'Resuming'
+    else
+        run_campaign_execute "$CAMPAIGN_EXECUTE" 'Executing'
+    fi
+    exit $?
+fi
 
 if [ "$JOBLIST" = ' ' ]; then
     print_job_list

@@ -185,6 +185,16 @@ Run non-interactive health checks:
 ./hash-cracker.sh --self-test
 ```
 
+Create and run a reproducible campaign plan (requires `python3`):
+
+```bash
+./hash-cracker.sh --plan deep-plus --output campaign.json
+./hash-cracker.sh --execute campaign.json
+./hash-cracker.sh --resume campaign.json
+```
+
+Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, per-step exit codes, and execution state. Plans never execute Hashcat. Execution resumes the first incomplete step and rejects changed configuration, runtime flags, hashlist, or wordlist inputs; the potfile is treated as mutable campaign state. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
+
 Run the smoke suite with Bash coverage (requires `python3`):
 
 ```bash
@@ -213,6 +223,9 @@ By default, `hash-cracker` enables optimized kernels, enables loopback, disables
 - `--list-jobs` - print available job IDs and exit
 - `--preset [NAME]`, `--preset=NAME` - run a built-in non-interactive job preset and exit
 - `--list-presets` - print available built-in presets and exit
+- `--plan [PRESET|JOB] --output PATH` - create a versioned campaign manifest without executing Hashcat
+- `--execute PATH` - execute a campaign manifest from its first incomplete step
+- `--resume PATH` - resume an interrupted or failed campaign manifest
 - `--self-test`, `--doctor` - run non-interactive configuration and dependency checks, then exit with status code
 
 ## Built-In Presets
