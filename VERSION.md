@@ -1,5 +1,20 @@
 # Version log
 
+## v6.5.0 - Coverage Gate
+
+### Added
+
+- Added deterministic smoke-test fixtures that work without a developer-local configuration file.
+- Added coverage reporting with nested Bash execution tracing, per-file HTML/JSON output, and baseline regression checks.
+- Added CI coverage artifact publication and coverage baseline enforcement.
+- Expanded automated coverage across all 22 processors and CLI failure paths.
+
+### Changed
+
+- Dry-run PACK workflows no longer require Python or `pyenchant` when their preprocessing is skipped.
+- Hashcat failures now propagate through processors and stop failing presets correctly.
+- Configuration, optional dependency, and session-log paths can be overridden for isolated test runs.
+
 ## v6.4.1 - Run Ledger
 
 ### Fixed

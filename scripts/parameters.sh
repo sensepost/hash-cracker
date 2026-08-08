@@ -173,7 +173,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-CONFIGFILE="hash-cracker.conf"
+CONFIGFILE="${HASH_CRACKER_CONFIG:-hash-cracker.conf}"
 # shellcheck disable=SC2034
 STATICCONFIG=true
 COUNTER=0
@@ -213,6 +213,8 @@ run_hashcat() {
     rc=$?
 
     if [ $rc -ne 0 ]; then
+        # shellcheck disable=SC2034
+        HASHCAT_FAILURE="$rc"
         echo "[hash-cracker] hashcat command failed with exit code $rc" >&2
     fi
     return $rc

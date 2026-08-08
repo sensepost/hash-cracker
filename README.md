@@ -185,6 +185,14 @@ Run non-interactive health checks:
 ./hash-cracker.sh --self-test
 ```
 
+Run the smoke suite with Bash coverage (requires `python3`):
+
+```bash
+make coverage
+```
+
+The report is written to `coverage/` and includes HTML and JSON output, including executable-line and function coverage. Coverage uses Bash’s execution trace so nested `bash -lc` test cases and sourced processor scripts are attributed to the application files. The measured line set excludes shell-only syntax, here-document data, and embedded `awk` source that Bash cannot execute or trace as Bash lines. On the first CI run, `coverage/coverage-baseline-candidate.txt` records the measured baseline. To enforce that baseline locally, copy that value to `coverage-baseline.txt`; subsequent coverage runs fail if executable-line coverage decreases.
+
 ## Flags
 
 By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.

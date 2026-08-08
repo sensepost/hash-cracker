@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.4.1 "Run Ledger"'
+    printf '%s' 'v6.5.0 "Coverage Gate"'
 }
 
 function release_label_text() {
@@ -287,7 +287,7 @@ function check_job_dependencies() {
             else
                 statsgen="scripts/extensions/pack-linux/rulegen.py"
             fi
-            if ! command -v python3 >/dev/null 2>&1; then
+            if [ "$DRYRUN" != ' ' ] && ! command -v python3 >/dev/null 2>&1; then
                 dependency_fail \
                     "Option 12 requires 'python3'." \
                     "install python3 and ensure 'python3' is in PATH."
@@ -299,7 +299,7 @@ function check_job_dependencies() {
                     "restore the bundled PACK files under scripts/extensions/."
                 return 1
             fi
-            if ! python3 -c 'import enchant' >/dev/null 2>&1; then
+            if [ "$DRYRUN" != ' ' ] && ! python3 -c 'import enchant' >/dev/null 2>&1; then
                 dependency_fail \
                     "Option 12 requires Python package 'pyenchant'." \
                     "install with 'python3 -m pip install pyenchant==3.3.0' and ensure enchant dictionaries are available."
@@ -316,7 +316,7 @@ function check_job_dependencies() {
                 statsgen="scripts/extensions/pack-linux/statsgen.py"
                 maskgen="scripts/extensions/pack-linux/maskgen.py"
             fi
-            if ! command -v "$python_bin" >/dev/null 2>&1; then
+            if [ "$DRYRUN" != ' ' ] && ! command -v "$python_bin" >/dev/null 2>&1; then
                 dependency_fail \
                     "Option 13 requires '$python_bin'." \
                     "install $python_bin and ensure it is in PATH."
@@ -360,8 +360,12 @@ function run_processor() {
     fi
 
     (
+        HASHCAT_FAILURE=0
         # shellcheck source=/dev/null
         source "$selected_processor"
+        if [ "$HASHCAT_FAILURE" -ne 0 ]; then
+            exit "$HASHCAT_FAILURE"
+        fi
     )
     rc=$?
     return "$rc"
@@ -373,7 +377,8 @@ function hashcat_base() {
 
 function processor_bootstrap() {
     if [[ "$STATICCONFIG" = true ]]; then
-        source hash-cracker.conf
+        # shellcheck source=/dev/null
+        source "$CONFIGFILE"
         source scripts/runtime-overrides.sh
     else
         source scripts/selectors/hashtype.sh
@@ -548,7 +553,7 @@ function stats_export_scope() {
 }
 
 function export_session_stats_history_json() {
-    local logs_dir='logs'
+    local logs_dir="${SESSION_LOG_DIR:-logs}"
     local first='1'
     local file
     local line
@@ -713,7 +718,7 @@ function prune_session_logs() {
 }
 
 function init_session_stats_logfile() {
-    local logs_dir='logs'
+    local logs_dir="${SESSION_LOG_DIR:-logs}"
     local log_dir
     local session_stamp
     local keep_count
@@ -1133,6 +1138,10 @@ function menu() {
         source scripts/parameters.sh "$@"
     done
 }
+
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
 
 run_early_list_mode "$@"
 init_colors
