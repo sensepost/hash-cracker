@@ -1,5 +1,11 @@
 # Version log
 
+## Unreleased
+
+### Added
+
+- Added reproducible campaign manifests with command previews, input fingerprints, atomic step state, execution, and resume support.
+
 ## v6.5.0 - Coverage Gate
 
 ### Added

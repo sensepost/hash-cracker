@@ -21,6 +21,9 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--list-jobs\n\t\t Print available job IDs and exit"
     echo -e "\t--preset [NAME]\n\t\t Run a built-in non-interactive job preset"
     echo -e "\t--list-presets\n\t\t Print available preset names and exit"
+    echo -e "\t--plan [PRESET|JOB] --output PATH\n\t\t Create a reproducible campaign plan without executing Hashcat"
+    echo -e "\t--execute PATH\n\t\t Execute a campaign manifest from its first incomplete step"
+    echo -e "\t--resume PATH\n\t\t Resume an interrupted or failed campaign manifest"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
     exit 1
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
@@ -58,6 +61,10 @@ elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
 fi
 
 # Dynamic Parameters
+CAMPAIGN_PLAN=''
+CAMPAIGN_OUTPUT=''
+CAMPAIGN_EXECUTE=''
+CAMPAIGN_RESUME=''
 # shellcheck disable=SC2034
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -143,6 +150,66 @@ while [[ "$#" -gt 0 ]]; do
             fi
             ;;
         --list-presets) PRESETLIST=' ' ;;
+        --plan)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --plan. Provide a preset name or job ID."
+                exit 1
+            fi
+            CAMPAIGN_PLAN="$2"
+            shift
+            ;;
+        --plan=*)
+            CAMPAIGN_PLAN="${1#*=}"
+            if [ -z "$CAMPAIGN_PLAN" ]; then
+                status_error "Missing value for --plan. Provide a preset name or job ID."
+                exit 1
+            fi
+            ;;
+        --output)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --output. Provide a campaign manifest path."
+                exit 1
+            fi
+            CAMPAIGN_OUTPUT="$2"
+            shift
+            ;;
+        --output=*)
+            CAMPAIGN_OUTPUT="${1#*=}"
+            if [ -z "$CAMPAIGN_OUTPUT" ]; then
+                status_error "Missing value for --output. Provide a campaign manifest path."
+                exit 1
+            fi
+            ;;
+        --execute)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --execute. Provide a campaign manifest path."
+                exit 1
+            fi
+            CAMPAIGN_EXECUTE="$2"
+            shift
+            ;;
+        --execute=*)
+            CAMPAIGN_EXECUTE="${1#*=}"
+            if [ -z "$CAMPAIGN_EXECUTE" ]; then
+                status_error "Missing value for --execute. Provide a campaign manifest path."
+                exit 1
+            fi
+            ;;
+        --resume)
+            if [ -z "${2:-}" ]; then
+                status_error "Missing value for --resume. Provide a campaign manifest path."
+                exit 1
+            fi
+            CAMPAIGN_RESUME="$2"
+            shift
+            ;;
+        --resume=*)
+            CAMPAIGN_RESUME="${1#*=}"
+            if [ -z "$CAMPAIGN_RESUME" ]; then
+                status_error "Missing value for --resume. Provide a campaign manifest path."
+                exit 1
+            fi
+            ;;
         --session-log-keep)
             case "${2:-}" in
                 '' | *[!0-9]*)
@@ -173,6 +240,38 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+if [ -n "$CAMPAIGN_PLAN" ] && [ -z "$CAMPAIGN_OUTPUT" ]; then
+    status_error "Campaign plans require --output PATH."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_OUTPUT" ] && [ -z "$CAMPAIGN_PLAN" ]; then
+    status_error "--output is only valid with --plan."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_EXECUTE" ] && [ -n "$CAMPAIGN_RESUME" ]; then
+    status_error "Use either --execute or --resume, not both."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_PLAN" ] && { [ -n "$CAMPAIGN_EXECUTE" ] || [ -n "$CAMPAIGN_RESUME" ]; }; then
+    status_error "Use either --plan or --execute/--resume, not both."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_PLAN" ] && { [ -n "${PRESETMODE:-}" ] || [ -n "${JOBMODE:-}" ]; }; then
+    status_error "Use either --plan or --preset/--job, not both."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_EXECUTE" ] && { [ -n "${PRESETMODE:-}" ] || [ -n "${JOBMODE:-}" ]; }; then
+    status_error "Use either --execute/--resume or --preset/--job, not both."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_RESUME" ] && { [ -n "${PRESETMODE:-}" ] || [ -n "${JOBMODE:-}" ]; }; then
+    status_error "Use either --execute/--resume or --preset/--job, not both."
+    exit 1
+fi
+if [ -n "$CAMPAIGN_PLAN" ]; then
+    DRYRUN=' '
+fi
+
 CONFIGFILE="${HASH_CRACKER_CONFIG:-hash-cracker.conf}"
 # shellcheck disable=SC2034
 STATICCONFIG=true
@@ -202,6 +301,9 @@ run_hashcat() {
     local rc
 
     printf -v cmd_line '%q ' "$HASHCAT_BIN" "$@"
+    if [ -n "${CAMPAIGN_COMMAND_FILE:-}" ]; then
+        campaign_record_command "${cmd_line% }"
+    fi
 
     if [ "$DRYRUN" = ' ' ]; then
         printf '[DRY-RUN] '
@@ -356,6 +458,17 @@ fi
 
 if [ -n "${PRESETMODE:-}" ]; then
     status_ok "Preset mode enabled: $PRESETMODE"
+fi
+
+if [ -n "$CAMPAIGN_PLAN" ]; then
+    status_ok "Campaign planning enabled: $CAMPAIGN_PLAN"
+    status_ok "Campaign output: $CAMPAIGN_OUTPUT"
+fi
+if [ -n "$CAMPAIGN_EXECUTE" ]; then
+    status_ok "Campaign execution enabled: $CAMPAIGN_EXECUTE"
+fi
+if [ -n "$CAMPAIGN_RESUME" ]; then
+    status_ok "Campaign resume enabled: $CAMPAIGN_RESUME"
 fi
 
 echo -e "\nStatic parameters:"

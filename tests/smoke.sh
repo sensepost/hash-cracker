@@ -7,6 +7,7 @@ cd "$REPO_ROOT"
 TMP_DIR="$(mktemp -d /tmp/hash-cracker-smoke.XXXX)"
 CONFIG_PATH="$TMP_DIR/hash-cracker.conf"
 export HASH_CRACKER_CONFIG="$CONFIG_PATH"
+export SESSION_LOG_DIR="$TMP_DIR/logs"
 export COMMON_SUBSTR_BIN="$TMP_DIR/common-substr.sh"
 export CEWL="$TMP_DIR/cewl"
 
@@ -119,6 +120,12 @@ assert_not_contains() {
     fi
 }
 
+echo "[smoke] campaign execution failure controls are explicit"
+CAMPAIGN_MISSING_PATH="$TMP_DIR/missing-campaign.json"
+run_case campaign_missing_manifest bash -lc "./hash-cracker.sh --execute '$CAMPAIGN_MISSING_PATH'"
+assert_rc_eq 1
+assert_contains "Campaign manifest not found: $CAMPAIGN_MISSING_PATH"
+
 fail_with_log() {
     local message="$1"
     local log_file="$2"
@@ -145,6 +152,9 @@ assert_rc_eq 0
 run_case helper_invalid_processor bash -lc 'source ./hash-cracker.sh; if run_processor 999; then exit 1; else exit 0; fi'
 assert_rc_eq 0
 
+run_case helper_invalid_processor_path bash -lc 'source ./hash-cracker.sh; if processor_path_by_id 999; then exit 1; else exit 0; fi'
+assert_rc_eq 0
+
 run_case helper_unsupported_preset bash -lc 'source ./hash-cracker.sh; preset_entries() { printf "invalid|Invalid fixture|2\\n"; }; if run_preset_mode invalid; then exit 1; else exit 0; fi'
 assert_rc_eq 0
 
@@ -161,6 +171,24 @@ assert_rc_eq 0
 if [ -e "$HELPER_INTERRUPT_FILE" ]; then
     fail_with_log "processor interrupt did not clean its temporary file" "$LAST_LOG"
 fi
+
+HELPER_CAMPAIGN_INTERRUPT_PROCESSOR="$TMP_DIR/helper-campaign-interrupt-processor.sh"
+HELPER_CAMPAIGN_INTERRUPT_MARKER="$TMP_DIR/helper-campaign-interrupt.marker"
+printf 'processor_interrupt\n' >"$HELPER_CAMPAIGN_INTERRUPT_PROCESSOR"
+run_case helper_campaign_interrupt bash -lc "source '$REPO_ROOT/hash-cracker.sh'; menu_entries() { printf '1|Interrupt fixture|$HELPER_CAMPAIGN_INTERRUPT_PROCESSOR\\n'; }; CAMPAIGN_INTERRUPT_MARKER='$HELPER_CAMPAIGN_INTERRUPT_MARKER'; if run_processor 1; then exit 1; else test \"\$?\" -eq 130; fi"
+assert_rc_eq 0
+if [ ! -f "$HELPER_CAMPAIGN_INTERRUPT_MARKER" ]; then
+    fail_with_log "campaign interrupt marker was not created" "$LAST_LOG"
+fi
+
+run_case helper_campaign_unknown_job bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '999'; }; if run_campaign_plan fixture '$TMP_DIR/unknown-job.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_dependency_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; check_job_dependencies() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/dependency-failure.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_plan_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; check_job_dependencies() { return 0; }; run_processor() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-failure.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
 
 HELPER_CACHE="$TMP_DIR/helper-cache"
 run_case helper_hashlist_refresh bash -lc "source ./hash-cracker.sh; HASHLIST='$TMP_DIR/input'; POTFILE=/dev/null; SESSION_POT_UNIQUE_CACHE='$HELPER_CACHE'; SESSION_POT_LINES_LAST=0; SESSION_POT_BYTES_LAST=0; SESSION_POT_LINES_BASE=0; SESSION_POT_UNIQUE_BASE=0; SESSION_POT_BYTES_BASE=0; SESSION_POT_UNIQUE_CUR=0; SESSION_HASHLIST_PATH_LAST='$TMP_DIR/old-hashlist'; refresh_session_stats"
@@ -223,6 +251,74 @@ echo "[smoke] missing flag values fail before startup"
 run_case missing_flag_value bash -lc "./hash-cracker.sh --stats-export"
 assert_rc_eq 1
 assert_contains "Missing value for --stats-export"
+
+run_case campaign_missing_plan_value bash -lc "./hash-cracker.sh --plan"
+assert_rc_eq 1
+assert_contains "Missing value for --plan"
+
+run_case campaign_missing_plan_equals_value bash -lc "./hash-cracker.sh --plan="
+assert_rc_eq 1
+assert_contains "Missing value for --plan"
+
+run_case campaign_missing_plan_output bash -lc "./hash-cracker.sh --plan quick"
+assert_rc_eq 1
+assert_contains "Campaign plans require --output PATH."
+
+run_case campaign_missing_output_value bash -lc "./hash-cracker.sh --output"
+assert_rc_eq 1
+assert_contains "Missing value for --output"
+
+run_case campaign_missing_output_equals_value bash -lc "./hash-cracker.sh --output="
+assert_rc_eq 1
+assert_contains "Missing value for --output"
+
+run_case campaign_missing_execute_value bash -lc "./hash-cracker.sh --execute"
+assert_rc_eq 1
+assert_contains "Missing value for --execute"
+
+run_case campaign_missing_execute_equals_value bash -lc "./hash-cracker.sh --execute="
+assert_rc_eq 1
+assert_contains "Missing value for --execute"
+
+run_case campaign_missing_resume_value bash -lc "./hash-cracker.sh --resume"
+assert_rc_eq 1
+assert_contains "Missing value for --resume"
+
+run_case campaign_missing_resume_equals_value bash -lc "./hash-cracker.sh --resume="
+assert_rc_eq 1
+assert_contains "Missing value for --resume"
+
+run_case campaign_output_without_plan bash -lc "./hash-cracker.sh --output campaign.json"
+assert_rc_eq 1
+assert_contains "--output is only valid with --plan"
+
+run_case campaign_execute_resume_conflict bash -lc "./hash-cracker.sh --execute one.json --resume two.json"
+assert_rc_eq 1
+assert_contains "Use either --execute or --resume"
+
+run_case campaign_plan_execute_conflict bash -lc "./hash-cracker.sh --plan quick --output plan.json --execute plan.json"
+assert_rc_eq 1
+assert_contains "Use either --plan or --execute/--resume"
+
+run_case campaign_plan_job_conflict bash -lc "./hash-cracker.sh --plan quick --output plan.json --job 1"
+assert_rc_eq 1
+assert_contains "Use either --plan or --preset/--job"
+
+run_case campaign_execute_job_conflict bash -lc "./hash-cracker.sh --execute plan.json --job 1"
+assert_rc_eq 1
+assert_contains "Use either --execute/--resume or --preset/--job"
+
+run_case campaign_resume_preset_conflict bash -lc "./hash-cracker.sh --resume plan.json --preset quick"
+assert_rc_eq 1
+assert_contains "Use either --execute/--resume or --preset/--job"
+
+run_case campaign_interactive_job bash -lc "./hash-cracker.sh --plan 2 --output '$TMP_DIR/interactive-campaign.json'"
+assert_rc_eq 1
+assert_contains "requires interactive input or is unsupported"
+
+run_case campaign_invalid_preset bash -lc "./hash-cracker.sh --plan nope --output '$TMP_DIR/invalid-campaign.json'"
+assert_rc_eq 1
+assert_contains "Invalid campaign preset: nope"
 
 echo "[smoke] early informational and CLI validation modes are deterministic"
 run_case module_info bash -lc "./hash-cracker.sh --module-info"
@@ -558,6 +654,225 @@ assert_contains "| 9      | Iterate results"
 assert_contains "| ok      | 0"
 assert_contains "Preset: quick | planned: 2 | completed: 2 | failed: 0 | duration:"
 assert_contains "Preset 'quick' completed."
+
+echo "[smoke] campaign planning captures reproducible command steps"
+CAMPAIGN_PATH="$TMP_DIR/quick-campaign.json"
+run_case campaign_plan bash -lc "./hash-cracker.sh --plan quick --output '$CAMPAIGN_PATH'"
+assert_rc_eq 0
+assert_contains "Campaign plan ready: $CAMPAIGN_PATH"
+if ! python3 - "$CAMPAIGN_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["schema_version"] == "1"
+assert manifest["status"] == "planned"
+assert manifest["campaign"]["jobs"] == [1, 9]
+assert len(manifest["steps"]) == 2
+assert all(step["commands"] for step in manifest["steps"])
+assert manifest["inputs"]["potfile"]["mutable"] is True
+PY
+    fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
+fi
+
+CAMPAIGN_JOB_PATH="$TMP_DIR/job-campaign.json"
+run_case campaign_plan_equals bash -lc "./hash-cracker.sh --plan=1 --output='$CAMPAIGN_JOB_PATH'"
+assert_rc_eq 0
+assert_contains "Campaign plan ready: $CAMPAIGN_JOB_PATH"
+
+echo "[smoke] campaign execution records completed steps and supports resume"
+run_case campaign_execute_equals bash -lc "SESSION_LOG_DIR='$TMP_DIR/campaign-logs' ./hash-cracker.sh --execute='$CAMPAIGN_PATH'"
+assert_rc_eq 0
+assert_contains "Campaign has no incomplete steps: $CAMPAIGN_PATH"
+if ! python3 - "$CAMPAIGN_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["status"] == "completed"
+assert all(step["state"] == "completed" for step in manifest["steps"])
+assert all(step["executed_commands"] for step in manifest["steps"])
+PY
+    fail_with_log "completed campaign state was invalid" "$LAST_LOG"
+fi
+
+run_case campaign_resume_equals bash -lc "SESSION_LOG_DIR='$TMP_DIR/campaign-logs' ./hash-cracker.sh --resume='$CAMPAIGN_PATH'"
+assert_rc_eq 0
+assert_contains "Campaign has no incomplete steps: $CAMPAIGN_PATH"
+
+CAMPAIGN_FAIL_HASHCAT="$TMP_DIR/campaign-failing-hashcat"
+printf '#!/usr/bin/env bash\nexit 7\n' >"$CAMPAIGN_FAIL_HASHCAT"
+chmod +x "$CAMPAIGN_FAIL_HASHCAT"
+CAMPAIGN_FAIL_CONFIG="$TMP_DIR/campaign-failing.conf"
+cat >"$CAMPAIGN_FAIL_CONFIG" <<EOF
+HASHCAT=($CAMPAIGN_FAIL_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+CAMPAIGN_FAIL_PATH="$TMP_DIR/failing-campaign.json"
+run_case campaign_failure_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_FAIL_CONFIG' ./hash-cracker.sh --plan=quick --output '$CAMPAIGN_FAIL_PATH'"
+assert_rc_eq 0
+run_case campaign_execute_failure bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_FAIL_CONFIG' SESSION_LOG_DIR='$TMP_DIR/failing-campaign-logs' ./hash-cracker.sh --execute '$CAMPAIGN_FAIL_PATH'"
+assert_rc_eq 7
+assert_contains "Campaign '$CAMPAIGN_FAIL_PATH' stopped at step-001-job-1 with rc=7."
+if ! python3 - "$CAMPAIGN_FAIL_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["status"] == "failed"
+assert manifest["steps"][0]["state"] == "failed"
+assert manifest["steps"][0]["exit_code"] == 7
+PY
+    fail_with_log "failed campaign state was invalid" "$LAST_LOG"
+fi
+
+printf '#!/usr/bin/env bash\nexit 0\n' >"$CAMPAIGN_FAIL_HASHCAT"
+run_case campaign_resume_failure bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_FAIL_CONFIG' SESSION_LOG_DIR='$TMP_DIR/failing-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_FAIL_PATH'"
+assert_rc_eq 0
+assert_contains "Campaign has no incomplete steps: $CAMPAIGN_FAIL_PATH"
+if ! python3 - "$CAMPAIGN_FAIL_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["status"] == "completed"
+assert manifest["steps"][0]["state"] == "completed"
+assert manifest["steps"][0]["attempts"] == 2
+PY
+    fail_with_log "resumed campaign state was invalid" "$LAST_LOG"
+fi
+
+printf 'changed\n' >"$TMP_DIR/wordlist2.txt"
+run_case campaign_stale_input bash -lc "SESSION_LOG_DIR='$TMP_DIR/campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_PATH'"
+assert_rc_eq 1
+assert_contains "campaign input changed for wordlist2"
+printf 'test\n' >"$TMP_DIR/wordlist2.txt"
+
+run_case campaign_runtime_drift bash -lc "SESSION_LOG_DIR='$TMP_DIR/campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_PATH' --no-limit"
+assert_rc_eq 1
+assert_contains "campaign runtime changed for kernel"
+
+CAMPAIGN_NEXT_FAILURE_BIN="$TMP_DIR/campaign-next-failure-bin"
+mkdir -p "$CAMPAIGN_NEXT_FAILURE_BIN"
+cat >"$CAMPAIGN_NEXT_FAILURE_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+case "${2:-}" in
+    validate) exit 0 ;;
+    next) exit 1 ;;
+    *) exit 0 ;;
+esac
+EOF
+chmod +x "$CAMPAIGN_NEXT_FAILURE_BIN/python3"
+: >"$TMP_DIR/campaign-next-failure.json"
+run_case campaign_next_failure bash -lc "PATH='$CAMPAIGN_NEXT_FAILURE_BIN:$PATH' ./hash-cracker.sh --execute '$TMP_DIR/campaign-next-failure.json'"
+assert_rc_eq 1
+assert_contains "Unable to read the next campaign step."
+
+CAMPAIGN_MARK_RUNNING_FAILURE_BIN="$TMP_DIR/campaign-mark-running-failure-bin"
+mkdir -p "$CAMPAIGN_MARK_RUNNING_FAILURE_BIN"
+cat >"$CAMPAIGN_MARK_RUNNING_FAILURE_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+case "${2:-}" in
+    validate) exit 0 ;;
+    next) printf '0|step-001-job-1|1|Brute force\n' ;;
+    mark-running) exit 1 ;;
+    *) exit 0 ;;
+esac
+EOF
+chmod +x "$CAMPAIGN_MARK_RUNNING_FAILURE_BIN/python3"
+: >"$TMP_DIR/campaign-mark-running-failure.json"
+run_case campaign_mark_running_failure bash -lc "PATH='$CAMPAIGN_MARK_RUNNING_FAILURE_BIN:$PATH' ./hash-cracker.sh --execute '$TMP_DIR/campaign-mark-running-failure.json'"
+assert_rc_eq 1
+
+CAMPAIGN_DEPENDENCY_FAILURE_BIN="$TMP_DIR/campaign-dependency-failure-bin"
+mkdir -p "$CAMPAIGN_DEPENDENCY_FAILURE_BIN"
+cat >"$CAMPAIGN_DEPENDENCY_FAILURE_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-c' ]; then
+    exit 1
+fi
+case "${2:-}" in
+    validate) exit 0 ;;
+    next) printf '0|step-001-job-12|12|PACK rule\n' ;;
+    *) exit 0 ;;
+esac
+EOF
+chmod +x "$CAMPAIGN_DEPENDENCY_FAILURE_BIN/python3"
+: >"$TMP_DIR/campaign-dependency-failure.json"
+run_case campaign_dependency_failure bash -lc "PATH='$CAMPAIGN_DEPENDENCY_FAILURE_BIN:$PATH' ./hash-cracker.sh --execute '$TMP_DIR/campaign-dependency-failure.json'"
+assert_rc_eq 1
+assert_contains "Campaign '$TMP_DIR/campaign-dependency-failure.json' stopped at step-001-job-12 with rc=1."
+
+CAMPAIGN_UPDATE_FAILURE_BIN="$TMP_DIR/campaign-update-failure-bin"
+mkdir -p "$CAMPAIGN_UPDATE_FAILURE_BIN"
+cat >"$CAMPAIGN_UPDATE_FAILURE_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+case "${2:-}" in
+    validate) exit 0 ;;
+    next) printf '0|step-001-job-1|1|Brute force\n' ;;
+    update) exit 1 ;;
+    *) exit 0 ;;
+esac
+EOF
+chmod +x "$CAMPAIGN_UPDATE_FAILURE_BIN/python3"
+: >"$TMP_DIR/campaign-update-failure.json"
+run_case campaign_update_failure bash -lc "PATH='$CAMPAIGN_UPDATE_FAILURE_BIN:$PATH' ./hash-cracker.sh --execute '$TMP_DIR/campaign-update-failure.json'"
+assert_rc_eq 1
+
+CAMPAIGN_INTERRUPT_HASHCAT="$TMP_DIR/campaign-interrupt-hashcat"
+cat >"$CAMPAIGN_INTERRUPT_HASHCAT" <<'EOF'
+#!/usr/bin/env bash
+kill -INT "$PPID"
+sleep 0.1
+exit 0
+EOF
+chmod +x "$CAMPAIGN_INTERRUPT_HASHCAT"
+CAMPAIGN_INTERRUPT_CONFIG="$TMP_DIR/campaign-interrupt.conf"
+cat >"$CAMPAIGN_INTERRUPT_CONFIG" <<EOF
+HASHCAT=($CAMPAIGN_INTERRUPT_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+CAMPAIGN_INTERRUPT_PATH="$TMP_DIR/interrupted-campaign.json"
+run_case campaign_interrupt_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' ./hash-cracker.sh --plan 1 --output '$CAMPAIGN_INTERRUPT_PATH'"
+assert_rc_eq 0
+run_case campaign_interrupt_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --execute '$CAMPAIGN_INTERRUPT_PATH'"
+assert_rc_eq 130
+assert_contains "Campaign '$CAMPAIGN_INTERRUPT_PATH' stopped at step-001-job-1 with rc=130."
+if ! python3 - "$CAMPAIGN_INTERRUPT_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["status"] == "paused"
+assert manifest["steps"][0]["state"] == "interrupted"
+PY
+    fail_with_log "interrupted campaign state was invalid" "$LAST_LOG"
+fi
+
+printf '#!/usr/bin/env bash\nexit 0\n' >"$CAMPAIGN_INTERRUPT_HASHCAT"
+run_case campaign_interrupt_resume bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_INTERRUPT_PATH'"
+assert_rc_eq 0
+if ! python3 - "$CAMPAIGN_INTERRUPT_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["status"] == "completed"
+assert manifest["steps"][0]["state"] == "completed"
+assert manifest["steps"][0]["attempts"] == 2
+PY
+    fail_with_log "resumed interrupted campaign state was invalid" "$LAST_LOG"
+fi
 
 echo "[smoke] preset deep-plus dry-run reaches extended jobs"
 FAKE_COMMON_SUBSTR="$TMP_DIR/fake-common-substr.sh"

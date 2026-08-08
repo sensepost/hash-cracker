@@ -13,7 +13,8 @@ fi
 rm -rf -- "$COVERAGE_DIR"
 mkdir -p -- "$COVERAGE_DIR"
 
-TMP_DIR="$(mktemp -d /tmp/hash-cracker-coverage.XXXX)"
+COVERAGE_TMP_ROOT="${COVERAGE_TMP_ROOT:-${TMPDIR:-/tmp}}"
+TMP_DIR="$(mktemp -d "$COVERAGE_TMP_ROOT/hash-cracker-coverage.XXXX")"
 trap 'rm -rf -- "$TMP_DIR"' EXIT
 
 TRACE_FILE="$TMP_DIR/bash-trace.log"
