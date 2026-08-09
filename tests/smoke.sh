@@ -190,6 +190,55 @@ assert_rc_eq 0
 run_case helper_campaign_plan_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; check_job_dependencies() { return 0; }; run_processor() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-failure.json'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
+run_case helper_campaign_command_start_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_start"
+assert_rc_eq 0
+
+run_case helper_campaign_command_start_missing_manifest bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; unset CAMPAIGN_MANIFEST; if campaign_command_start; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_command_start_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; CAMPAIGN_STEP_INDEX=0; CAMPAIGN_STEP_ID=step-001; CAMPAIGN_COMMAND_INDEX=0; python3() { return 1; }; if campaign_command_start; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_command_record_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_record 0 fixture"
+assert_rc_eq 0
+
+run_case helper_campaign_command_record_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; CAMPAIGN_STEP_INDEX=0; CAMPAIGN_STEP_ID=step-001; python3() { return 1; }; if campaign_command_record 0 fixture; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_preserve_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_preserve_inputs '$TMP_DIR/input'"
+assert_rc_eq 0
+
+run_case helper_campaign_preserve_empty bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; campaign_command_preserve_inputs"
+assert_rc_eq 0
+
+run_case helper_campaign_preserve_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; CAMPAIGN_STEP_INDEX=0; CAMPAIGN_STEP_ID=step-001; CAMPAIGN_ACTIVE_COMMAND_INDEX=0; CAMPAIGN_PRESERVED_PATHS=(); python3() { return 1; }; if campaign_command_preserve_inputs '$TMP_DIR/input'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_command_finish_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_finish 0 0 0"
+assert_rc_eq 0
+
+run_case helper_campaign_command_finish_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; CAMPAIGN_STEP_INDEX=0; CAMPAIGN_STEP_ID=step-001; python3() { return 1; }; if campaign_command_finish 0 0 0; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_run_hashcat_checkpoint_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh' --dry-run; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+run_case helper_run_hashcat_finish_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; return 0; }; campaign_command_record() { return 0; }; campaign_command_finish() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+run_case helper_run_hashcat_record_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; return 0; }; campaign_command_record() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+CAMPAIGN_RESTORE_MISMATCH_FILE="$TMP_DIR/campaign-restore-mismatch"
+printf 'wrong-hashcat\0' >"$CAMPAIGN_RESTORE_MISMATCH_FILE"
+run_case helper_run_hashcat_restore_mismatch bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_COMMAND_ARGS_FILE='$CAMPAIGN_RESTORE_MISMATCH_FILE'; CAMPAIGN_RESTORE=0; return 0; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+CAMPAIGN_RESTORE_EXISTING_FILE="$TMP_DIR/campaign-restore-existing"
+printf '%s\0--restore\0' "$TMP_DIR/fake-hashcat" >"$CAMPAIGN_RESTORE_EXISTING_FILE"
+run_case helper_run_hashcat_existing_restore bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_COMMAND_ARGS_FILE='$CAMPAIGN_RESTORE_EXISTING_FILE'; CAMPAIGN_RESTORE=1; return 0; }; campaign_command_record() { return 0; }; campaign_command_finish() { return 0; }; run_hashcat fixture"
+assert_rc_eq 0
+
 HELPER_CACHE="$TMP_DIR/helper-cache"
 run_case helper_hashlist_refresh bash -lc "source ./hash-cracker.sh; HASHLIST='$TMP_DIR/input'; POTFILE=/dev/null; SESSION_POT_UNIQUE_CACHE='$HELPER_CACHE'; SESSION_POT_LINES_LAST=0; SESSION_POT_BYTES_LAST=0; SESSION_POT_LINES_BASE=0; SESSION_POT_UNIQUE_BASE=0; SESSION_POT_BYTES_BASE=0; SESSION_POT_UNIQUE_CUR=0; SESSION_HASHLIST_PATH_LAST='$TMP_DIR/old-hashlist'; refresh_session_stats"
 assert_rc_eq 0
@@ -665,11 +714,19 @@ import json
 import sys
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
-assert manifest["schema_version"] == "1"
+assert manifest["schema_version"] == "2"
 assert manifest["status"] == "planned"
 assert manifest["campaign"]["jobs"] == [1, 9]
+assert manifest["campaign"]["session_prefix"].startswith("hc-")
 assert len(manifest["steps"]) == 2
 assert all(step["commands"] for step in manifest["steps"])
+assert all(
+    command["state"] == "pending"
+    and command["attempts"] == 0
+    and command["session"] is None
+    for step in manifest["steps"]
+    for command in step["commands"]
+)
 assert manifest["inputs"]["potfile"]["mutable"] is True
 PY
     fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
@@ -687,11 +744,20 @@ assert_contains "Campaign has no incomplete steps: $CAMPAIGN_PATH"
 if ! python3 - "$CAMPAIGN_PATH" <<'PY'; then
 import json
 import sys
+from pathlib import Path
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "completed"
 assert all(step["state"] == "completed" for step in manifest["steps"])
 assert all(step["executed_commands"] for step in manifest["steps"])
+commands = [command for step in manifest["steps"] for command in step["commands"]]
+assert all(command["state"] == "completed" for command in commands)
+assert all(command["attempts"] == 1 for command in commands)
+assert all(command["session"] for command in commands)
+assert all(command["executed_preview"] for command in commands)
+assert all(command["executed_argv"] for command in commands)
+assert len({command["session"] for command in commands}) == len(commands)
+assert all(not Path(command["restore_file"]).exists() for command in commands)
 PY
     fail_with_log "completed campaign state was invalid" "$LAST_LOG"
 fi
@@ -701,7 +767,21 @@ assert_rc_eq 0
 assert_contains "Campaign has no incomplete steps: $CAMPAIGN_PATH"
 
 CAMPAIGN_FAIL_HASHCAT="$TMP_DIR/campaign-failing-hashcat"
-printf '#!/usr/bin/env bash\nexit 7\n' >"$CAMPAIGN_FAIL_HASHCAT"
+CAMPAIGN_FAIL_COUNT="$TMP_DIR/campaign-failing-count"
+rm -f "$CAMPAIGN_FAIL_COUNT"
+cat >"$CAMPAIGN_FAIL_HASHCAT" <<EOF
+#!/usr/bin/env bash
+count=0
+if [ -f "$CAMPAIGN_FAIL_COUNT" ]; then
+    count=\$(cat "$CAMPAIGN_FAIL_COUNT")
+fi
+count=\$((count + 1))
+printf '%s\n' "\$count" >"$CAMPAIGN_FAIL_COUNT"
+if [ "\$count" -eq 2 ]; then
+    exit 7
+fi
+exit 0
+EOF
 chmod +x "$CAMPAIGN_FAIL_HASHCAT"
 CAMPAIGN_FAIL_CONFIG="$TMP_DIR/campaign-failing.conf"
 cat >"$CAMPAIGN_FAIL_CONFIG" <<EOF
@@ -727,11 +807,16 @@ manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "failed"
 assert manifest["steps"][0]["state"] == "failed"
 assert manifest["steps"][0]["exit_code"] == 7
+commands = manifest["steps"][0]["commands"]
+assert commands[0]["state"] == "completed"
+assert commands[0]["attempts"] == 1
+assert commands[1]["state"] == "failed"
+assert commands[1]["attempts"] == 1
+assert all(command["state"] == "completed" for command in commands[2:])
 PY
     fail_with_log "failed campaign state was invalid" "$LAST_LOG"
 fi
 
-printf '#!/usr/bin/env bash\nexit 0\n' >"$CAMPAIGN_FAIL_HASHCAT"
 run_case campaign_resume_failure bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_FAIL_CONFIG' SESSION_LOG_DIR='$TMP_DIR/failing-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_FAIL_PATH'"
 assert_rc_eq 0
 assert_contains "Campaign has no incomplete steps: $CAMPAIGN_FAIL_PATH"
@@ -743,6 +828,10 @@ manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "completed"
 assert manifest["steps"][0]["state"] == "completed"
 assert manifest["steps"][0]["attempts"] == 2
+commands = manifest["steps"][0]["commands"]
+assert all(command["state"] == "completed" for command in commands)
+assert commands[0]["attempts"] == 1
+assert commands[1]["attempts"] == 2
 PY
     fail_with_log "resumed campaign state was invalid" "$LAST_LOG"
 fi
@@ -825,8 +914,22 @@ run_case campaign_update_failure bash -lc "PATH='$CAMPAIGN_UPDATE_FAILURE_BIN:$P
 assert_rc_eq 1
 
 CAMPAIGN_INTERRUPT_HASHCAT="$TMP_DIR/campaign-interrupt-hashcat"
+export CAMPAIGN_INTERRUPT_ARGS_FILE="$TMP_DIR/campaign-interrupt-args"
+export CAMPAIGN_INTERRUPT_RELEASE_FILE="$TMP_DIR/campaign-interrupt-release"
+rm -f "$CAMPAIGN_INTERRUPT_ARGS_FILE" "$CAMPAIGN_INTERRUPT_RELEASE_FILE"
 cat >"$CAMPAIGN_INTERRUPT_HASHCAT" <<'EOF'
 #!/usr/bin/env bash
+printf '%s\n' "$*" >>"$CAMPAIGN_INTERRUPT_ARGS_FILE"
+for argument in "$@"; do
+    case "$argument" in
+        --restore-file-path=*)
+            : >"${argument#*=}"
+            ;;
+    esac
+done
+if [ -f "$CAMPAIGN_INTERRUPT_RELEASE_FILE" ]; then
+    exit 0
+fi
 kill -INT "$PPID"
 sleep 0.1
 exit 0
@@ -843,33 +946,64 @@ WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 CAMPAIGN_INTERRUPT_PATH="$TMP_DIR/interrupted-campaign.json"
-run_case campaign_interrupt_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' ./hash-cracker.sh --plan 1 --output '$CAMPAIGN_INTERRUPT_PATH'"
+run_case campaign_interrupt_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' ./hash-cracker.sh --plan 9 --output '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 0
 run_case campaign_interrupt_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --execute '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 130
-assert_contains "Campaign '$CAMPAIGN_INTERRUPT_PATH' stopped at step-001-job-1 with rc=130."
+assert_contains "Campaign '$CAMPAIGN_INTERRUPT_PATH' stopped at step-001-job-9 with rc=130."
 if ! python3 - "$CAMPAIGN_INTERRUPT_PATH" <<'PY'; then
 import json
 import sys
+from pathlib import Path
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "paused"
 assert manifest["steps"][0]["state"] == "interrupted"
+command = manifest["steps"][0]["commands"][0]
+assert command["state"] == "running"
+assert command["attempts"] == 1
+assert command["session"]
+assert Path(command["restore_file"]).is_file()
+assert len(command["preserved_inputs"]) == 1
+assert Path(command["preserved_inputs"][0]).is_file()
 PY
     fail_with_log "interrupted campaign state was invalid" "$LAST_LOG"
 fi
 
-printf '#!/usr/bin/env bash\nexit 0\n' >"$CAMPAIGN_INTERRUPT_HASHCAT"
+: >"$CAMPAIGN_INTERRUPT_RELEASE_FILE"
 run_case campaign_interrupt_resume bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 0
 if ! python3 - "$CAMPAIGN_INTERRUPT_PATH" <<'PY'; then
 import json
+import os
+import shlex
 import sys
+from pathlib import Path
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "completed"
 assert manifest["steps"][0]["state"] == "completed"
 assert manifest["steps"][0]["attempts"] == 2
+commands = manifest["steps"][0]["commands"]
+assert all(command["state"] == "completed" for command in commands)
+assert commands[0]["attempts"] == 1
+assert not Path(commands[0]["restore_file"]).exists()
+assert commands[0]["preserved_inputs"] == []
+logged = [
+    shlex.split(line)
+    for line in Path(os.environ["CAMPAIGN_INTERRUPT_ARGS_FILE"]).read_text().splitlines()
+]
+assert len(logged) >= 2
+preserved_paths = [
+    Path(argument) for argument in logged[0] if argument.startswith("/tmp/hash-cracker-tmp.")
+]
+assert preserved_paths
+assert all(not path.exists() for path in preserved_paths)
+assert "--restore" not in logged[0]
+assert "--restore" in logged[1]
+assert f"--session={commands[0]['session']}" in logged[0]
+assert f"--session={commands[0]['session']}" in logged[1]
+assert logged[1] == [argument for argument in logged[0] if argument != "--restore"] + ["--restore"]
 PY
     fail_with_log "resumed interrupted campaign state was invalid" "$LAST_LOG"
 fi

@@ -14,7 +14,8 @@ import tempfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
+LEGACY_SCHEMA_VERSION = "1"
 
 
 class CampaignError(Exception):
@@ -48,18 +49,39 @@ def load_manifest(path: str) -> dict:
     except (OSError, json.JSONDecodeError) as error:
         raise CampaignError(f"cannot read manifest {path}: {error}") from error
 
-    if manifest.get("schema_version") != SCHEMA_VERSION:
+    if manifest.get("schema_version") not in (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION):
         raise CampaignError(
             f"unsupported campaign schema: {manifest.get('schema_version', 'missing')}"
         )
     if not isinstance(manifest.get("steps"), list) or not manifest["steps"]:
         raise CampaignError("campaign manifest has no steps")
+    campaign = manifest.setdefault("campaign", {})
+    campaign.setdefault(
+        "session_prefix",
+        f"hc-{hashlib.sha256(resolved_path(path).encode()).hexdigest()[:12]}",
+    )
+    for step in manifest["steps"]:
+        step.setdefault("commands", [])
+        step.setdefault("current_command", None)
+        for command in step["commands"]:
+            command.setdefault("state", "pending")
+            command.setdefault("session", None)
+            command.setdefault("restore_file", None)
+            command.setdefault("attempts", 0)
+            command.setdefault("exit_code", None)
+            command.setdefault("started_at", None)
+            command.setdefault("finished_at", None)
+            command.setdefault("duration_seconds", None)
+            command.setdefault("executed_preview", None)
+            command.setdefault("executed_argv", None)
+            command.setdefault("preserved_inputs", [])
     return manifest
 
 
 def write_manifest(path: str, manifest: dict) -> None:
     destination = Path(path).expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    manifest["schema_version"] = SCHEMA_VERSION
     manifest["updated_at"] = timestamp()
 
     temporary_path = None
@@ -113,6 +135,28 @@ def read_steps(path: str) -> list[dict]:
     return steps
 
 
+def command_record(preview: str) -> dict:
+    try:
+        argv = shlex.split(preview)
+    except ValueError:
+        argv = [preview]
+    return {
+        "preview": preview,
+        "argv": argv,
+        "state": "pending",
+        "session": None,
+        "restore_file": None,
+        "attempts": 0,
+        "exit_code": None,
+        "started_at": None,
+        "finished_at": None,
+        "duration_seconds": None,
+        "executed_preview": None,
+        "executed_argv": None,
+        "preserved_inputs": [],
+    }
+
+
 def read_commands(path: str) -> dict[str, list[dict]]:
     commands: dict[str, list[dict]] = {}
     for raw_line in Path(path).read_text(encoding="utf-8").splitlines():
@@ -122,13 +166,7 @@ def read_commands(path: str) -> dict[str, list[dict]]:
             step_id, preview = raw_line.split("\t", 1)
         except ValueError as error:
             raise CampaignError(f"invalid campaign command record: {raw_line}") from error
-        try:
-            argv = shlex.split(preview)
-        except ValueError:
-            argv = [preview]
-        commands.setdefault(step_id, []).append(
-            {"preview": preview, "argv": argv}
-        )
+        commands.setdefault(step_id, []).append(command_record(preview))
     return commands
 
 
@@ -175,6 +213,9 @@ def create_manifest(args: argparse.Namespace) -> None:
             "name": args.name,
             "kind": args.kind,
             "jobs": [step["job"] for step in steps],
+            "session_prefix": (
+                f"hc-{hashlib.sha256(resolved_path(args.output).encode()).hexdigest()[:12]}"
+            ),
         },
         "inputs": input_metadata(args),
         "runtime": runtime_metadata(args),
@@ -219,22 +260,29 @@ def validate_manifest(args: argparse.Namespace) -> None:
 def next_step(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
     for index, step in enumerate(manifest["steps"]):
-        if step.get("state") != "completed":
+        if step.get("state") != "completed" or any(
+            command.get("state") != "completed" for command in step["commands"]
+        ):
             print(f"{index}|{step['id']}|{step['job']}|{step['name']}")
             return 0
     return 2
 
 
+def get_step(manifest: dict, index: int, step_id: str) -> dict:
+    try:
+        step = manifest["steps"][index]
+    except (IndexError, TypeError) as error:
+        raise CampaignError(f"invalid campaign step index: {index}") from error
+    if step["id"] != step_id:
+        raise CampaignError(
+            f"campaign step mismatch: expected {step['id']}, got {step_id}"
+        )
+    return step
+
+
 def mark_running(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
-    try:
-        step = manifest["steps"][args.index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(f"invalid campaign step index: {args.index}") from error
-    if step["id"] != args.step_id:
-        raise CampaignError(
-            f"campaign step mismatch: expected {step['id']}, got {args.step_id}"
-        )
+    step = get_step(manifest, args.index, args.step_id)
     step["state"] = "running"
     step["attempts"] = int(step.get("attempts", 0)) + 1
     step["started_at"] = timestamp()
@@ -244,16 +292,143 @@ def mark_running(args: argparse.Namespace) -> None:
     write_manifest(args.manifest, manifest)
 
 
+def campaign_state_dir(manifest_path: str) -> Path:
+    return Path(f"{Path(manifest_path).expanduser().resolve(strict=False)}.state")
+
+
+def command_start(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    try:
+        command = step["commands"][args.command_index]
+    except (IndexError, TypeError) as error:
+        raise CampaignError(
+            f"invalid campaign command index: {args.command_index}"
+        ) from error
+
+    for previous in step["commands"][: args.command_index]:
+        if previous.get("state") not in ("completed", "failed"):
+            raise CampaignError(
+                f"campaign command order is blocked before index {args.command_index}"
+            )
+
+    if command.get("state") == "completed":
+        print("completed\t\t\t0\t")
+        return
+
+    was_running = command.get("state") == "running" and bool(
+        command.get("session")
+    )
+    if not was_running:
+        if command.get("restore_file"):
+            Path(command["restore_file"]).unlink(missing_ok=True)
+        if command.get("session"):
+            Path(
+                campaign_state_dir(args.manifest) / f"{command['session']}.argv"
+            ).unlink(missing_ok=True)
+        for preserved in command.get("preserved_inputs", []):
+            Path(preserved).unlink(missing_ok=True)
+        command["preserved_inputs"] = []
+        command["attempts"] = int(command.get("attempts", 0)) + 1
+        command["session"] = (
+            f"{manifest['campaign']['session_prefix']}-"
+            f"{step['id']}-cmd-{args.command_index:03d}-attempt-"
+            f"{command['attempts']:02d}"
+        )
+        command["restore_file"] = str(
+            campaign_state_dir(args.manifest) / f"{command['session']}.restore"
+        )
+        command["state"] = "running"
+        command["started_at"] = timestamp()
+        command["finished_at"] = None
+        command["exit_code"] = None
+        command["duration_seconds"] = None
+
+    restore_file = command.get("restore_file") or ""
+    restore = int(was_running and bool(restore_file) and Path(restore_file).is_file())
+    state_dir = campaign_state_dir(args.manifest)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    argv_file = ""
+    if was_running and command.get("executed_argv"):
+        argv_file = str(state_dir / f"{command['session']}.argv")
+        with Path(argv_file).open("wb") as stream:
+            for argument in command["executed_argv"]:
+                stream.write(argument.encode() + b"\0")
+    step["current_command"] = args.command_index
+    manifest["status"] = "running"
+    write_manifest(args.manifest, manifest)
+    print(f"running\t{command['session']}\t{restore_file}\t{restore}\t{argv_file}")
+
+
+def record_command(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    try:
+        command = step["commands"][args.command_index]
+    except (IndexError, TypeError) as error:
+        raise CampaignError(
+            f"invalid campaign command index: {args.command_index}"
+        ) from error
+    try:
+        argv = shlex.split(args.preview)
+    except ValueError as error:
+        raise CampaignError(f"invalid campaign command preview: {error}") from error
+    if not argv:
+        raise CampaignError("campaign command preview is empty")
+    command["executed_preview"] = args.preview
+    command["executed_argv"] = argv
+    write_manifest(args.manifest, manifest)
+
+
+def preserve_command_inputs(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    try:
+        command = step["commands"][args.command_index]
+    except (IndexError, TypeError) as error:
+        raise CampaignError(
+            f"invalid campaign command index: {args.command_index}"
+        ) from error
+    preserved = command.setdefault("preserved_inputs", [])
+    for value in args.path:
+        if Path(value).is_file() and value not in preserved:
+            preserved.append(value)
+    write_manifest(args.manifest, manifest)
+
+
+def command_finish(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    try:
+        command = step["commands"][args.command_index]
+    except (IndexError, TypeError) as error:
+        raise CampaignError(
+            f"invalid campaign command index: {args.command_index}"
+        ) from error
+    if command.get("state") == "completed":
+        return
+    command["state"] = args.state
+    command["exit_code"] = args.exit_code
+    command["duration_seconds"] = args.duration
+    command["finished_at"] = timestamp()
+    if args.state == "completed" and command.get("restore_file"):
+        Path(command["restore_file"]).unlink(missing_ok=True)
+    if args.state == "completed" and command.get("session"):
+        Path(campaign_state_dir(args.manifest) / f"{command['session']}.argv").unlink(
+            missing_ok=True
+        )
+    if args.state == "completed":
+        for preserved in command.get("preserved_inputs", []):
+            Path(preserved).unlink(missing_ok=True)
+        command["preserved_inputs"] = []
+    if args.state == "completed":
+        step["current_command"] = None
+    write_manifest(args.manifest, manifest)
+
+
 def update_step(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
-    try:
-        step = manifest["steps"][args.index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(f"invalid campaign step index: {args.index}") from error
-    if step["id"] != args.step_id:
-        raise CampaignError(
-            f"campaign step mismatch: expected {step['id']}, got {args.step_id}"
-        )
+    step = get_step(manifest, args.index, args.step_id)
 
     step["state"] = args.state
     step["exit_code"] = args.exit_code
@@ -338,6 +513,41 @@ def parser() -> argparse.ArgumentParser:
     update.add_argument("--duration", type=int, required=True)
     update.add_argument("--commands-file")
     update.set_defaults(handler=update_step)
+
+    command_start_parser = commands.add_parser("command-start")
+    command_start_parser.add_argument("--manifest", required=True)
+    command_start_parser.add_argument("--index", type=int, required=True)
+    command_start_parser.add_argument("--step-id", required=True)
+    command_start_parser.add_argument("--command-index", type=int, required=True)
+    command_start_parser.set_defaults(handler=command_start)
+
+    command_finish_parser = commands.add_parser("command-finish")
+    command_finish_parser.add_argument("--manifest", required=True)
+    command_finish_parser.add_argument("--index", type=int, required=True)
+    command_finish_parser.add_argument("--step-id", required=True)
+    command_finish_parser.add_argument("--command-index", type=int, required=True)
+    command_finish_parser.add_argument(
+        "--state", choices=("completed", "failed"), required=True
+    )
+    command_finish_parser.add_argument("--exit-code", type=int, required=True)
+    command_finish_parser.add_argument("--duration", type=int, required=True)
+    command_finish_parser.set_defaults(handler=command_finish)
+
+    command_record_parser = commands.add_parser("command-record")
+    command_record_parser.add_argument("--manifest", required=True)
+    command_record_parser.add_argument("--index", type=int, required=True)
+    command_record_parser.add_argument("--step-id", required=True)
+    command_record_parser.add_argument("--command-index", type=int, required=True)
+    command_record_parser.add_argument("--preview", required=True)
+    command_record_parser.set_defaults(handler=record_command)
+
+    command_preserve_parser = commands.add_parser("command-preserve")
+    command_preserve_parser.add_argument("--manifest", required=True)
+    command_preserve_parser.add_argument("--index", type=int, required=True)
+    command_preserve_parser.add_argument("--step-id", required=True)
+    command_preserve_parser.add_argument("--command-index", type=int, required=True)
+    command_preserve_parser.add_argument("--path", action="append", required=True)
+    command_preserve_parser.set_defaults(handler=preserve_command_inputs)
 
     return command_parser
 

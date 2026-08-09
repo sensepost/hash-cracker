@@ -5,6 +5,7 @@
 ### Added
 
 - Added reproducible campaign manifests with command previews, input fingerprints, atomic step state, execution, and resume support.
+- Added command-level campaign checkpoints with deterministic Hashcat sessions and restore-file support for exact interrupted-command resume.
 
 ## v6.5.0 - Coverage Gate
 
