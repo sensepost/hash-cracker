@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v6.6.0 - Campaign Control
+
 ### Added
 
 - Added reproducible campaign manifests with command previews, input fingerprints, atomic step state, execution, and resume support.
