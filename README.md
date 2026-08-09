@@ -193,7 +193,7 @@ Create and run a reproducible campaign plan (requires `python3`):
 ./hash-cracker.sh --resume campaign.json
 ```
 
-Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, per-step exit codes, and execution state. Plans never execute Hashcat. Execution resumes the first incomplete step and rejects changed configuration, runtime flags, hashlist, or wordlist inputs; the potfile is treated as mutable campaign state. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
+Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, per-step exit codes, and command-level execution state. Plans never execute Hashcat. During execution, every Hashcat command receives a deterministic session name and restore-file path. If a run is interrupted, `--resume` skips completed commands and re-enters the interrupted command with the same session and `--restore`; failed commands are retried with a new session. Generated processor inputs used by the interrupted command are retained until that command completes. Campaign sidecar state is stored beside the manifest under `<manifest>.state`. Execution rejects changed configuration, runtime flags, hashlist, or wordlist inputs; the potfile is treated as mutable campaign state. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
 
 Run the smoke suite with Bash coverage (requires `python3`):
 

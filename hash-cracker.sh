@@ -393,6 +393,105 @@ function campaign_record_command() {
     printf '%s\t%s\n' "$CAMPAIGN_CURRENT_STEP" "$command_line" >>"$CAMPAIGN_COMMAND_FILE"
 }
 
+function campaign_command_start() {
+    local result
+
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 0
+    fi
+    if [ -z "${CAMPAIGN_MANIFEST:-}" ]; then
+        status_error "Campaign command checkpoint is missing its manifest path."
+        return 1
+    fi
+
+    if ! result="$(python3 scripts/campaign.py command-start \
+        --manifest "$CAMPAIGN_MANIFEST" \
+        --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" \
+        --command-index "$CAMPAIGN_COMMAND_INDEX")"; then
+        status_error "Unable to checkpoint campaign command $CAMPAIGN_COMMAND_INDEX."
+        return 1
+    fi
+
+    IFS=$'\t' read -r CAMPAIGN_COMMAND_STATE CAMPAIGN_SESSION_NAME \
+        CAMPAIGN_RESTORE_FILE CAMPAIGN_RESTORE CAMPAIGN_COMMAND_ARGS_FILE <<<"$result"
+    CAMPAIGN_COMMAND_INDEX=$((CAMPAIGN_COMMAND_INDEX + 1))
+    return 0
+}
+
+function campaign_command_record() {
+    local command_index="$1"
+    local preview="$2"
+
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 0
+    fi
+    if ! python3 scripts/campaign.py command-record \
+        --manifest "$CAMPAIGN_MANIFEST" \
+        --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" \
+        --command-index "$command_index" \
+        --preview "$preview"; then
+        status_error "Unable to persist campaign command $command_index arguments."
+        return 1
+    fi
+    return 0
+}
+
+function campaign_command_preserve_inputs() {
+    local path
+    local -a preserve_args=()
+
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 0
+    fi
+    for path in "$@"; do
+        if [ -n "$path" ]; then
+            CAMPAIGN_PRESERVED_PATHS+=("$path")
+            preserve_args+=(--path "$path")
+        fi
+    done
+    if [ "${#preserve_args[@]}" -eq 0 ]; then
+        return 0
+    fi
+    if ! python3 scripts/campaign.py command-preserve \
+        --manifest "$CAMPAIGN_MANIFEST" \
+        --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" \
+        --command-index "$CAMPAIGN_ACTIVE_COMMAND_INDEX" \
+        "${preserve_args[@]}"; then
+        status_error "Unable to preserve campaign command inputs."
+        return 1
+    fi
+    return 0
+}
+
+function campaign_command_finish() {
+    local command_index="$1"
+    local rc="$2"
+    local duration="$3"
+    local state='failed'
+
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 0
+    fi
+    if [ "$rc" -eq 0 ]; then
+        state='completed'
+    fi
+    if ! python3 scripts/campaign.py command-finish \
+        --manifest "$CAMPAIGN_MANIFEST" \
+        --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" \
+        --command-index "$command_index" \
+        --state "$state" \
+        --exit-code "$rc" \
+        --duration "$duration"; then
+        status_error "Unable to persist campaign command $command_index state."
+        return 1
+    fi
+    return 0
+}
+
 function campaign_jobs_for_source() {
     local source="$1"
 
@@ -562,6 +661,12 @@ function run_campaign_execute() {
         # shellcheck disable=SC2034
         CAMPAIGN_MODE='execute'
         CAMPAIGN_CURRENT_STEP="$step_id"
+        CAMPAIGN_MANIFEST="$manifest"
+        CAMPAIGN_STEP_INDEX="$index"
+        CAMPAIGN_STEP_ID="$step_id"
+        CAMPAIGN_COMMAND_INDEX=0
+        CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
+        CAMPAIGN_PRESERVED_PATHS=()
         CAMPAIGN_COMMAND_FILE="$command_file"
         CAMPAIGN_INTERRUPT_MARKER="$interrupt_marker"
         start_time=$(current_epoch_seconds)
@@ -626,12 +731,33 @@ function processor_cleanup() {
     local path
     for path in "$@"; do
         if [ -n "$path" ]; then
+            if campaign_path_preserved "$path"; then
+                continue
+            fi
             rm -f -- "$path" 2>/dev/null || true
         fi
     done
 }
 
+function campaign_path_preserved() {
+    local path="$1"
+    local preserved
+
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 1
+    fi
+    for preserved in "${CAMPAIGN_PRESERVED_PATHS[@]:-}"; do
+        if [ "$path" = "$preserved" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 function processor_interrupt() {
+    if [ "${CAMPAIGN_MODE:-}" = 'execute' ] && [ "${CAMPAIGN_ACTIVE_COMMAND_INDEX:--1}" -ge 0 ]; then
+        campaign_command_preserve_inputs "$@" || true
+    fi
     if [ -n "${CAMPAIGN_INTERRUPT_MARKER:-}" ]; then
         : >"$CAMPAIGN_INTERRUPT_MARKER"
     fi

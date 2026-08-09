@@ -297,10 +297,67 @@ done
 # Processors call "$HASHCAT ...", so we point HASHCAT to this function name.
 HASHCAT_BIN="$HASHCAT"
 run_hashcat() {
+    local command_index=-1
     local cmd_line
+    local command_start_time
+    local duration
     local rc
+    local finish_rc
+    local -a command_args=("$@")
 
-    printf -v cmd_line '%q ' "$HASHCAT_BIN" "$@"
+    if [ "${CAMPAIGN_MODE:-}" = 'execute' ]; then
+        # shellcheck disable=SC2034
+        CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
+        command_index="$CAMPAIGN_COMMAND_INDEX"
+        if ! campaign_command_start; then
+            # shellcheck disable=SC2034
+            HASHCAT_FAILURE=1
+            return 1
+        fi
+        if [ "$CAMPAIGN_COMMAND_STATE" = 'completed' ]; then
+            return 0
+        fi
+        CAMPAIGN_ACTIVE_COMMAND_INDEX="$command_index"
+        if [ -n "$CAMPAIGN_COMMAND_ARGS_FILE" ]; then
+            command_args=()
+            while IFS= read -r -d '' restored_arg; do
+                command_args+=("$restored_arg")
+            done <"$CAMPAIGN_COMMAND_ARGS_FILE"
+            if [ "${command_args[0]:-}" != "$HASHCAT_BIN" ]; then
+                # shellcheck disable=SC2034
+                HASHCAT_FAILURE=1
+                status_error "Campaign command checkpoint has a different Hashcat executable."
+                return 1
+            fi
+            command_args=("${command_args[@]:1}")
+            if [ "$CAMPAIGN_RESTORE" -eq 1 ]; then
+                local has_restore=0
+                local restored_arg
+                for restored_arg in "${command_args[@]}"; do
+                    if [ "$restored_arg" = '--restore' ]; then
+                        has_restore=1
+                        break
+                    fi
+                done
+                if [ "$has_restore" -eq 0 ]; then
+                    command_args+=("--restore")
+                fi
+            fi
+        else
+            command_args+=("--session=$CAMPAIGN_SESSION_NAME")
+            command_args+=("--restore-file-path=$CAMPAIGN_RESTORE_FILE")
+            if [ "$CAMPAIGN_RESTORE" -eq 1 ]; then
+                command_args+=("--restore")
+            fi
+        fi
+    fi
+
+    printf -v cmd_line '%q ' "$HASHCAT_BIN" "${command_args[@]}"
+    if [ "$command_index" -ge 0 ] && ! campaign_command_record "$command_index" "${cmd_line% }"; then
+        # shellcheck disable=SC2034
+        HASHCAT_FAILURE=1
+        return 1
+    fi
     if [ -n "${CAMPAIGN_COMMAND_FILE:-}" ]; then
         campaign_record_command "${cmd_line% }"
     fi
@@ -311,8 +368,20 @@ run_hashcat() {
         return 0
     fi
 
-    "$HASHCAT_BIN" "$@"
+    command_start_time=$(current_epoch_seconds)
+    "$HASHCAT_BIN" "${command_args[@]}"
     rc=$?
+    duration=$(($(current_epoch_seconds) - command_start_time))
+
+    if [ "$command_index" -ge 0 ]; then
+        campaign_command_finish "$command_index" "$rc" "$duration"
+        finish_rc=$?
+        if [ "$finish_rc" -ne 0 ] && [ "$rc" -eq 0 ]; then
+            rc=1
+        fi
+        # shellcheck disable=SC2034
+        CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
+    fi
 
     if [ $rc -ne 0 ]; then
         # shellcheck disable=SC2034
