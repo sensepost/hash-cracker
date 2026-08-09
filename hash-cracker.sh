@@ -50,7 +50,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.5.0 "Coverage Gate"'
+    printf '%s' 'v6.6.0 "Campaign Control"'
 }
 
 function release_label_text() {

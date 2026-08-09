@@ -1045,8 +1045,8 @@ assert_contains "Preset 'quick' completed."
 if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
     fail_with_log "preset stats export file was not created" "$LAST_LOG"
 fi
-if ! grep -Fq '"release": "v6.5.0 \"Coverage Gate\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.5.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.6.0 \"Campaign Control\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.6.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
