@@ -1,8 +1,6 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
-RESTART="source scripts/processors/21-custom-brute-force.sh"
-
 # Interrupt handling
 trap 'processor_interrupt' INT TERM
 
@@ -10,33 +8,46 @@ trap 'processor_interrupt' INT TERM
 processor_bootstrap
 
 # Logic
-read -p "Heavy lifting? How much chars are we going to brute-force? (1-99): " CHARS
 TARGET=''
-[ -n "$CHARS" ] && [ "$CHARS" -eq "$CHARS" ] 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo $CHARS is not a number.
-    $RESTART
-elif [ "$CHARS" -lt 1 ]; then
-    echo NO!
-    $RESTART
-else
-    COUNT="$CHARS"
-    while [ "$COUNT" -gt 0 ]; do
-        TARGET+="?a"
-        COUNT=$((COUNT - 1))
-    done
-fi
+while true; do
+    if ! read -r -p "Heavy lifting? How much chars are we going to brute-force? (1-99): " CHARS; then
+        status_error "Unable to read the brute-force length."
+        exit 1
+    fi
+    if [[ "$CHARS" =~ ^[0-9]+$ ]] && [ "$CHARS" -ge 1 ]; then
+        COUNT="$CHARS"
+        while [ "$COUNT" -gt 0 ]; do
+            TARGET+="?a"
+            COUNT=$((COUNT - 1))
+        done
+        break
+    fi
+    if [[ "$CHARS" =~ ^[0-9]+$ ]]; then
+        echo "NO!"
+    else
+        printf '%s is not a number.\n' "$CHARS"
+    fi
+    status_error "Enter a positive numeric brute-force length."
+done
 
-read -p "Enable increment? (y/n) " INCREMENT
+while true; do
+    if ! read -r -p "Enable increment? (y/n) " INCREMENT; then
+        status_error "Unable to read the increment choice."
+        exit 1
+    fi
+    case "$INCREMENT" in
+        y)
+            INCREMENT='--increment'
+            break
+            ;;
+        n)
+            INCREMENT=''
+            break
+            ;;
+        *) status_error "Choose y or n for increment." ;;
+    esac
+done
 
-if [ "$INCREMENT" == 'y' ]; then
-    INCREMENT='--increment'
-elif [ "$INCREMENT" == 'n' ]; then
-    INCREMENT=''
-else
-    $RESTART
-fi
-
-hashcat_base -a3 $TARGET $INCREMENT
+hashcat_base -a3 "$TARGET" "$INCREMENT"
 
 echo -e "\nCustom Brute Force Processing Done\n"

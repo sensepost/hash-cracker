@@ -14,8 +14,8 @@ esac
 fingerprint_candidate_max=$((fingerprint_segment_max * 2))
 
 # Temporary Files
-tmp=$(dryrun_tempfile fingerprint)
-tmp2=$(dryrun_tempfile fingerprint)
+tmp=$(dryrun_tempfile fingerprint-1)
+tmp2=$(dryrun_tempfile fingerprint-2)
 trap 'processor_interrupt "$tmp" "$tmp2"' INT TERM
 trap 'processor_cleanup "$tmp" "$tmp2"' EXIT
 
@@ -24,8 +24,11 @@ if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
     dryrun_note "would generate fingerprint fragments up to $fingerprint_segment_max chars, producing combinator candidates up to $fingerprint_candidate_max chars"
 else
-    awk -F: '{print $NF}' "$POTFILE" | sort -u >"$tmp"
-    LC_ALL=C awk -v max_len="$fingerprint_segment_max" '
+    if ! awk -F: '{print $NF}' "$POTFILE" | sort -u >"$tmp"; then
+        status_error "Fingerprint plaintext extraction failed."
+        exit 1
+    fi
+    if ! LC_ALL=C awk -v max_len="$fingerprint_segment_max" '
         function rotl(s) { return substr(s, 2) substr(s, 1, 1) }
         function rotr(s) { return substr(s, length(s), 1) substr(s, 1, length(s) - 1) }
         function emit_chunks(s, n,    j) {
@@ -48,7 +51,11 @@ else
                 }
             }
         }
-    ' "$tmp" | sort -u >"$tmp2" && rm -f -- "$tmp"
+    ' "$tmp" | sort -u >"$tmp2" && rm -f -- "$tmp"; then
+        status_error "Fingerprint generation failed."
+        exit 1
+    fi
+    processor_require_file "$tmp2" "Fingerprint output" || exit 1
 fi
 
 hashcat_base -a 1 "$tmp2" "$tmp2"

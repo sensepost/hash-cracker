@@ -1,6 +1,8 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
 
+CAMPAIGN_EPHEMERAL_FILES=()
+
 function init_colors() {
     if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
         COLOR_RED=$'\033[31m'
@@ -50,7 +52,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.6.0 "Campaign Control"'
+    printf '%s' 'v6.7.0 "Execution Confidence"'
 }
 
 function release_label_text() {
@@ -375,14 +377,26 @@ function run_processor() {
 
     (
         HASHCAT_FAILURE=0
+        PROCESSOR_FAILURE=0
+        set -o pipefail
         # shellcheck source=/dev/null
         source "$selected_processor"
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            exit "$rc"
+        fi
+        if [ "$PROCESSOR_FAILURE" -ne 0 ]; then
+            exit "$PROCESSOR_FAILURE"
+        fi
         if [ "$HASHCAT_FAILURE" -ne 0 ]; then
             exit "$HASHCAT_FAILURE"
         fi
     )
     rc=$?
     if [ -n "${CAMPAIGN_INTERRUPT_MARKER:-}" ] && [ -f "$CAMPAIGN_INTERRUPT_MARKER" ]; then
+        if [ "$rc" -ne 0 ] && [ "$rc" -ne 130 ]; then
+            return "$rc"
+        fi
         return 130
     fi
     return "$rc"
@@ -390,7 +404,27 @@ function run_processor() {
 
 function campaign_record_command() {
     local command_line="$1"
-    printf '%s\t%s\n' "$CAMPAIGN_CURRENT_STEP" "$command_line" >>"$CAMPAIGN_COMMAND_FILE"
+    shift
+    if ! python3 - "$CAMPAIGN_CURRENT_STEP" "$command_line" "$@" >>"$CAMPAIGN_COMMAND_FILE" <<'PY'; then
+import json
+import sys
+
+print(json.dumps({"step_id": sys.argv[1], "preview": sys.argv[2], "argv": sys.argv[3:]}))
+PY
+        status_error "Unable to record campaign command arguments."
+        return 1
+    fi
+    return 0
+}
+
+function campaign_register_ephemeral() {
+    local path
+
+    for path in "$@"; do
+        if [ -n "$path" ]; then
+            CAMPAIGN_EPHEMERAL_FILES+=("$path")
+        fi
+    done
 }
 
 function campaign_command_start() {
@@ -422,19 +456,34 @@ function campaign_command_start() {
 function campaign_command_record() {
     local command_index="$1"
     local preview="$2"
+    shift 2
+    local argv_file
 
     if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
         return 0
+    fi
+    if ! argv_file=$(mktemp /tmp/hash-cracker-campaign-argv.XXXX); then
+        status_error "Unable to allocate campaign command argument storage."
+        return 1
+    fi
+    campaign_register_ephemeral "$argv_file"
+    if ! printf '%s\0' "$@" >"$argv_file"; then
+        rm -f -- "$argv_file"
+        status_error "Unable to stage campaign command arguments."
+        return 1
     fi
     if ! python3 scripts/campaign.py command-record \
         --manifest "$CAMPAIGN_MANIFEST" \
         --index "$CAMPAIGN_STEP_INDEX" \
         --step-id "$CAMPAIGN_STEP_ID" \
         --command-index "$command_index" \
-        --preview "$preview"; then
+        --preview "$preview" \
+        --argv-file "$argv_file"; then
+        rm -f -- "$argv_file"
         status_error "Unable to persist campaign command $command_index arguments."
         return 1
     fi
+    rm -f -- "$argv_file"
     return 0
 }
 
@@ -512,6 +561,43 @@ function campaign_jobs_for_source() {
     fi
 }
 
+function campaign_artifact_paths() {
+    local path
+
+    printf '%s\n' \
+        "$HASHCAT_BIN" \
+        hash-cracker.sh \
+        scripts/parameters.sh \
+        scripts/campaign.py \
+        scripts/linux.sh \
+        scripts/mac.sh \
+        scripts/runtime-overrides.sh \
+        scripts/extensions/hashtypes
+    find scripts/processors scripts/selectors scripts/rules \
+        scripts/extensions/pack-linux scripts/extensions/pack-mac \
+        -type f \( -name '*.sh' -o -name '*.config' -o -name '*.py' \) -print 2>/dev/null | LC_ALL=C sort
+    for path in \
+        "${COMMON_SUBSTR_BIN:-}" \
+        "${EXPANDER_BIN:-}" \
+        "${MKPASS_BIN:-}" \
+        "${CEWL:-}"; do
+        if [ -n "$path" ] && [ -f "$path" ]; then
+            printf '%s\n' "$path"
+        fi
+    done
+}
+
+function campaign_artifact_args() {
+    local artifact
+
+    CAMPAIGN_ARTIFACT_ARGS=()
+    while IFS= read -r artifact; do
+        if [ -n "$artifact" ]; then
+            CAMPAIGN_ARTIFACT_ARGS+=(--artifact "$artifact")
+        fi
+    done < <(campaign_artifact_paths)
+}
+
 function run_campaign_plan() {
     local source="$1"
     local output="$2"
@@ -526,6 +612,7 @@ function run_campaign_plan() {
     local rc
     local kind='preset'
     local -a job_ids
+    local -a campaign_args
 
     if [[ "$source" =~ ^[0-9]+$ ]]; then
         kind='job'
@@ -534,8 +621,16 @@ function run_campaign_plan() {
         return 1
     fi
 
-    step_file=$(mktemp /tmp/hash-cracker-campaign-steps.XXXX)
-    command_file=$(mktemp /tmp/hash-cracker-campaign-commands.XXXX)
+    if ! step_file=$(mktemp /tmp/hash-cracker-campaign-steps.XXXX); then
+        status_error "Unable to allocate campaign planning state."
+        return 1
+    fi
+    if ! command_file=$(mktemp /tmp/hash-cracker-campaign-commands.XXXX); then
+        rm -f -- "$step_file"
+        status_error "Unable to allocate campaign command state."
+        return 1
+    fi
+    campaign_register_ephemeral "$step_file" "$command_file"
     : >"$command_file"
     CAMPAIGN_MODE='plan'
     CAMPAIGN_COMMAND_FILE="$command_file"
@@ -557,6 +652,7 @@ function run_campaign_plan() {
             rm -f -- "$step_file" "$command_file"
             return 1
         fi
+        CAMPAIGN_TEMP_INDEX=0
         run_processor "$job_id"
         rc=$?
         if [ "$rc" -ne 0 ]; then
@@ -567,25 +663,30 @@ function run_campaign_plan() {
         index=$((index + 1))
     done
 
-    python3 scripts/campaign.py create \
-        --output "$output" \
-        --name "$source" \
-        --kind "$kind" \
-        --release "$(release_version_text)" \
-        --steps-file "$step_file" \
-        --commands-file "$command_file" \
-        --config "$CONFIGFILE" \
-        --hashlist "$HASHLIST" \
-        --potfile "$POTFILE" \
-        --wordlist "$WORDLIST" \
-        --wordlist2 "$WORDLIST2" \
-        --hashcat "$HASHCAT_BIN" \
-        --hashtype "$HASHTYPE" \
-        --machine "$MACHINE" \
-        --kernel="$KERNEL" \
-        --loopback="$LOOPBACK" \
-        --hwmon="$HWMON" \
+    campaign_artifact_args
+    campaign_args=(
+        python3 scripts/campaign.py create
+        --output "$output"
+        --name "$source"
+        --kind "$kind"
+        --release "$(release_version_text)"
+        --steps-file "$step_file"
+        --commands-file "$command_file"
+        --config "$CONFIGFILE"
+        --hashlist "$HASHLIST"
+        --potfile "$POTFILE"
+        --wordlist "$WORDLIST"
+        --wordlist2 "$WORDLIST2"
+        --hashcat "$HASHCAT_BIN"
+        --hashtype "$HASHTYPE"
+        --machine "$MACHINE"
+        --kernel="$KERNEL"
+        --loopback="$LOOPBACK"
+        --hwmon="$HWMON"
         --showcracked="$SHOWCRACKED"
+    )
+    campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
+    "${campaign_args[@]}"
     rc=$?
     rm -f -- "$step_file" "$command_file"
     if [ "$rc" -eq 0 ]; then
@@ -611,24 +712,30 @@ function run_campaign_execute() {
     local state
     local update_rc
     local session_stats_line
+    local -a campaign_args
 
     if [ ! -f "$manifest" ]; then
         status_error "Campaign manifest not found: $manifest"
         return 1
     fi
-    if ! python3 scripts/campaign.py validate \
-        --manifest "$manifest" \
-        --config "$CONFIGFILE" \
-        --hashlist "$HASHLIST" \
-        --wordlist "$WORDLIST" \
-        --wordlist2 "$WORDLIST2" \
-        --hashcat "$HASHCAT_BIN" \
-        --hashtype "$HASHTYPE" \
-        --machine "$MACHINE" \
-        --kernel="$KERNEL" \
-        --loopback="$LOOPBACK" \
-        --hwmon="$HWMON" \
-        --showcracked="$SHOWCRACKED"; then
+    campaign_artifact_args
+    campaign_args=(
+        python3 scripts/campaign.py validate
+        --manifest "$manifest"
+        --config "$CONFIGFILE"
+        --hashlist "$HASHLIST"
+        --wordlist "$WORDLIST"
+        --wordlist2 "$WORDLIST2"
+        --hashcat "$HASHCAT_BIN"
+        --hashtype "$HASHTYPE"
+        --machine "$MACHINE"
+        --kernel="$KERNEL"
+        --loopback="$LOOPBACK"
+        --hwmon="$HWMON"
+        --showcracked="$SHOWCRACKED"
+    )
+    campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
+    if ! "${campaign_args[@]}"; then
         return 1
     fi
 
@@ -654,8 +761,12 @@ function run_campaign_execute() {
             return 1
         fi
 
-        command_file=$(mktemp /tmp/hash-cracker-campaign-executed.XXXX)
+        if ! command_file=$(mktemp /tmp/hash-cracker-campaign-executed.XXXX); then
+            status_error "Unable to allocate campaign execution state."
+            return 1
+        fi
         interrupt_marker="${command_file}.interrupt"
+        campaign_register_ephemeral "$command_file" "$interrupt_marker"
         : >"$command_file"
         rm -f -- "$interrupt_marker"
         # shellcheck disable=SC2034
@@ -665,6 +776,7 @@ function run_campaign_execute() {
         CAMPAIGN_STEP_INDEX="$index"
         CAMPAIGN_STEP_ID="$step_id"
         CAMPAIGN_COMMAND_INDEX=0
+        CAMPAIGN_TEMP_INDEX=0
         CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
         CAMPAIGN_PRESERVED_PATHS=()
         CAMPAIGN_COMMAND_FILE="$command_file"
@@ -703,7 +815,9 @@ function run_campaign_execute() {
         refresh_session_stats
         session_stats_line=$(build_session_stats_line)
         log_session_stats_line "$session_stats_line"
-        export_session_stats_json
+        if ! export_session_stats_json; then
+            return 1
+        fi
 
         if [ "$rc" -ne 0 ]; then
             status_error "Campaign '$manifest' stopped at $step_id with rc=$rc."
@@ -713,7 +827,56 @@ function run_campaign_execute() {
 }
 
 function hashcat_base() {
-    "$HASHCAT" $KERNEL --bitmap-max=24 -d $DEVICE $HWMON $SHOWCRACKED --potfile-path=$POTFILE -m$HASHTYPE $HASHLIST "$@"
+    local -a hashcat_args=()
+    local -a processor_args=()
+    local arg
+
+    if [ -n "$KERNEL" ] && [ "$KERNEL" != ' ' ]; then
+        hashcat_args+=("$KERNEL")
+    fi
+    hashcat_args+=(--bitmap-max=24 -d "$DEVICE")
+    if [ -n "$HWMON" ] && [ "$HWMON" != ' ' ]; then
+        hashcat_args+=("$HWMON")
+    fi
+    case "$SHOWCRACKED" in
+        '' | ' ') ;;
+        '-o /dev/null') hashcat_args+=(-o /dev/null) ;;
+        *) hashcat_args+=("$SHOWCRACKED") ;;
+    esac
+    hashcat_args+=("--potfile-path=$POTFILE" "-m$HASHTYPE" "$HASHLIST")
+
+    for arg in "$@"; do
+        if [ -n "$arg" ] && [ "$arg" != ' ' ]; then
+            processor_args+=("$arg")
+        fi
+    done
+
+    "$HASHCAT" "${hashcat_args[@]}" "${processor_args[@]}"
+}
+
+function processor_run() {
+    local rc
+
+    "$@"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        # shellcheck disable=SC2034
+        PROCESSOR_FAILURE="$rc"
+    fi
+    return "$rc"
+}
+
+function processor_require_file() {
+    local path="$1"
+    local label="${2:-Processor output}"
+
+    if [ ! -f "$path" ]; then
+        status_error "$label was not created: $path"
+        # shellcheck disable=SC2034
+        PROCESSOR_FAILURE=1
+        return 1
+    fi
+    return 0
 }
 
 function processor_bootstrap() {
@@ -755,14 +918,25 @@ function campaign_path_preserved() {
 }
 
 function processor_interrupt() {
+    local interrupt_rc=130
+    local preserve_rc=0
+
     if [ "${CAMPAIGN_MODE:-}" = 'execute' ] && [ "${CAMPAIGN_ACTIVE_COMMAND_INDEX:--1}" -ge 0 ]; then
-        campaign_command_preserve_inputs "$@" || true
+        if ! campaign_command_preserve_inputs "$@"; then
+            preserve_rc=1
+        fi
     fi
     if [ -n "${CAMPAIGN_INTERRUPT_MARKER:-}" ]; then
-        : >"$CAMPAIGN_INTERRUPT_MARKER"
+        if ! : >"$CAMPAIGN_INTERRUPT_MARKER"; then
+            preserve_rc=1
+        fi
     fi
-    processor_cleanup "$@"
-    exit 0
+    if [ "$preserve_rc" -eq 0 ]; then
+        processor_cleanup "$@"
+        exit "$interrupt_rc"
+    fi
+    status_error "Unable to preserve interrupted campaign inputs; cleanup was skipped."
+    exit 1
 }
 
 function dry_run_enabled() {
@@ -775,6 +949,21 @@ function dryrun_note() {
 
 function dryrun_tempfile() {
     local tag="${1:-tmp}"
+    local campaign_key
+    local campaign_id
+    local temp_index
+
+    if [ "${CAMPAIGN_MODE:-}" = 'plan' ] || [ "${CAMPAIGN_MODE:-}" = 'execute' ]; then
+        campaign_key="${CAMPAIGN_MANIFEST:-${CAMPAIGN_OUTPUT:-}}"
+        if [ -n "$campaign_key" ] && [ -n "${CAMPAIGN_CURRENT_STEP:-}" ]; then
+            temp_index="${CAMPAIGN_TEMP_INDEX:-0}"
+            CAMPAIGN_TEMP_INDEX=$((temp_index + 1))
+            campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
+            printf '/tmp/hash-cracker-campaign-%s-%s-%s-%s' \
+                "$campaign_id" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
+            return 0
+        fi
+    fi
     if dry_run_enabled; then
         printf '/tmp/hash-cracker-dryrun-%s-%d-%d' "$tag" "$BASHPID" "$RANDOM"
     else
@@ -817,9 +1006,16 @@ function count_hashlist_unique_entries() {
 }
 
 function cleanup_session_state() {
+    local path
+
     if [ -n "${SESSION_POT_UNIQUE_CACHE:-}" ]; then
         rm -f -- "$SESSION_POT_UNIQUE_CACHE" 2>/dev/null || true
     fi
+    for path in "${CAMPAIGN_EPHEMERAL_FILES[@]:-}"; do
+        if [ -n "$path" ]; then
+            rm -f -- "$path" 2>/dev/null || true
+        fi
+    done
 }
 
 function rebuild_unique_plaintext_cache() {
@@ -905,8 +1101,12 @@ function ensure_parent_dir() {
 
     parent=$(dirname "$path")
     if [ -n "$parent" ] && [ "$parent" != "." ]; then
-        mkdir -p "$parent" 2>/dev/null || true
+        if ! mkdir -p "$parent"; then
+            status_error "Unable to create output directory: $parent"
+            return 1
+        fi
     fi
+    return 0
 }
 
 function stats_export_scope() {
@@ -993,9 +1193,11 @@ function export_session_stats_json() {
         return 0
     fi
 
-    ensure_parent_dir "$out_path"
+    if ! ensure_parent_dir "$out_path"; then
+        return 1
+    fi
 
-    if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
+    if [ "${SESSION_LOG_DISABLED:-0}" = '1' ] || [ "${SESSION_LOG_AVAILABLE:-0}" -ne 1 ]; then
         log_enabled="false"
     else
         log_enabled="true"
@@ -1008,9 +1210,15 @@ function export_session_stats_json() {
     if [ "$export_scope" = 'all' ]; then
         history_json="$(export_session_stats_history_json)"
     fi
+
+    if [ -d "$out_path" ]; then
+        status_error "Unable to replace stats export: $out_path"
+        return 1
+    fi
+
     tmp_path="${out_path}.tmp.$$"
 
-    cat >"$tmp_path" <<EOF
+    if ! cat >"$tmp_path" <<EOF; then
 {
   "schema_version": "1",
   "generated_at": "$(json_escape "$generated_at")",
@@ -1040,8 +1248,17 @@ function export_session_stats_json() {
   "history": $history_json
 }
 EOF
+        rm -f -- "$tmp_path"
+        status_error "Unable to write stats export: $out_path"
+        return 1
+    fi
 
-    mv "$tmp_path" "$out_path" 2>/dev/null || true
+    if ! mv -- "$tmp_path" "$out_path"; then
+        rm -f -- "$tmp_path"
+        status_error "Unable to replace stats export: $out_path"
+        return 1
+    fi
+    return 0
 }
 
 function session_log_keep_count() {
@@ -1088,6 +1305,8 @@ function init_session_stats_logfile() {
     local session_stamp
     local keep_count
 
+    SESSION_LOG_AVAILABLE=0
+
     if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
         SESSION_STATS_LOGFILE=''
         return 0
@@ -1098,17 +1317,30 @@ function init_session_stats_logfile() {
     if [ -n "${SESSION_STATS_LOGFILE:-}" ]; then
         log_dir=$(dirname "$SESSION_STATS_LOGFILE")
         if [ -n "$log_dir" ] && [ "$log_dir" != "." ]; then
-            mkdir -p "$log_dir" 2>/dev/null || true
+            if ! mkdir -p "$log_dir"; then
+                status_bad "Unable to create session log directory: $log_dir"
+                SESSION_STATS_LOGFILE=''
+                return 1
+            fi
         fi
+        SESSION_LOG_AVAILABLE=1
         return 0
     fi
 
     session_stamp=$(date '+%Y%m%d-%H%M%S')
     SESSION_STATS_LOGFILE="$logs_dir/session-${session_stamp}-${BASHPID}.log"
 
-    mkdir -p "$logs_dir" 2>/dev/null || true
+    if ! mkdir -p "$logs_dir"; then
+        status_bad "Unable to create session log directory: $logs_dir"
+        SESSION_STATS_LOGFILE=''
+        return 1
+    fi
+    SESSION_LOG_AVAILABLE=1
     prune_session_logs "$logs_dir" "$keep_count"
-    ln -sfn "$(basename "$SESSION_STATS_LOGFILE")" "$logs_dir/latest.log" 2>/dev/null || true
+    if ! ln -sfn "$(basename "$SESSION_STATS_LOGFILE")" "$logs_dir/latest.log"; then
+        status_bad "Unable to update latest session log link: $logs_dir/latest.log"
+    fi
+    return 0
 }
 
 function log_session_stats_line() {
@@ -1117,7 +1349,12 @@ function log_session_stats_line() {
         return 0
     fi
 
-    printf '[%s] %s\n' "$(timestamp_now)" "$line" >>"$SESSION_STATS_LOGFILE" 2>/dev/null || true
+    if ! printf '[%s] %s\n' "$(timestamp_now)" "$line" >>"$SESSION_STATS_LOGFILE"; then
+        status_bad "Unable to append session stats log: $SESSION_STATS_LOGFILE"
+        SESSION_LOG_AVAILABLE=0
+        return 1
+    fi
+    return 0
 }
 
 function dashboard_line() {
@@ -1135,6 +1372,8 @@ function show_session_stats_dashboard() {
 
     if [ "${SESSION_LOG_DISABLED:-0}" = '1' ]; then
         log_state="disabled"
+    elif [ "${SESSION_LOG_AVAILABLE:-0}" -ne 1 ]; then
+        log_state="unavailable"
     else
         log_state="enabled"
     fi
@@ -1207,7 +1446,12 @@ function refresh_session_stats() {
     if [ "$SESSION_POT_LINES_CUR" -ne "$SESSION_POT_LINES_LAST" ] || [ "$SESSION_POT_BYTES_CUR" -ne "$SESSION_POT_BYTES_LAST" ]; then
         if [ "$SESSION_POT_LINES_CUR" -ge "$SESSION_POT_LINES_LAST" ] && [ "$SESSION_POT_BYTES_CUR" -ge "$SESSION_POT_BYTES_LAST" ]; then
             delta_lines=$((SESSION_POT_LINES_CUR - SESSION_POT_LINES_LAST))
-            update_unique_plaintexts_incremental "$delta_lines"
+            if [ "$delta_lines" -gt 0 ]; then
+                update_unique_plaintexts_incremental "$delta_lines"
+            elif [ "$SESSION_POT_BYTES_CUR" -gt "$SESSION_POT_BYTES_LAST" ]; then
+                stats_debug_note "Stats refresh mode: full recount (byte-only potfile growth)"
+                rebuild_unique_plaintext_cache
+            fi
         else
             status_heading "Refreshing session stats (recounting unique potfile plaintexts, this may take a moment)..."
             rebuild_unique_plaintext_cache
@@ -1307,7 +1551,9 @@ function run_single_job_mode() {
     refresh_session_stats
     session_stats_line=$(build_session_stats_line)
     log_session_stats_line "$session_stats_line"
-    export_session_stats_json
+    if ! export_session_stats_json; then
+        return 1
+    fi
 
     if [ "$selected" = "99" ]; then
         show_session_stats_dashboard
@@ -1344,7 +1590,11 @@ function run_single_job_mode() {
     refresh_session_stats
     session_stats_line=$(build_session_stats_line)
     log_session_stats_line "$session_stats_line"
-    export_session_stats_json
+    if ! export_session_stats_json; then
+        if [ "$rc" -eq 0 ]; then
+            rc=1
+        fi
+    fi
 
     return $rc
 }
@@ -1389,7 +1639,9 @@ function run_preset_mode() {
     refresh_session_stats
     session_stats_line=$(build_session_stats_line)
     log_session_stats_line "$session_stats_line"
-    export_session_stats_json
+    if ! export_session_stats_json; then
+        return 1
+    fi
 
     status_heading "Running preset '$preset_name' (jobs: $preset_jobs)"
     preset_start_time=$(current_epoch_seconds)
@@ -1427,7 +1679,9 @@ function run_preset_mode() {
         refresh_session_stats
         session_stats_line=$(build_session_stats_line)
         log_session_stats_line "$session_stats_line"
-        export_session_stats_json
+        if ! export_session_stats_json; then
+            return 1
+        fi
     done
 
     preset_end_time=$(current_epoch_seconds)
@@ -1453,7 +1707,9 @@ function menu() {
         echo
         session_stats_line=$(build_session_stats_line)
         log_session_stats_line "$session_stats_line"
-        export_session_stats_json
+        if ! export_session_stats_json; then
+            return 1
+        fi
 
         if [ "$DRYRUN" = ' ' ]; then
             read -r -p "Select job [0-22,99] or type exit [DRY-RUN MODE]: " START

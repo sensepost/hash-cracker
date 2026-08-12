@@ -26,7 +26,11 @@ echo -e "\nNOTE: If it takes to long, use CTRL+C to stop where CeWL is currently
 if dry_run_enabled; then
     dryrun_note "would run CeWL against $URL and write $CEWLLIST"
 else
-    "$CEWL" -d "$DEPTH" -m "$LENGTH" -w "$CEWLLIST" "$URL" -u "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"
+    if ! processor_run "$CEWL" -d "$DEPTH" -m "$LENGTH" -w "$CEWLLIST" "$URL" -u "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36"; then
+        status_error "CeWL failed to generate a wordlist."
+        exit 1
+    fi
+    processor_require_file "$CEWLLIST" "CeWL wordlist" || exit 1
 fi
 
-echo -e "\nCeWL created a wordlist named:" $CEWLLIST "\n"
+printf '\nCeWL created a wordlist named: %s\n\n' "$CEWLLIST"

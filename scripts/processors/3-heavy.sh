@@ -21,8 +21,8 @@ source scripts/rules/rules.config
 RULELIST=("$tenKrules" "$fbfull" "$NSAKEYv2" "$fordyv1" "$pantag" "$OUTD" "$techtrip2" "$williamsuper" "$digits3" "$dive" "$robotmyfavorite")
 
 # Logic
-hashcat_base $WORDLIST
+hashcat_base "$WORDLIST"
 for RULE in "${RULELIST[@]}"; do
-    hashcat_base $WORDLIST -r $RULE $LOOPBACK
+    hashcat_base "$WORDLIST" -r "$RULE" "$LOOPBACK"
 done
 echo -e "\nDefault processing with heavy rules done\n"

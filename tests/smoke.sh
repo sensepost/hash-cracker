@@ -13,6 +13,9 @@ export CEWL="$TMP_DIR/cewl"
 
 cat >"$COMMON_SUBSTR_BIN" <<'EOF'
 #!/usr/bin/env bash
+if [ "${COMMON_SUBSTR_FAIL:-0}" = '1' ]; then
+    exit 23
+fi
 printf 'preview\n'
 EOF
 chmod +x "$COMMON_SUBSTR_BIN"
@@ -69,7 +72,15 @@ EOF
 chmod +x "$EDGE_AWK_BIN/awk"
 
 restore_config() {
-    return 0
+    cat >"$CONFIG_PATH" <<EOF
+HASHCAT=("$TMP_DIR/fake-hashcat")
+DEVICE=1
+HASHTYPE=1000
+HASHLIST="$TMP_DIR/input"
+POTFILE="$TMP_DIR/hash-cracker.pot"
+WORDLIST="$TMP_DIR/wordlist.txt"
+WORDLIST2="$TMP_DIR/wordlist2.txt"
+EOF
 }
 
 cleanup() {
@@ -167,7 +178,7 @@ assert_rc_eq 0
 HELPER_INTERRUPT_FILE="$TMP_DIR/helper-interrupt"
 printf 'temporary\n' >"$HELPER_INTERRUPT_FILE"
 run_case helper_interrupt bash -lc "source ./hash-cracker.sh; processor_interrupt '$HELPER_INTERRUPT_FILE'"
-assert_rc_eq 0
+assert_rc_eq 130
 if [ -e "$HELPER_INTERRUPT_FILE" ]; then
     fail_with_log "processor interrupt did not clean its temporary file" "$LAST_LOG"
 fi
@@ -214,6 +225,16 @@ assert_rc_eq 0
 run_case helper_campaign_preserve_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; CAMPAIGN_STEP_INDEX=0; CAMPAIGN_STEP_ID=step-001; CAMPAIGN_ACTIVE_COMMAND_INDEX=0; CAMPAIGN_PRESERVED_PATHS=(); python3() { return 1; }; if campaign_command_preserve_inputs '$TMP_DIR/input'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
+run_case helper_processor_interrupt_preserve_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_ACTIVE_COMMAND_INDEX=0; CAMPAIGN_INTERRUPT_MARKER='$TMP_DIR/interrupt-preserve-failure'; campaign_command_preserve_inputs() { return 1; }; processor_interrupt '$TMP_DIR/input'"
+assert_rc_eq 1
+assert_contains "Unable to preserve interrupted campaign inputs; cleanup was skipped."
+
+INTERRUPT_MARKER_DIRECTORY="$TMP_DIR/interrupt-marker-directory"
+mkdir -p "$INTERRUPT_MARKER_DIRECTORY"
+run_case helper_processor_interrupt_marker_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_ACTIVE_COMMAND_INDEX=-1; CAMPAIGN_INTERRUPT_MARKER='$INTERRUPT_MARKER_DIRECTORY'; processor_interrupt '$TMP_DIR/input'"
+assert_rc_eq 1
+assert_contains "Unable to preserve interrupted campaign inputs; cleanup was skipped."
+
 run_case helper_campaign_command_finish_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_finish 0 0 0"
 assert_rc_eq 0
 
@@ -226,7 +247,10 @@ assert_rc_eq 0
 run_case helper_run_hashcat_finish_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; return 0; }; campaign_command_record() { return 0; }; campaign_command_finish() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
 assert_rc_eq 0
 
-run_case helper_run_hashcat_record_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; return 0; }; campaign_command_record() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+run_case helper_run_hashcat_record_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=-1; CAMPAIGN_COMMAND_FILE=fixture; CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; campaign_command_start() { return 0; }; campaign_record_command() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+run_case helper_run_hashcat_checkpoint_record_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_SESSION_NAME=fixture; CAMPAIGN_RESTORE_FILE='$TMP_DIR/fixture.restore'; CAMPAIGN_RESTORE=0; CAMPAIGN_COMMAND_ARGS_FILE=; campaign_command_start() { return 0; }; campaign_command_record() { return 1; }; if run_hashcat fixture; then exit 1; else test \"\$?\" -eq 1; fi"
 assert_rc_eq 0
 
 CAMPAIGN_RESTORE_MISMATCH_FILE="$TMP_DIR/campaign-restore-mismatch"
@@ -239,8 +263,67 @@ printf '%s\0--restore\0' "$TMP_DIR/fake-hashcat" >"$CAMPAIGN_RESTORE_EXISTING_FI
 run_case helper_run_hashcat_existing_restore bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_COMMAND_INDEX=0; campaign_command_start() { CAMPAIGN_COMMAND_STATE=running; CAMPAIGN_COMMAND_ARGS_FILE='$CAMPAIGN_RESTORE_EXISTING_FILE'; CAMPAIGN_RESTORE=1; return 0; }; campaign_command_record() { return 0; }; campaign_command_finish() { return 0; }; run_hashcat fixture"
 assert_rc_eq 0
 
+PROCESSOR_SOURCE_FAILURE="$TMP_DIR/processor-source-failure.sh"
+printf 'exit 7\n' >"$PROCESSOR_SOURCE_FAILURE"
+run_case helper_run_processor_source_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; menu_entries() { printf '1|Fixture|$PROCESSOR_SOURCE_FAILURE\\n'; }; if run_processor 1; then exit 1; else test \"\$?\" -eq 7; fi"
+assert_rc_eq 0
+
+PROCESSOR_RETURN_FAILURE="$TMP_DIR/processor-return-failure.sh"
+printf 'return 7\n' >"$PROCESSOR_RETURN_FAILURE"
+run_case helper_run_processor_return_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; menu_entries() { printf '1|Fixture|$PROCESSOR_RETURN_FAILURE\\n'; }; run_processor 1"
+assert_rc_eq 7
+
+PROCESSOR_STATE_FAILURE="$TMP_DIR/processor-state-failure.sh"
+printf 'PROCESSOR_FAILURE=1\n' >"$PROCESSOR_STATE_FAILURE"
+run_case helper_run_processor_state_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; menu_entries() { printf '1|Fixture|$PROCESSOR_STATE_FAILURE\\n'; }; if run_processor 1; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+PROCESSOR_MARKER_FAILURE="$TMP_DIR/processor-marker-failure.sh"
+printf 'exit 7\n' >"$PROCESSOR_MARKER_FAILURE"
+PROCESSOR_MARKER="$TMP_DIR/processor-marker"
+: >"$PROCESSOR_MARKER"
+run_case helper_run_processor_marker_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; menu_entries() { printf '1|Fixture|$PROCESSOR_MARKER_FAILURE\\n'; }; CAMPAIGN_INTERRUPT_MARKER='$PROCESSOR_MARKER'; if run_processor 1; then exit 1; else test \"\$?\" -eq 7; fi"
+assert_rc_eq 0
+
+run_case helper_processor_require_file_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; PROCESSOR_FAILURE=0; if processor_require_file '$TMP_DIR/no-generated-output' Fixture; then exit 1; else test \"\$?\" -eq 1 && test \"\$PROCESSOR_FAILURE\" -eq 1; fi"
+assert_rc_eq 0
+
+CAMPAIGN_RECORD_FILE="$TMP_DIR/campaign-record-failure"
+: >"$CAMPAIGN_RECORD_FILE"
+run_case helper_campaign_record_command_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_CURRENT_STEP=step-001; CAMPAIGN_COMMAND_FILE='$CAMPAIGN_RECORD_FILE'; python3() { return 1; }; if campaign_record_command preview argument; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_command_record_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; mktemp() { return 1; }; if campaign_command_record 0 preview argument; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_command_record_printf_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; mktemp() { /usr/bin/mktemp \"\$@\"; }; printf() { return 1; }; if campaign_command_record 0 preview argument; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_plan_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; mktemp() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-mktemp-failure.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_plan_command_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; run_processor() { return 0; }; mktemp() { case \"\${1:-}\" in *campaign-steps.*) /usr/bin/mktemp \"\$@\" ;; *campaign-commands.*) return 1 ;; *) /usr/bin/mktemp \"\$@\" ;; esac; }; if run_campaign_plan fixture '$TMP_DIR/plan-command-mktemp-failure.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+CAMPAIGN_EXECUTE_MKTEMP_MANIFEST="$TMP_DIR/execute-mktemp-failure.json"
+: >"$CAMPAIGN_EXECUTE_MKTEMP_MANIFEST"
+run_case helper_campaign_execute_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_artifact_args() { CAMPAIGN_ARTIFACT_ARGS=(); }; python3() { case \"\${2:-}\" in validate|mark-running) return 0 ;; next) printf '0|step-001|1|Fixture\\n' ;; esac; }; mktemp() { return 1; }; if run_campaign_execute '$CAMPAIGN_EXECUTE_MKTEMP_MANIFEST' Executing; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_stats_export_cat_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATSEXPORT='$TMP_DIR/helper-cat-export.json'; SESSION_LOG_DISABLED=1; SESSION_LOG_AVAILABLE=0; SESSION_NEW_CRACKS=0; SESSION_NEW_UNIQUE=0; SESSION_GROWTH_BYTES=0; SESSION_POT_LINES_CUR=0; SESSION_POT_UNIQUE_CUR=0; SESSION_POT_BYTES_CUR=0; SESSION_HASHLIST_INPUT_UNIQUE=0; cat() { return 1; }; if export_session_stats_json; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+run_case helper_stats_export_mv_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATSEXPORT='$TMP_DIR/helper-mv-export.json'; SESSION_LOG_DISABLED=1; SESSION_LOG_AVAILABLE=0; SESSION_NEW_CRACKS=0; SESSION_NEW_UNIQUE=0; SESSION_GROWTH_BYTES=0; SESSION_POT_LINES_CUR=0; SESSION_POT_UNIQUE_CUR=0; SESSION_POT_BYTES_CUR=0; SESSION_HASHLIST_INPUT_UNIQUE=0; mv() { return 1; }; if export_session_stats_json; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+
+run_case helper_session_log_link_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; SESSION_LOG_DIR='$TMP_DIR/helper-link-logs'; SESSION_STATS_LOGFILE=''; SESSION_LOG_DISABLED=0; ln() { return 1; }; init_session_stats_logfile"
+assert_rc_eq 0
+assert_contains "Unable to update latest session log link: $TMP_DIR/helper-link-logs/latest.log"
+
 HELPER_CACHE="$TMP_DIR/helper-cache"
 run_case helper_hashlist_refresh bash -lc "source ./hash-cracker.sh; HASHLIST='$TMP_DIR/input'; POTFILE=/dev/null; SESSION_POT_UNIQUE_CACHE='$HELPER_CACHE'; SESSION_POT_LINES_LAST=0; SESSION_POT_BYTES_LAST=0; SESSION_POT_LINES_BASE=0; SESSION_POT_UNIQUE_BASE=0; SESSION_POT_BYTES_BASE=0; SESSION_POT_UNIQUE_CUR=0; SESSION_HASHLIST_PATH_LAST='$TMP_DIR/old-hashlist'; refresh_session_stats"
+assert_rc_eq 0
+run_case helper_incremental_empty_delta bash -lc "source ./hash-cracker.sh; if update_unique_plaintexts_incremental 0; then exit 0; else exit 1; fi"
 assert_rc_eq 0
 
 run_case helper_missing_pack_files bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd '$TMP_DIR'; MACHINE=Linux; DRYRUN=' '; if check_job_dependencies 12; then exit 1; else exit 0; fi"
@@ -291,7 +374,7 @@ assert_rc_eq 1
 assert_contains "Missing required configuration file"
 
 INCOMPLETE_CONFIG="$TMP_DIR/incomplete.conf"
-printf 'HASHCAT=(%s)\n' "$TMP_DIR/fake-hashcat" >"$INCOMPLETE_CONFIG"
+printf 'HASHCAT=(%s)\nDEVICE=1\n' "$TMP_DIR/fake-hashcat" >"$INCOMPLETE_CONFIG"
 run_case incomplete_config bash -lc "HASH_CRACKER_CONFIG='$INCOMPLETE_CONFIG' ./hash-cracker.sh --dry-run"
 assert_rc_eq 1
 assert_contains "Missing required setting 'HASHTYPE'"
@@ -704,6 +787,55 @@ assert_contains "| ok      | 0"
 assert_contains "Preset: quick | planned: 2 | completed: 2 | failed: 0 | duration:"
 assert_contains "Preset 'quick' completed."
 
+echo "[smoke] Hashcat arguments preserve paths containing spaces"
+BOUNDARY_DIR="$TMP_DIR/path with spaces"
+BOUNDARY_HASHLIST="$BOUNDARY_DIR/input hashes"
+BOUNDARY_POTFILE="$BOUNDARY_DIR/hash cracker.pot"
+BOUNDARY_WORDLIST="$BOUNDARY_DIR/word list one.txt"
+BOUNDARY_WORDLIST2="$BOUNDARY_DIR/word list two.txt"
+BOUNDARY_ARGS_FILE="$BOUNDARY_DIR/hashcat-args"
+BOUNDARY_HASHCAT="$BOUNDARY_DIR/fake hashcat"
+mkdir -p "$BOUNDARY_DIR"
+printf 'hash:password\n' >"$BOUNDARY_HASHLIST"
+: >"$BOUNDARY_POTFILE"
+printf 'one\n' >"$BOUNDARY_WORDLIST"
+printf 'two\n' >"$BOUNDARY_WORDLIST2"
+cat >"$BOUNDARY_HASHCAT" <<EOF
+#!/usr/bin/env bash
+printf '%s\0' "\$@" >"$BOUNDARY_ARGS_FILE"
+EOF
+chmod +x "$BOUNDARY_HASHCAT"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=("$BOUNDARY_HASHCAT")
+DEVICE=1
+HASHTYPE=1000
+HASHLIST="$BOUNDARY_HASHLIST"
+POTFILE="$BOUNDARY_POTFILE"
+WORDLIST="$BOUNDARY_WORDLIST"
+WORDLIST2="$BOUNDARY_WORDLIST2"
+EOF
+run_case boundary_paths bash -lc "printf '8\n0\n' | ./hash-cracker.sh"
+assert_rc_eq 0
+if ! python3 - "$BOUNDARY_ARGS_FILE" "$BOUNDARY_HASHLIST" "--potfile-path=$BOUNDARY_POTFILE" "$BOUNDARY_WORDLIST" "$BOUNDARY_WORDLIST2" <<'PY'; then
+import sys
+
+arguments = open(sys.argv[1], 'rb').read().split(b'\0')[:-1]
+arguments = [value.decode() for value in arguments]
+for expected in sys.argv[2:]:
+    assert expected in arguments, (expected, arguments)
+PY
+    fail_with_log "Hashcat arguments were split at a path boundary" "$LAST_LOG"
+fi
+restore_config
+
+echo "[smoke] explicit stats export failures are visible"
+STATS_EXPORT_BLOCKER="$TMP_DIR/stats-export-blocker"
+printf 'not a directory\n' >"$STATS_EXPORT_BLOCKER"
+STATS_EXPORT_DIRECTORY="$STATS_EXPORT_BLOCKER/export.json"
+run_case stats_export_write_failure bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export '$STATS_EXPORT_DIRECTORY'"
+assert_rc_eq 1
+assert_contains "Unable to create output directory: $STATS_EXPORT_BLOCKER"
+
 echo "[smoke] campaign planning captures reproducible command steps"
 CAMPAIGN_PATH="$TMP_DIR/quick-campaign.json"
 run_case campaign_plan bash -lc "./hash-cracker.sh --plan quick --output '$CAMPAIGN_PATH'"
@@ -728,9 +860,34 @@ assert all(
     for command in step["commands"]
 )
 assert manifest["inputs"]["potfile"]["mutable"] is True
+assert manifest["artifacts"]
 PY
     fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
 fi
+
+CAMPAIGN_ARTIFACT_HASHCAT="$TMP_DIR/campaign-artifact-hashcat"
+cat >"$CAMPAIGN_ARTIFACT_HASHCAT" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$CAMPAIGN_ARTIFACT_HASHCAT"
+CAMPAIGN_ARTIFACT_CONFIG="$TMP_DIR/campaign-artifact.conf"
+cat >"$CAMPAIGN_ARTIFACT_CONFIG" <<EOF
+HASHCAT=($CAMPAIGN_ARTIFACT_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+CAMPAIGN_ARTIFACT_PATH="$TMP_DIR/artifact-campaign.json"
+run_case campaign_artifact_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' ./hash-cracker.sh --plan=1 --output '$CAMPAIGN_ARTIFACT_PATH'"
+assert_rc_eq 0
+printf '# changed after planning\n' >>"$CAMPAIGN_ARTIFACT_HASHCAT"
+run_case campaign_artifact_drift bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' ./hash-cracker.sh --execute '$CAMPAIGN_ARTIFACT_PATH'"
+assert_rc_eq 1
+assert_contains "campaign artifact changed:"
 
 CAMPAIGN_JOB_PATH="$TMP_DIR/job-campaign.json"
 run_case campaign_plan_equals bash -lc "./hash-cracker.sh --plan=1 --output='$CAMPAIGN_JOB_PATH'"
@@ -995,7 +1152,9 @@ logged = [
 ]
 assert len(logged) >= 2
 preserved_paths = [
-    Path(argument) for argument in logged[0] if argument.startswith("/tmp/hash-cracker-tmp.")
+    Path(argument)
+    for argument in logged[0]
+    if argument.startswith("/tmp/hash-cracker-campaign-")
 ]
 assert preserved_paths
 assert all(not path.exists() for path in preserved_paths)
@@ -1045,8 +1204,14 @@ assert_contains "Preset 'quick' completed."
 if [ ! -s "$PRESET_STATS_EXPORT_PATH" ]; then
     fail_with_log "preset stats export file was not created" "$LAST_LOG"
 fi
-if ! grep -Fq '"release": "v6.6.0 \"Campaign Control\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.6.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+
+echo "[smoke] helper preprocessing failures propagate"
+run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-cracker.sh --job 11"
+assert_rc_eq 1
+assert_contains "Common-substring helper preprocessing failed."
+assert_not_contains "Substring processing done"
+if ! grep -Fq '"release": "v6.7.0 \"Execution Confidence\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.7.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
@@ -1274,6 +1439,14 @@ run_case processor_20_multiple_mode bash -lc "printf '20\nm\n$TMP_DIR\n0\n' | ./
 assert_rc_eq 0
 assert_contains "Stacking with light rules done"
 
+run_case processor_2_invalid_mode bash -lc "printf '2\nx\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+
+run_case processor_6_invalid_mode bash -lc "printf '6\nx\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+
 echo "[smoke] processor input validation and alternate paths are exercised"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
@@ -1336,6 +1509,22 @@ run_case processor_21_increment bash -lc "printf '21\n2\ny\n0\n' | ./hash-cracke
 assert_rc_eq 0
 assert_contains "--increment"
 
+run_case processor_21_length_eof bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=' '; printf '' | source scripts/processors/21-custom-brute-force.sh"
+assert_rc_eq 1
+assert_contains "Unable to read the brute-force length."
+
+run_case processor_21_increment_eof bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=' '; printf '2\n' | source scripts/processors/21-custom-brute-force.sh"
+assert_rc_eq 1
+assert_contains "Unable to read the increment choice."
+
+run_case processor_17_rules_eof bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=' '; printf 'p\n1\n1\n' | source scripts/processors/17-markov-generator.sh"
+assert_rc_eq 1
+assert_contains "Unable to read the Markov rules choice."
+
+run_case processor_17_source_eof bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=' '; printf '' | source scripts/processors/17-markov-generator.sh"
+assert_rc_eq 1
+assert_contains "Unable to read the Markov source choice."
+
 echo "[smoke] dynamic selectors validate and accept interactive input"
 run_case selector_hashtype bash -lc "printf '1000\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashtype.sh'"
 assert_rc_eq 0
@@ -1370,9 +1559,17 @@ assert_rc_eq 0
 assert_contains "File does not exist, try again."
 assert_contains "Wordlist $TMP_DIR/wordlist.txt selected."
 
+run_case selector_wordlist_eof bash -lc "printf '' | bash -c 'STATICCONFIG=false; source scripts/selectors/wordlist.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read a wordlist path."
+
 run_case selector_multiple_wordlist_directory bash -lc "printf '$TMP_DIR\n' | bash -c 'START=15; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
 assert_rc_eq 0
 assert_contains "Directory $TMP_DIR selected."
+
+run_case selector_multiple_wordlist_directory_eof bash -lc "printf '' | bash -c 'START=15; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read a wordlist path."
 
 run_case selector_multiple_wordlist_invalid_directory bash -lc "printf '$TMP_DIR/not-a-directory\n$TMP_DIR\n' | bash -c 'START=15; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
 assert_rc_eq 0
@@ -1396,7 +1593,15 @@ assert_contains "Wordlist $TMP_DIR/wordlist2.txt selected."
 run_case selector_multiple_wordlist_second_invalid bash -lc "printf '$TMP_DIR/wordlist.txt\n$TMP_DIR/not-a-wordlist\n$TMP_DIR/wordlist.txt\n$TMP_DIR/wordlist2.txt\n' | bash -c 'START=8; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
 assert_rc_eq 0
 assert_contains "File does not exist, try again."
-assert_contains "Wordlist $TMP_DIR/wordlist2.txt selected."
+assert_contains "Wordlist $TMP_DIR/wordlist.txt selected."
+
+run_case selector_multiple_wordlist_first_eof bash -lc "printf '' | bash -c 'START=8; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read the first wordlist path."
+
+run_case selector_multiple_wordlist_second_eof bash -lc "printf '$TMP_DIR/wordlist.txt\n' | bash -c 'START=8; STATICCONFIG=false; source scripts/selectors/multiple-wordlist.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read the second wordlist path."
 
 MISSING_STATIC_WORDLIST="$TMP_DIR/missing-static-wordlist"
 cat >"$CONFIG_PATH" <<EOF
@@ -1649,6 +1854,194 @@ if [ ! -s "$TMP_DIR/normal-cewl-list" ]; then
     fail_with_log "normal CeWL helper did not create its output" "$LAST_LOG"
 fi
 
+FAILING_CEWL="$TMP_DIR/failing-cewl"
+cat >"$FAILING_CEWL" <<'EOF'
+#!/usr/bin/env bash
+exit 23
+EOF
+chmod +x "$FAILING_CEWL"
+run_case processor_18_helper_failure bash -lc "printf '18\nhttps://example.test\n$TMP_DIR/failing-cewl-list\n1\n4\n0\n' | CEWL='$FAILING_CEWL' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "CeWL failed to generate a wordlist."
+assert_contains "Job 18 (CeWL wordlist generator) failed with rc=1"
+assert_not_contains "CeWL created a wordlist named:"
+
+FAILING_COMMON_SUBSTR="$TMP_DIR/failing-common-substr"
+cat >"$FAILING_COMMON_SUBSTR" <<'EOF'
+#!/usr/bin/env bash
+exit 23
+EOF
+chmod +x "$FAILING_COMMON_SUBSTR"
+run_case processor_10_helper_failure bash -lc "COMMON_SUBSTR_BIN='$FAILING_COMMON_SUBSTR' ./hash-cracker.sh --job 10"
+assert_rc_eq 1
+assert_contains "Prefix/suffix helper preprocessing failed."
+run_case processor_11_helper_failure_again bash -lc "COMMON_SUBSTR_BIN='$FAILING_COMMON_SUBSTR' ./hash-cracker.sh --job 11"
+assert_rc_eq 1
+assert_contains "Common-substring helper preprocessing failed."
+
+FAILING_PACK_BIN="$TMP_DIR/failing-pack-bin"
+mkdir -p "$FAILING_PACK_BIN"
+cat >"$FAILING_PACK_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-c' ]; then
+    exit 0
+fi
+exit 23
+EOF
+chmod +x "$FAILING_PACK_BIN/python3"
+run_case processor_12_helper_failure bash -lc "PATH='$FAILING_PACK_BIN:$PATH' ./hash-cracker.sh --job 12"
+assert_rc_eq 1
+assert_contains "PACK rule generation failed."
+run_case processor_12_mac_helper_failure bash -lc "PATH='$PLATFORM_BIN:$FAILING_PACK_BIN:$PATH' ./hash-cracker.sh --job 12"
+assert_rc_eq 1
+assert_contains "PACK rule generation failed."
+run_case processor_13_statsgen_failure bash -lc "PATH='$FAILING_PACK_BIN:$PATH' ./hash-cracker.sh --job 13"
+assert_rc_eq 1
+assert_contains "PACK statistics generation failed."
+run_case processor_13_mac_statsgen_failure bash -lc "PATH='$PLATFORM_BIN:$FAILING_PACK_BIN:$PATH' ./hash-cracker.sh --job 13"
+assert_rc_eq 1
+assert_contains "PACK statistics generation failed."
+
+MASKGEN_FAIL_BIN="$TMP_DIR/maskgen-fail-bin"
+mkdir -p "$MASKGEN_FAIL_BIN"
+cat >"$MASKGEN_FAIL_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-c' ]; then
+    exit 0
+fi
+case "${1:-}" in
+    *statsgen.py)
+        previous=''
+        for argument do
+            if [ "$previous" = '-o' ]; then : >"$argument"; fi
+            previous="$argument"
+        done
+        exit 0
+        ;;
+    *) exit 23 ;;
+esac
+EOF
+chmod +x "$MASKGEN_FAIL_BIN/python3"
+run_case processor_13_maskgen_failure bash -lc "PATH='$MASKGEN_FAIL_BIN:$PATH' ./hash-cracker.sh --job 13"
+assert_rc_eq 1
+assert_contains "PACK mask generation failed."
+run_case processor_13_mac_maskgen_failure bash -lc "PATH='$PLATFORM_BIN:$MASKGEN_FAIL_BIN:$PATH' ./hash-cracker.sh --job 13"
+assert_rc_eq 1
+assert_contains "PACK mask generation failed."
+
+MARKOV_FAIL_BIN="$TMP_DIR/markov-fail-bin"
+mkdir -p "$MARKOV_FAIL_BIN"
+cat >"$MARKOV_FAIL_BIN/mkpass" <<'EOF'
+#!/usr/bin/env bash
+exit 23
+EOF
+chmod +x "$MARKOV_FAIL_BIN/mkpass"
+run_case processor_17_helper_failure bash -lc "printf '17\np\n1\n1\nn\n0\n' | MKPASS_BIN='$MARKOV_FAIL_BIN/mkpass' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Markov helper failed."
+assert_contains "Job 17 (Markov-chain passwords generator) failed with rc=1"
+run_case processor_17_mac_helper_failure bash -lc "printf '17\np\n1\n1\nn\n0\n' | PATH='$PLATFORM_BIN:$PATH' MKPASS_BIN='$MARKOV_FAIL_BIN/mkpass' ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Markov helper failed."
+
+BROKEN_POTFILE="$TMP_DIR/broken-potfile"
+mkdir -p "$BROKEN_POTFILE"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$BROKEN_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case processor_14_extraction_failure bash -lc "./hash-cracker.sh --job 14"
+assert_rc_eq 1
+assert_contains "Fingerprint plaintext extraction failed."
+
+run_case processor_9_extraction_failure bash -lc "./hash-cracker.sh --job 9"
+assert_rc_eq 1
+assert_contains "Iteration plaintext extraction failed."
+run_case processor_10_extraction_failure bash -lc "./hash-cracker.sh --job 10"
+assert_rc_eq 1
+assert_contains "Prefix/suffix plaintext extraction failed."
+run_case processor_11_extraction_failure bash -lc "./hash-cracker.sh --job 11"
+assert_rc_eq 1
+assert_contains "Common-substring plaintext extraction failed."
+run_case processor_12_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 12"
+assert_rc_eq 1
+assert_contains "PACK rule plaintext extraction failed."
+run_case processor_13_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 13"
+assert_rc_eq 1
+assert_contains "PACK mask plaintext extraction failed."
+run_case processor_17_extraction_failure bash -lc "printf '17\np\n1\n1\n0\n' | ./hash-cracker.sh"
+assert_rc_eq 0
+assert_contains "Markov source extraction failed."
+
+BROKEN_HASHLIST="$TMP_DIR/broken-hashlist"
+mkdir -p "$BROKEN_HASHLIST"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$BROKEN_HASHLIST
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case processor_16_extraction_failure bash -lc "./hash-cracker.sh --job 16"
+assert_rc_eq 1
+assert_contains "Username extraction failed."
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$BROKEN_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case processor_19_missing_potfile_failure bash -lc "./hash-cracker.sh --job 19"
+assert_rc_eq 1
+assert_contains "Digit-removal source potfile is missing"
+
+printf 'hash:$HEX[zz]\n' >"$TMP_DIR/hash-cracker.pot"
+restore_config
+run_case processor_19_malformed_hex bash -lc "./hash-cracker.sh --job 19"
+assert_rc_eq 1
+assert_contains "Unable to decode hexadecimal potfile candidates."
+
+restore_config
+printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
+PACK_WORKDIR_TMP="$TMP_DIR/pack-workdir"
+PACK_WORKDIR_BLOCKER="$PACK_WORKDIR_TMP.work"
+printf 'not a directory\n' >"$PACK_WORKDIR_BLOCKER"
+run_case processor_12_workdir_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { printf '$PACK_WORKDIR_TMP'; }; source scripts/processors/12-pack-rule.sh"
+assert_rc_eq 1
+assert_contains "Unable to create the PACK rule work directory: $PACK_WORKDIR_BLOCKER"
+
+FINGERPRINT_GENERATION_BLOCKER="$TMP_DIR/fingerprint-generation-blocker"
+printf 'not a directory\n' >"$FINGERPRINT_GENERATION_BLOCKER"
+run_case processor_14_generation_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { case \"\$1\" in fingerprint-1) printf '$TMP_DIR/fingerprint-generation-input' ;; *) printf '$FINGERPRINT_GENERATION_BLOCKER/output' ;; esac; }; source scripts/processors/14-fingerprint.sh"
+assert_rc_eq 1
+assert_contains "Fingerprint generation failed."
+
+DIGIT_OUTPUT_BLOCKER="$TMP_DIR/digit-output-blocker"
+printf 'not a directory\n' >"$DIGIT_OUTPUT_BLOCKER"
+run_case processor_19_generation_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { printf '$DIGIT_OUTPUT_BLOCKER/output'; }; source scripts/processors/19-digitremover.sh"
+assert_rc_eq 1
+assert_contains "Unable to generate digit-removal candidates from the potfile."
+
+WRITE_FAILURE_DIR="$TMP_DIR/write-failure"
+mkdir -p "$WRITE_FAILURE_DIR"
+run_case processor_4_write_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { printf '$WRITE_FAILURE_DIR'; }; printf 'Acme\\n' | (source scripts/processors/4-word.sh)"
+assert_rc_eq 1
+assert_contains "Unable to write the custom word input."
+run_case processor_5_write_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { printf '$WRITE_FAILURE_DIR'; }; printf 'Acme\\n' | (source scripts/processors/5-word-bruteforce.sh)"
+assert_rc_eq 1
+assert_contains "Unable to write the custom word input."
+
 printf 'hash:pass123\nhash:\$HEX[616263313233]\n' >"$TMP_DIR/hash-cracker.pot"
 run_case processor_19_normal bash -lc "./hash-cracker.sh --job 19"
 assert_rc_eq 0
@@ -1816,6 +2209,74 @@ fi
 if ! grep -Fq 'ordinary history line' "$MALFORMED_EXPORT"; then
     fail_with_log "stats export omitted rotated log entries" "$MALFORMED_EXPORT"
 fi
+
+restore_config
+STATS_EXPORT_TARGET_DIR="$TMP_DIR/stats-export-target"
+mkdir -p "$STATS_EXPORT_TARGET_DIR"
+run_case stats_export_replace_failure bash -lc "./hash-cracker.sh --job 1 --stats-export '$STATS_EXPORT_TARGET_DIR'"
+assert_rc_eq 1
+assert_contains "Unable to replace stats export: $STATS_EXPORT_TARGET_DIR"
+
+FINAL_STATS_EXPORT="$TMP_DIR/final-stats-export.json"
+FINAL_EXPORT_HASHCAT="$TMP_DIR/final-export-hashcat"
+cat >"$FINAL_EXPORT_HASHCAT" <<EOF
+#!/usr/bin/env bash
+rm -f -- "$FINAL_STATS_EXPORT"
+mkdir -p "$FINAL_STATS_EXPORT"
+EOF
+chmod +x "$FINAL_EXPORT_HASHCAT"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($FINAL_EXPORT_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case stats_export_final_replace_failure bash -lc "./hash-cracker.sh --job 1 --stats-export '$FINAL_STATS_EXPORT'"
+assert_rc_eq 1
+assert_contains "Unable to replace stats export: $FINAL_STATS_EXPORT"
+
+rm -rf -- "$FINAL_STATS_EXPORT"
+CAMPAIGN_STATS_EXPORT_PATH="$TMP_DIR/stats-export-campaign.json"
+run_case campaign_stats_export_plan bash -lc "./hash-cracker.sh --plan 1 --output '$CAMPAIGN_STATS_EXPORT_PATH'"
+assert_rc_eq 0
+run_case campaign_stats_export_failure bash -lc "./hash-cracker.sh --execute '$CAMPAIGN_STATS_EXPORT_PATH' --stats-export '$FINAL_STATS_EXPORT'"
+assert_rc_eq 1
+assert_contains "Unable to replace stats export: $FINAL_STATS_EXPORT"
+
+rm -rf -- "$FINAL_STATS_EXPORT"
+run_case preset_stats_export_final_replace_failure bash -lc "./hash-cracker.sh --preset quick --stats-export '$FINAL_STATS_EXPORT'"
+assert_rc_eq 1
+assert_contains "Unable to replace stats export: $FINAL_STATS_EXPORT"
+
+PRESET_INITIAL_EXPORT_DIRECTORY="$TMP_DIR/preset-initial-export-directory"
+mkdir -p "$PRESET_INITIAL_EXPORT_DIRECTORY"
+run_case preset_stats_export_initial_replace_failure bash -lc "./hash-cracker.sh --preset quick --stats-export '$PRESET_INITIAL_EXPORT_DIRECTORY'"
+assert_rc_eq 1
+assert_contains "Unable to replace stats export: $PRESET_INITIAL_EXPORT_DIRECTORY"
+
+restore_config
+LOG_DIR_BLOCKER="$TMP_DIR/log-dir-blocker"
+printf 'not a directory\n' >"$LOG_DIR_BLOCKER"
+run_case session_log_directory_failure bash -lc "SESSION_LOG_DIR='$LOG_DIR_BLOCKER' ./hash-cracker.sh --job 1"
+assert_rc_eq 0
+assert_contains "Unable to create session log directory: $LOG_DIR_BLOCKER"
+
+CUSTOM_LOG_PARENT_BLOCKER="$TMP_DIR/custom-log-parent-blocker"
+printf 'not a directory\n' >"$CUSTOM_LOG_PARENT_BLOCKER"
+run_case custom_session_log_directory_failure bash -lc "SESSION_STATS_LOGFILE='$CUSTOM_LOG_PARENT_BLOCKER/session.log' ./hash-cracker.sh --job 1"
+assert_rc_eq 0
+assert_contains "Unable to create session log directory: $CUSTOM_LOG_PARENT_BLOCKER"
+
+APPEND_LOG_DIRECTORY="$TMP_DIR/append-log-directory"
+mkdir -p "$APPEND_LOG_DIRECTORY"
+run_case session_log_append_failure bash -lc "printf '99\\n0\\n' | SESSION_STATS_LOGFILE='$APPEND_LOG_DIRECTORY' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Unable to append session stats log: $APPEND_LOG_DIRECTORY"
+assert_contains "Session logging"
+assert_contains "unavailable"
 
 echo "[smoke] dependency failure is reported by self-test"
 MISSING_COMMON_SUBSTR="$TMP_DIR/missing-common-substr"

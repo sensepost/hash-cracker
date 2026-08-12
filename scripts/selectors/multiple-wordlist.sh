@@ -1,17 +1,20 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
-RESTART="source scripts/selectors/multiple-wordlist.sh"
-
 if ! [[ $START = '8' ]]; then
-    read -e -p "Enter path to a wordlist directory or a single wordlist file: " WORDLIST
-    if [ -d "$WORDLIST" ] && [ -n "$(find "$WORDLIST" -mindepth 1 -print -quit 2>/dev/null)" ]; then
-        echo "Directory" "$WORDLIST" "selected."
-    elif [ -f "$WORDLIST" ]; then
-        echo "Wordlist file" "$WORDLIST" "selected."
-    else
+    while true; do
+        if ! read -e -p "Enter path to a wordlist directory or a single wordlist file: " WORDLIST; then
+            echo "Unable to read a wordlist path."
+            exit 1
+        fi
+        if [ -d "$WORDLIST" ] && [ -n "$(find "$WORDLIST" -mindepth 1 -print -quit 2>/dev/null)" ]; then
+            echo "Directory" "$WORDLIST" "selected."
+            break
+        elif [ -f "$WORDLIST" ]; then
+            echo "Wordlist file" "$WORDLIST" "selected."
+            break
+        fi
         echo "Input must be a non-empty directory or an existing file, try again."
-        $RESTART
-    fi
+    done
 fi
 
 if [[ $START = '8' ]]; then
@@ -21,22 +24,30 @@ if [[ $START = '8' ]]; then
             echo "Wordlist 2:" "$WORDLIST2"
         else
             echo "Wordlist 1 and/or 2 does not exist, edit static configuration in 'hash-cracker.conf'."
-            exit
+            exit 1
         fi
     else
-        read -e -p "Enter full path to first wordlist: " WORDLIST
-        if [ -f "$WORDLIST" ]; then
-            echo "Wordlist" "$WORDLIST" "selected."
-        else
+        while true; do
+            if ! read -e -p "Enter full path to first wordlist: " WORDLIST; then
+                echo "Unable to read the first wordlist path."
+                exit 1
+            fi
+            if [ -f "$WORDLIST" ]; then
+                echo "Wordlist" "$WORDLIST" "selected."
+                break
+            fi
             echo "File does not exist, try again."
-            $RESTART
-        fi
-        read -e -p "Enter full path to second wordlist: " WORDLIST2
-        if [ -f "$WORDLIST2" ]; then
-            echo "Wordlist" "$WORDLIST2" "selected."
-        else
+        done
+        while true; do
+            if ! read -e -p "Enter full path to second wordlist: " WORDLIST2; then
+                echo "Unable to read the second wordlist path."
+                exit 1
+            fi
+            if [ -f "$WORDLIST2" ]; then
+                echo "Wordlist" "$WORDLIST2" "selected."
+                break
+            fi
             echo "File does not exist, try again."
-            $RESTART
-        fi
+        done
     fi
 fi

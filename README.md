@@ -47,6 +47,7 @@ These are only needed for specific menu options.
 
 #### macOS
 
+- Bundled native helpers support Apple Silicon (`arm64`) only; Intel macOS is not supported for those workflows.
 - `python3`
   - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
   - Option `12` requires `pyenchant`:
@@ -64,9 +65,11 @@ Notes:
 
 `hash-cracker.conf` is required and is loaded automatically on every start.
 
+The configuration is sourced as trusted Bash code. Only use a configuration file you created or reviewed locally; do not point `HASH_CRACKER_CONFIG` at untrusted input.
+
 The file must live in the repository root and define these settings:
 
-- `HASHCAT` - path to the `hashcat` binary
+- `HASHCAT` - path to the `hashcat` binary, preferably as a quoted Bash array assignment such as `HASHCAT=("/path with spaces/hashcat")`
 - `DEVICE` - value passed to `hashcat -d`
 - `HASHTYPE` - hash mode, for example `1000` for NTLM
 - `HASHLIST` - file containing target hashes
@@ -78,7 +81,7 @@ Current example:
 
 ```bash
 # Hashcat path
-HASHCAT=(/usr/local/bin/hashcat)
+HASHCAT=("/usr/local/bin/hashcat")
 
 # Device to Use (hashcat -d $DEVICE)
 DEVICE=1
@@ -87,14 +90,14 @@ DEVICE=1
 HASHTYPE=1000
 
 # File containing target hashes
-HASHLIST=input
+HASHLIST="input"
 
 # Potfile you want to use
-POTFILE=hash-cracker.pot
+POTFILE="hash-cracker.pot"
 
 # Wordlist(s)
-WORDLIST=wordlists/ignis-1M.txt
-WORDLIST2=wordlists/ignis-1K.txt
+WORDLIST="wordlists/ignis-1M.txt"
+WORDLIST2="wordlists/ignis-1K.txt"
 ```
 
 ## Usage
@@ -193,7 +196,7 @@ Create and run a reproducible campaign plan (requires `python3`):
 ./hash-cracker.sh --resume campaign.json
 ```
 
-Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, per-step exit codes, and command-level execution state. Plans never execute Hashcat. During execution, every Hashcat command receives a deterministic session name and restore-file path. If a run is interrupted, `--resume` skips completed commands and re-enters the interrupted command with the same session and `--restore`; failed commands are retried with a new session. Generated processor inputs used by the interrupted command are retained until that command completes. Campaign sidecar state is stored beside the manifest under `<manifest>.state`. Execution rejects changed configuration, runtime flags, hashlist, or wordlist inputs; the potfile is treated as mutable campaign state. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
+Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, optional execution-artifact fingerprints, per-step exit codes, and command-level execution state. Plans never execute Hashcat. During execution, every Hashcat command receives a deterministic session name and restore-file path. If a run is interrupted, `--resume` skips completed commands and re-enters the interrupted command with the same session and `--restore`; failed commands are retried with a new session. Generated processor inputs used by the interrupted command are retained until that command completes. Campaign sidecar state is stored beside the manifest under `<manifest>.state`. A manifest is single-writer state: concurrent executions against the same campaign are unsupported. New manifests reject changed configuration, runtime flags, hashlist, wordlist, Hashcat, processor, selector, rule, or referenced helper artifacts when those fingerprints are present; older manifests continue to use their recorded input and runtime checks. These content fingerprints do not record native-binary source commits or toolchain provenance. The potfile is mutable campaign state and is expected to grow append-only during normal Hashcat execution; reductions trigger a safe statistics recount. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
 
 Run the smoke suite with Bash coverage (requires `python3`):
 
@@ -299,6 +302,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Set `--no-session-log` to disable file logging
 - With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).
 - With `--stats-export`, current stats are written as JSON on each refresh cycle.
+- Session logs and requested JSON exports are local audit artifacts. JSON export write failures are fatal; default session-log failures are reported as warnings so a cracking run is not mistaken for a missing audit record.
 - Exported JSON includes a top-level `"schema_version"` for stable downstream parsing.
 - With `--stats-export-scope latest` (default), JSON contains the latest snapshot only.
 - With `--stats-export-scope all`, JSON also includes parsed history from `logs/session-*.log`.
