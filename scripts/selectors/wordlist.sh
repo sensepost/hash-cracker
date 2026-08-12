@@ -1,20 +1,22 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
-RESTART="source scripts/selectors/wordlist.sh"
-
 if [[ "$STATICCONFIG" = true ]]; then
     if [ -f "$WORDLIST" ]; then
         echo "Wordlist" "$WORDLIST" "selected."
     else
         echo "Wordlist 1 does not exist, edit static configuration in 'hash-cracker.conf'."
-        exit
+        exit 1
     fi
 else
-    read -e -p "Enter full path to wordlist: " WORDLIST
-    if [ -f "$WORDLIST" ]; then
-        echo "Wordlist" "$WORDLIST" "selected."
-    else
+    while true; do
+        if ! read -e -p "Enter full path to wordlist: " WORDLIST; then
+            echo "Unable to read a wordlist path."
+            exit 1
+        fi
+        if [ -f "$WORDLIST" ]; then
+            echo "Wordlist" "$WORDLIST" "selected."
+            break
+        fi
         echo "File does not exist, try again."
-        $RESTART
-    fi
+    done
 fi

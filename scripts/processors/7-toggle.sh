@@ -22,7 +22,7 @@ RULELIST=("$rockyou30000" "$ORTRTS" "$OUTD" "$passwordpro" "$d3ad0ne" "$d3adhob0
 
 # Logic
 for RULE in "${RULELIST[@]}"; do
-    hashcat_base $WORDLIST -r $toggles1 -r $RULE $LOOPBACK
-    hashcat_base $WORDLIST -r $toggles2 -r $RULE $LOOPBACK
+    hashcat_base "$WORDLIST" -r "$toggles1" -r "$RULE" "$LOOPBACK"
+    hashcat_base "$WORDLIST" -r "$toggles2" -r "$RULE" "$LOOPBACK"
 done
 echo -e "\nToggle processing done\n"

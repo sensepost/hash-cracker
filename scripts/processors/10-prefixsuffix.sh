@@ -6,10 +6,10 @@ processor_bootstrap
 common_substr_bin="${COMMON_SUBSTR_BIN:-scripts/extensions/common-substr-linux}"
 
 # Temporary Files
-tmp=$(dryrun_tempfile prefixsuffix)
-tmp2=$(dryrun_tempfile prefixsuffix)
-tmp3=$(dryrun_tempfile prefixsuffix)
-tmp4=$(dryrun_tempfile prefixsuffix)
+tmp=$(dryrun_tempfile prefixsuffix-1)
+tmp2=$(dryrun_tempfile prefixsuffix-2)
+tmp3=$(dryrun_tempfile prefixsuffix-3)
+tmp4=$(dryrun_tempfile prefixsuffix-4)
 trap 'processor_interrupt "$tmp" "$tmp2" "$tmp3" "$tmp4"' INT TERM
 trap 'processor_cleanup "$tmp" "$tmp2" "$tmp3" "$tmp4"' EXIT
 
@@ -22,17 +22,26 @@ if dry_run_enabled; then
         dryrun_note "would run common-substr-linux prefix/suffix generation into $tmp3 and $tmp4"
     fi
 else
-    cat $POTFILE | awk -F: '{print $NF}' | tee $tmp &>/dev/null
-    if [ "$MACHINE" == "Mac" ]; then
-        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && "$common_substr_bin" -n -p -f $tmp2 >$tmp3 && "$common_substr_bin" -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
-    else
-        cat $tmp | awk -F: '{print $NF}' | sort | tee $tmp2 &>/dev/null && "$common_substr_bin" -n -p -f $tmp2 >$tmp3 && "$common_substr_bin" -n -s -f $tmp2 >$tmp4 && rm $tmp2 $tmp
+    if ! cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null; then
+        status_error "Prefix/suffix plaintext extraction failed."
+        exit 1
     fi
+    if ! {
+        cat "$tmp" | awk -F: '{print $NF}' | sort | tee "$tmp2" &>/dev/null \
+            && "$common_substr_bin" -n -p -f "$tmp2" >"$tmp3" \
+            && "$common_substr_bin" -n -s -f "$tmp2" >"$tmp4" \
+            && rm -f -- "$tmp2" "$tmp"
+    }; then
+        status_error "Prefix/suffix helper preprocessing failed."
+        exit 1
+    fi
+    processor_require_file "$tmp3" "Prefix output" || exit 1
+    processor_require_file "$tmp4" "Suffix output" || exit 1
 fi
 
-hashcat_base -a1 $tmp3 $tmp4
-hashcat_base -a1 $tmp4 $tmp3
+hashcat_base -a1 "$tmp3" "$tmp4"
+hashcat_base -a1 "$tmp4" "$tmp3"
 if ! dry_run_enabled; then
-    rm $tmp3 $tmp4
+    rm -f -- "$tmp3" "$tmp4"
 fi
 echo -e "\nPrefix suffix processing done\n"

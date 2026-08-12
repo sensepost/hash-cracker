@@ -25,6 +25,9 @@ jobs:
       - name: Run smoke tests
         run: make test-smoke
 
+      - name: Run campaign tests
+        run: make test-campaign
+
   coverage:
     runs-on: ubuntu-latest
     env:

@@ -14,13 +14,16 @@ if [[ $MODE = [Ss] ]]; then
     source scripts/selectors/wordlist.sh
 elif [[ $MODE = [Mm] ]]; then
     source scripts/selectors/multiple-wordlist.sh
+else
+    status_error "Invalid wordlist mode '$MODE'. Choose S or M."
+    exit 1
 fi
 
 # Logic
-hashcat_base -a6 $WORDLIST -j c '?s?d?d?d?d' --increment
-hashcat_base -a6 $WORDLIST -j c '?d?d?d?d?s' --increment
-hashcat_base -a6 $WORDLIST -j c '?a?a' --increment
-hashcat_base -a6 $WORDLIST '?s?d?d?d?d' --increment
-hashcat_base -a6 $WORDLIST '?d?d?d?d?s' --increment
-hashcat_base -a6 $WORDLIST '?a?a' --increment
+hashcat_base -a6 "$WORDLIST" -j c '?s?d?d?d?d' --increment
+hashcat_base -a6 "$WORDLIST" -j c '?d?d?d?d?s' --increment
+hashcat_base -a6 "$WORDLIST" -j c '?a?a' --increment
+hashcat_base -a6 "$WORDLIST" '?s?d?d?d?d' --increment
+hashcat_base -a6 "$WORDLIST" '?d?d?d?d?s' --increment
+hashcat_base -a6 "$WORDLIST" '?a?a' --increment
 echo -e "\nHybrid processing done\n"

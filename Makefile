@@ -1,6 +1,6 @@
 SHELL_SOURCES := $(shell find . -type f -name '*.sh' ! -path './.git/*' ! -path './coverage/*' ! -path './scripts/extensions/*' | sort)
 
-.PHONY: lint format-check format qa test-smoke coverage coverage-check
+.PHONY: lint format-check format qa test test-smoke test-campaign coverage coverage-check
 
 lint:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
@@ -31,6 +31,12 @@ qa: lint format-check
 test-smoke:
 	@echo "Running smoke tests..."
 	@bash tests/smoke.sh
+
+test-campaign:
+	@echo "Running campaign tests..."
+	@python3 -m unittest discover -s tests -p 'test_*.py'
+
+test: test-campaign test-smoke
 
 coverage:
 	@echo "Running Bash coverage..."

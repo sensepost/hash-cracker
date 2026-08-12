@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import shlex
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -30,6 +31,13 @@ def resolved_path(value: str) -> str:
     return str(Path(value).expanduser().resolve(strict=False))
 
 
+def resolved_executable(value: str) -> str:
+    candidate = value
+    if os.sep not in value:
+        candidate = shutil.which(value) or value
+    return resolved_path(candidate)
+
+
 def file_fingerprint(value: str) -> str:
     path = Path(value)
     if not path.is_file():
@@ -49,6 +57,8 @@ def load_manifest(path: str) -> dict:
     except (OSError, json.JSONDecodeError) as error:
         raise CampaignError(f"cannot read manifest {path}: {error}") from error
 
+    if not isinstance(manifest, dict):
+        raise CampaignError("campaign manifest must contain a JSON object")
     if manifest.get("schema_version") not in (LEGACY_SCHEMA_VERSION, SCHEMA_VERSION):
         raise CampaignError(
             f"unsupported campaign schema: {manifest.get('schema_version', 'missing')}"
@@ -56,14 +66,27 @@ def load_manifest(path: str) -> dict:
     if not isinstance(manifest.get("steps"), list) or not manifest["steps"]:
         raise CampaignError("campaign manifest has no steps")
     campaign = manifest.setdefault("campaign", {})
+    if not isinstance(campaign, dict):
+        raise CampaignError("campaign manifest has invalid campaign metadata")
     campaign.setdefault(
         "session_prefix",
         f"hc-{hashlib.sha256(resolved_path(path).encode()).hexdigest()[:12]}",
     )
     for step in manifest["steps"]:
+        if not isinstance(step, dict):
+            raise CampaignError("campaign manifest contains an invalid step")
+        for field in ("id", "job", "name"):
+            if field not in step:
+                raise CampaignError(f"campaign step is missing '{field}'")
         step.setdefault("commands", [])
         step.setdefault("current_command", None)
+        if not isinstance(step["commands"], list):
+            raise CampaignError(f"campaign step has invalid commands: {step['id']}")
         for command in step["commands"]:
+            if not isinstance(command, dict):
+                raise CampaignError(
+                    f"campaign step has an invalid command: {step['id']}"
+                )
             command.setdefault("state", "pending")
             command.setdefault("session", None)
             command.setdefault("restore_file", None)
@@ -135,14 +158,15 @@ def read_steps(path: str) -> list[dict]:
     return steps
 
 
-def command_record(preview: str) -> dict:
-    try:
-        argv = shlex.split(preview)
-    except ValueError:
-        argv = [preview]
+def command_record(preview: str, argv: list[str] | None = None) -> dict:
+    if argv is None:
+        try:
+            argv = shlex.split(preview)
+        except ValueError as error:
+            raise CampaignError(f"invalid campaign command preview: {error}") from error
     return {
         "preview": preview,
-        "argv": argv,
+        "argv": list(argv),
         "state": "pending",
         "session": None,
         "restore_file": None,
@@ -162,6 +186,24 @@ def read_commands(path: str) -> dict[str, list[dict]]:
     for raw_line in Path(path).read_text(encoding="utf-8").splitlines():
         if not raw_line.strip():
             continue
+        if raw_line.lstrip().startswith("{"):
+            try:
+                record = json.loads(raw_line)
+                step_id = record["step_id"]
+                preview = record["preview"]
+                argv = record["argv"]
+            except (KeyError, TypeError, json.JSONDecodeError) as error:
+                raise CampaignError(
+                    f"invalid campaign command record: {raw_line}"
+                ) from error
+            if not isinstance(step_id, str) or not isinstance(preview, str):
+                raise CampaignError(f"invalid campaign command record: {raw_line}")
+            if not isinstance(argv, list) or not all(
+                isinstance(value, str) for value in argv
+            ):
+                raise CampaignError(f"invalid campaign command arguments: {raw_line}")
+            commands.setdefault(step_id, []).append(command_record(preview, argv))
+            continue
         try:
             step_id, preview = raw_line.split("\t", 1)
         except ValueError as error:
@@ -177,6 +219,9 @@ def input_metadata(args: argparse.Namespace) -> dict:
         "wordlist": args.wordlist,
         "wordlist2": args.wordlist2,
     }
+    for name, path in paths.items():
+        if not Path(path).is_file():
+            raise CampaignError(f"campaign input missing for {name}: {resolved_path(path)}")
     metadata = {
         name: {"path": resolved_path(path), "sha256": file_fingerprint(path)}
         for name, path in paths.items()
@@ -197,11 +242,47 @@ def runtime_metadata(args: argparse.Namespace) -> dict:
     }
 
 
+def artifact_metadata(paths: list[str]) -> list[dict[str, str]]:
+    artifacts = []
+    seen = set()
+    for value in paths:
+        if not value:
+            continue
+        path = resolved_executable(value)
+        if path in seen:
+            continue
+        seen.add(path)
+        artifacts.append({"path": path, "sha256": file_fingerprint(path)})
+    return artifacts
+
+
+def validate_output_path(args: argparse.Namespace, artifacts: list[dict[str, str]]) -> None:
+    output = resolved_path(args.output)
+    protected = [args.config, args.hashlist, args.wordlist, args.wordlist2, args.potfile]
+    protected.extend(item["path"] for item in artifacts)
+    for path in protected:
+        if output == resolved_path(path):
+            raise CampaignError(
+                f"campaign output conflicts with protected path: {output}"
+            )
+
+
 def create_manifest(args: argparse.Namespace) -> None:
     steps = read_steps(args.steps_file)
     commands = read_commands(args.commands_file)
+    step_ids = {step["id"] for step in steps}
+    unknown_commands = set(commands) - step_ids
+    if unknown_commands:
+        raise CampaignError(
+            f"campaign commands contain unknown steps: {', '.join(sorted(unknown_commands))}"
+        )
     for step in steps:
         step["commands"] = commands.get(step["id"], [])
+        if not step["commands"]:
+            raise CampaignError(f"campaign step has no recorded commands: {step['id']}")
+
+    artifacts = artifact_metadata(getattr(args, "artifact", []))
+    validate_output_path(args, artifacts)
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -219,6 +300,7 @@ def create_manifest(args: argparse.Namespace) -> None:
         },
         "inputs": input_metadata(args),
         "runtime": runtime_metadata(args),
+        "artifacts": artifacts,
         "steps": steps,
     }
     write_manifest(args.output, manifest)
@@ -228,12 +310,39 @@ def create_manifest(args: argparse.Namespace) -> None:
 
 def validate_manifest(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
+    expected_artifacts = manifest.get("artifacts")
+    if expected_artifacts is not None:
+        if not isinstance(expected_artifacts, list) or not expected_artifacts:
+            raise CampaignError("campaign manifest has invalid artifact fingerprints")
+        if any(
+            not isinstance(artifact, dict)
+            or not isinstance(artifact.get("path"), str)
+            or not isinstance(artifact.get("sha256"), str)
+            for artifact in expected_artifacts
+        ):
+            raise CampaignError("campaign manifest has invalid artifact fingerprints")
+        current_artifacts = artifact_metadata(getattr(args, "artifact", []))
+        expected_by_path = {
+            artifact.get("path"): artifact for artifact in expected_artifacts
+        }
+        current_by_path = {artifact["path"]: artifact for artifact in current_artifacts}
+        if set(expected_by_path) != set(current_by_path):
+            raise CampaignError("campaign artifact set changed; create a new plan")
+        for path, expected in expected_by_path.items():
+            if expected.get("sha256") != current_by_path[path].get("sha256"):
+                raise CampaignError(f"campaign artifact changed: {path}")
+
     current_paths = {
         "config": args.config,
         "hashlist": args.hashlist,
         "wordlist": args.wordlist,
         "wordlist2": args.wordlist2,
     }
+    for name, current_path in current_paths.items():
+        if not Path(current_path).is_file():
+            raise CampaignError(
+                f"campaign input missing for {name}: {resolved_path(current_path)}"
+            )
     for name, current_path in current_paths.items():
         expected = manifest["inputs"].get(name, {})
         current_resolved = resolved_path(current_path)
@@ -369,12 +478,41 @@ def record_command(args: argparse.Namespace) -> None:
         raise CampaignError(
             f"invalid campaign command index: {args.command_index}"
         ) from error
-    try:
-        argv = shlex.split(args.preview)
-    except ValueError as error:
-        raise CampaignError(f"invalid campaign command preview: {error}") from error
+    if getattr(args, "argv_file", None):
+        try:
+            raw_args = Path(args.argv_file).read_bytes()
+            if raw_args and not raw_args.endswith(b"\0"):
+                raise CampaignError("campaign command argument record is not NUL terminated")
+            argv = [value.decode("utf-8") for value in raw_args.split(b"\0")[:-1]]
+        except (OSError, UnicodeDecodeError) as error:
+            raise CampaignError(f"invalid campaign command arguments: {error}") from error
+    else:
+        try:
+            argv = shlex.split(args.preview)
+        except ValueError as error:
+            raise CampaignError(f"invalid campaign command preview: {error}") from error
     if not argv:
         raise CampaignError("campaign command preview is empty")
+    planned_argv = command.get("argv") or []
+    stable_planned_argv = [
+        value
+        for value in planned_argv
+        if value != "--restore"
+        and not value.startswith("--session=")
+        and not value.startswith("--restore-file-path=")
+    ]
+    stable_executed_argv = [
+        value
+        for value in argv
+        if value != "--restore"
+        and not value.startswith("--session=")
+        and not value.startswith("--restore-file-path=")
+    ]
+    if stable_executed_argv != stable_planned_argv:
+        raise CampaignError(
+            f"campaign command changed at step {args.step_id}, command {args.command_index}; "
+            "create a new plan"
+        )
     command["executed_preview"] = args.preview
     command["executed_argv"] = argv
     write_manifest(args.manifest, manifest)
@@ -475,6 +613,7 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--loopback", required=True)
     create.add_argument("--hwmon", required=True)
     create.add_argument("--showcracked", required=True)
+    create.add_argument("--artifact", action="append", default=[])
     create.set_defaults(handler=create_manifest)
 
     validate = commands.add_parser("validate")
@@ -490,6 +629,7 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("--loopback", required=True)
     validate.add_argument("--hwmon", required=True)
     validate.add_argument("--showcracked", required=True)
+    validate.add_argument("--artifact", action="append", default=[])
     validate.set_defaults(handler=validate_manifest)
 
     next_command = commands.add_parser("next")
@@ -539,6 +679,7 @@ def parser() -> argparse.ArgumentParser:
     command_record_parser.add_argument("--step-id", required=True)
     command_record_parser.add_argument("--command-index", type=int, required=True)
     command_record_parser.add_argument("--preview", required=True)
+    command_record_parser.add_argument("--argv-file")
     command_record_parser.set_defaults(handler=record_command)
 
     command_preserve_parser = commands.add_parser("command-preserve")
@@ -556,7 +697,15 @@ def main() -> int:
     args = parser().parse_args()
     try:
         result = args.handler(args)
-    except (CampaignError, OSError, ValueError) as error:
+    except (
+        CampaignError,
+        OSError,
+        UnicodeError,
+        ValueError,
+        KeyError,
+        TypeError,
+        AttributeError,
+    ) as error:
         print(f"campaign: {error}", file=sys.stderr)
         return 1
     return result if isinstance(result, int) else 0

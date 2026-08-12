@@ -285,7 +285,7 @@ fi
 # shellcheck source=/dev/null
 source "$CONFIGFILE"
 
-REQUIRED_CONFIG_VARS=(HASHCAT HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
+REQUIRED_CONFIG_VARS=(HASHCAT DEVICE HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
 for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
     if [ -z "${!REQUIRED_CONFIG_VAR}" ]; then
         status_error "Missing required setting '$REQUIRED_CONFIG_VAR' in $CONFIGFILE"
@@ -353,13 +353,17 @@ run_hashcat() {
     fi
 
     printf -v cmd_line '%q ' "$HASHCAT_BIN" "${command_args[@]}"
-    if [ "$command_index" -ge 0 ] && ! campaign_command_record "$command_index" "${cmd_line% }"; then
+    if [ "$command_index" -ge 0 ] && ! campaign_command_record "$command_index" "${cmd_line% }" "$HASHCAT_BIN" "${command_args[@]}"; then
         # shellcheck disable=SC2034
         HASHCAT_FAILURE=1
         return 1
     fi
     if [ -n "${CAMPAIGN_COMMAND_FILE:-}" ]; then
-        campaign_record_command "${cmd_line% }"
+        if ! campaign_record_command "${cmd_line% }" "$HASHCAT_BIN" "${command_args[@]}"; then
+            # shellcheck disable=SC2034
+            HASHCAT_FAILURE=1
+            return 1
+        fi
     fi
 
     if [ "$DRYRUN" = ' ' ]; then

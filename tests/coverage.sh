@@ -74,6 +74,7 @@ def measured_lines(path):
     measured = set()
     heredoc_marker = None
     multiline_awk = False
+    array_literal = False
     continuation = False
 
     for number, line in enumerate(lines, 1):
@@ -89,6 +90,11 @@ def measured_lines(path):
                 multiline_awk = False
             continue
 
+        if array_literal:
+            if stripped == ")":
+                array_literal = False
+            continue
+
         if continuation:
             continuation = line.rstrip().endswith("\\")
             continue
@@ -96,7 +102,20 @@ def measured_lines(path):
         if not stripped or stripped.startswith("#"):
             continue
 
-        if stripped in {"{", "}", "(", ")", "fi", "done", "esac", ";;", "then", "do"}:
+        if stripped in {
+            "{",
+            "}",
+            "(",
+            ")",
+            "fi",
+            "done",
+            "esac",
+            ";;",
+            "then",
+            "do",
+            "if ! {",
+            "}; then",
+        }:
             continue
         if stripped == "else" or stripped.startswith("elif "):
             continue
@@ -106,7 +125,11 @@ def measured_lines(path):
             continue
         if re.match(r"^(function\s+)?[A-Za-z_][A-Za-z0-9_-]*\s*\(\)\s*\{$", stripped):
             continue
+        if re.match(r"^(?:local\s+)?[A-Za-z_][A-Za-z0-9_]*=\($", stripped):
+            array_literal = True
+            continue
         if stripped.startswith(("for ", "while ", "until ", "case ")):
+            continuation = line.rstrip().endswith("\\")
             continue
         if stripped.endswith(")") and not stripped.startswith(
             ("if ", "echo ", "printf ", "return ", "exit ", "source ")

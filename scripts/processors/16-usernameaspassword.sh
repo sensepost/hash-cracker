@@ -17,13 +17,17 @@ trap 'processor_cleanup "$tmp"' EXIT
 if dry_run_enabled; then
     dryrun_note "would extract usernames from $HASHLIST into $tmp"
 else
-    cat $HASHLIST | cut -d '\' -f2 | awk -F: '{print $1}' >$tmp
+    if ! cat "$HASHLIST" | cut -d '\' -f2 | awk -F: '{print $1}' >"$tmp"; then
+        status_error "Username extraction failed."
+        exit 1
+    fi
+    processor_require_file "$tmp" "Username output" || exit 1
 fi
-hashcat_base $tmp
+hashcat_base "$tmp"
 for RULE in "${RULELIST[@]}"; do
-    hashcat_base $tmp -r $RULE $LOOPBACK
+    hashcat_base "$tmp" -r "$RULE" "$LOOPBACK"
 done
 if ! dry_run_enabled; then
-    rm $tmp
+    rm -f -- "$tmp"
 fi
 echo -e "\nUsername as Password processing with rules done\n"

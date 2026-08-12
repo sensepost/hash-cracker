@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v6.7.0 - Execution Confidence
+
+### Added
+
+- Added deterministic isolated smoke fixtures and direct campaign contract tests that cover all 22 processors without GPU hardware, real Hashcat execution, network access, or developer-local configuration.
+- Added executable-line and function coverage reporting with a no-regression baseline ratchet and CI artifacts.
+- Added campaign execution-artifact fingerprints and exact argument validation to detect drift before resuming a campaign.
+
+### Changed
+
+- Hashcat and processor paths now preserve argument boundaries, including paths containing spaces.
+- Processor, helper, campaign, session-log, and JSON-export failures now propagate or report explicit status instead of being silently ignored.
+- Potfile statistics safely recount after rotation or byte-only growth, while normal sessions continue to expect append-only potfiles.
+- Trusted local configuration, Apple Silicon-only macOS support, single-writer campaign manifests, and audit-output behavior are now documented.
+
 ## v6.6.0 - Campaign Control
 
 ### Added
