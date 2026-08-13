@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v6.8.0 - Hardware Bridge
+
 ### Added
 
 - Added an independent Python campaign line-coverage report and baseline ratchet.
