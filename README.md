@@ -313,7 +313,8 @@ When the tool starts successfully, it opens an interactive menu with these optio
 - Session logs and requested JSON exports are local audit artifacts. JSON export write failures are fatal; default session-log failures are reported as warnings so a cracking run is not mistaken for a missing audit record.
 - Exported JSON includes a top-level `"schema_version"` for stable downstream parsing.
 - With `--stats-export-scope latest` (default), JSON contains the latest snapshot only.
-- With `--stats-export-scope all`, JSON also includes parsed history from `logs/session-*.log`.
+- With `--stats-export-scope all`, JSON also includes parsed history from `session-*.log` files in the configured session-log directory.
+- See [Audit artifacts](AUDIT.md) for integrity limitations, retention behavior, and preservation guidance.
 
 ## Example Hashes
 
