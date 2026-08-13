@@ -2,7 +2,7 @@ SHELL_SOURCES := $(shell find . -type f -name '*.sh' ! -path './.git/*' ! -path 
 SHELLCHECK_VERSION ?= 0.10.0
 SHFMT_VERSION ?= 3.8.0
 
-.PHONY: verify-shellcheck verify-shfmt verify-tools lint format-check format qa test test-smoke test-campaign coverage coverage-python coverage-check
+.PHONY: verify-shellcheck verify-shfmt verify-tools lint format-check format qa test test-smoke test-campaign test-integration coverage coverage-python coverage-check
 
 verify-shellcheck:
 	@if ! command -v shellcheck >/dev/null 2>&1; then \
@@ -49,6 +49,10 @@ test-smoke:
 test-campaign:
 	@echo "Running campaign tests..."
 	@python3 -m unittest discover -s tests -p 'test_*.py'
+
+test-integration:
+	@echo "Running opt-in real Hashcat integration..."
+	@bash tests/integration.sh
 
 test: test-campaign test-smoke
 
