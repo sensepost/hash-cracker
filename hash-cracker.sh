@@ -52,7 +52,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.7.0 "Execution Confidence"'
+    printf '%s' 'v6.8.0 "Hardware Bridge"'
 }
 
 function release_label_text() {
