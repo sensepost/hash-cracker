@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Added an independent Python campaign line-coverage report and baseline ratchet.
+- Added a manual workflow trigger and explicit ShellCheck/shfmt version verification for maintainer CI.
+
 ## v6.7.0 - Execution Confidence
 
 ### Added
