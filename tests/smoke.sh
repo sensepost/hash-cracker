@@ -607,6 +607,26 @@ assert_rc_eq 0
 if [ "$(find "$RETENTION_LOG_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc -l | tr -d '[:space:]')" -ne 1 ]; then
     fail_with_log "session log retention did not keep one log" "$LAST_LOG"
 fi
+if [ ! -L "$RETENTION_LOG_DIR/latest.log" ]; then
+    fail_with_log "auto-created session logs did not update latest.log" "$LAST_LOG"
+fi
+RETENTION_LATEST_TARGET="$(readlink "$RETENTION_LOG_DIR/latest.log")"
+if [ ! -f "$RETENTION_LOG_DIR/$RETENTION_LATEST_TARGET" ]; then
+    fail_with_log "latest.log does not point to the active session log" "$LAST_LOG"
+fi
+
+EXPLICIT_RETENTION_DIR="$TMP_DIR/explicit-retention-logs"
+EXPLICIT_RETENTION_LOG="$TMP_DIR/explicit-retention.log"
+mkdir -p "$EXPLICIT_RETENTION_DIR"
+touch "$EXPLICIT_RETENTION_DIR/session-20200101-000000-1.log" "$EXPLICIT_RETENTION_DIR/session-20200102-000000-2.log"
+run_case explicit_session_log_retention bash -lc "printf '0\n' | SESSION_LOG_DIR='$EXPLICIT_RETENTION_DIR' SESSION_STATS_LOGFILE='$EXPLICIT_RETENTION_LOG' ./hash-cracker.sh --dry-run --session-log-keep 1"
+assert_rc_eq 0
+if [ "$(find "$EXPLICIT_RETENTION_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc -l | tr -d '[:space:]')" -ne 2 ]; then
+    fail_with_log "explicit session log path was unexpectedly pruned" "$LAST_LOG"
+fi
+if [ -L "$EXPLICIT_RETENTION_DIR/latest.log" ]; then
+    fail_with_log "explicit session log path unexpectedly updated latest.log" "$LAST_LOG"
+fi
 
 run_case session_log_retention_zero bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --session-log-keep 0"
 assert_rc_eq 0

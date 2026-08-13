@@ -6,6 +6,7 @@
 
 - Added an independent Python campaign line-coverage report and baseline ratchet.
 - Added a manual workflow trigger and explicit ShellCheck/shfmt version verification for maintainer CI.
+- Added an operational audit-artifact policy for session logs and JSON statistics exports.
 
 ### Changed
 
