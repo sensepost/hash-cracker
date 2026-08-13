@@ -347,6 +347,7 @@ make test-smoke
 - `make verify-tools` checks ShellCheck `0.10.0` and shfmt `3.8.0`.
 - `make test-smoke` runs non-interactive menu and dry-run smoke checks.
 - `make coverage-python` measures first-party campaign coverage separately from Bash coverage.
+- CI installs the pinned lint and format tool releases with checksum verification.
 - CI runs the maintainer checks, campaign tests, and separate Bash/Python coverage jobs automatically on push and pull request; `workflow_dispatch` is available for a manual rerun.
 
 ## License

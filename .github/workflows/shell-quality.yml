@@ -10,17 +10,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
 
       - name: Install lint/format tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck shfmt
+          set -euo pipefail
+          shellcheck_archive="$RUNNER_TEMP/shellcheck-v0.10.0.linux.x86_64.tar.xz"
+          shellcheck_url="https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz"
+          shellcheck_sha256="6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$shellcheck_archive" "$shellcheck_url"
+          echo "$shellcheck_sha256  $shellcheck_archive" | sha256sum --check
+          tar -xJf "$shellcheck_archive" -C "$RUNNER_TEMP"
+          sudo install -m 0755 \
+            "$RUNNER_TEMP/shellcheck-v0.10.0/shellcheck" /usr/local/bin/shellcheck
+
+          shfmt_binary="$RUNNER_TEMP/shfmt_v3.8.0_linux_amd64"
+          shfmt_url="https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64"
+          shfmt_sha256="27b3c6f9d9592fc5b4856c341d1ff2c88856709b9e76469313642a1d7b558fe0"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$shfmt_binary" "$shfmt_url"
+          echo "$shfmt_sha256  $shfmt_binary" | sha256sum --check
+          sudo install -m 0755 "$shfmt_binary" /usr/local/bin/shfmt
 
       - name: Verify maintainer tool versions
         run: make verify-tools
@@ -43,10 +59,10 @@ jobs:
       COVERAGE_TMP_ROOT: /var/tmp
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
 
@@ -57,7 +73,7 @@ jobs:
         run: make coverage-python
 
       - name: Upload Bash coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: bash-coverage
           path: |
@@ -67,7 +83,7 @@ jobs:
             coverage/line-percent.txt
 
       - name: Upload Python coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: python-coverage
           path: coverage/python/

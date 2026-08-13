@@ -7,6 +7,11 @@
 - Added an independent Python campaign line-coverage report and baseline ratchet.
 - Added a manual workflow trigger and explicit ShellCheck/shfmt version verification for maintainer CI.
 
+### Changed
+
+- Pinned GitHub Actions to immutable commit references for repository policy compliance.
+- Made CI lint and format tool installation versioned and checksum-verified.
+
 ## v6.7.0 - Execution Confidence
 
 ### Added
