@@ -206,6 +206,14 @@ make coverage
 
 The report is written to `coverage/` and includes HTML and JSON output, including executable-line and function coverage. Coverage uses Bash’s execution trace so nested `bash -lc` test cases and sourced processor scripts are attributed to the application files. The measured line set excludes shell-only syntax, here-document data, and embedded `awk` source that Bash cannot execute or trace as Bash lines. On the first CI run, `coverage/coverage-baseline-candidate.txt` records the measured baseline. To enforce that baseline locally, copy that value to `coverage-baseline.txt`; subsequent coverage runs fail if executable-line coverage decreases.
 
+Python campaign coverage is measured separately with:
+
+```bash
+make coverage-python
+```
+
+The Python report covers only first-party `scripts/campaign.py` logic and is written to `coverage/python/`. Its independent baseline is stored in `python-coverage-baseline.txt`; this keeps Bash and Python coverage metrics from being combined into a misleading single percentage.
+
 ## Flags
 
 By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.
@@ -336,8 +344,10 @@ make test-smoke
 - `make lint` runs `shellcheck` on project shell scripts.
 - `make format-check` verifies formatting with `shfmt`.
 - `make format` applies `shfmt` formatting changes.
+- `make verify-tools` checks ShellCheck `0.10.0` and shfmt `3.8.0`.
 - `make test-smoke` runs non-interactive menu and dry-run smoke checks.
-- CI runs `make lint`, `make format-check`, and `make test-smoke` automatically on push and pull request.
+- `make coverage-python` measures first-party campaign coverage separately from Bash coverage.
+- CI runs the maintainer checks, campaign tests, and separate Bash/Python coverage jobs automatically on push and pull request; `workflow_dispatch` is available for a manual rerun.
 
 ## License
 

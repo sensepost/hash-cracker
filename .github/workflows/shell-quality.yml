@@ -3,6 +3,7 @@ name: Shell Quality
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   shell-quality:
@@ -11,10 +12,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
       - name: Install lint/format tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 shellcheck shfmt
+          sudo apt-get install -y shellcheck shfmt
+
+      - name: Verify maintainer tool versions
+        run: make verify-tools
 
       - name: Run shell lint
         run: make lint
@@ -36,16 +45,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install coverage tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
       - name: Run Bash coverage
         run: make coverage
 
-      - name: Upload coverage report
+      - name: Run Python campaign coverage
+        run: make coverage-python
+
+      - name: Upload Bash coverage report
         uses: actions/upload-artifact@v4
         with:
           name: bash-coverage
-          path: coverage/
+          path: |
+            coverage/coverage.json
+            coverage/function-percent.txt
+            coverage/index.html
+            coverage/line-percent.txt
+
+      - name: Upload Python coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: coverage/python/
