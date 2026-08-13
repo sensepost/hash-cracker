@@ -214,6 +214,30 @@ make coverage-python
 
 The Python report covers only first-party `scripts/campaign.py` logic and is written to `coverage/python/`. Its independent baseline is stored in `python-coverage-baseline.txt`; this keeps Bash and Python coverage metrics from being combined into a misleading single percentage.
 
+### Optional real Hashcat integration
+
+The default CI suite never starts Hashcat and does not require GPU hardware. An
+opt-in integration check is available for a Linux runner with a real Hashcat
+installation and OpenCL/CUDA backend:
+
+```bash
+HASHCAT_INTEGRATION_DEVICE=1 \
+HASHCAT_INTEGRATION_REQUIRE_GPU=1 \
+make test-integration
+```
+
+The check creates isolated temporary inputs, runs the real Hashcat-backed
+combinator path against a known MD5 test value, and verifies the cracked result
+in a temporary potfile. It does not use the developer configuration or modify
+repository data. `HASHCAT_INTEGRATION_REQUIRE_GPU=0` permits a CPU OpenCL
+backend for local validation.
+
+The manual [Hashcat Integration workflow](.github/workflows/hashcat-integration.yml)
+targets a trusted self-hosted Linux runner with the labels `self-hosted`,
+`linux`, `x64`, and `hashcat`. It is intentionally manual-only because real
+Hashcat execution and self-hosted runners are outside the deterministic default
+CI contract.
+
 ## Flags
 
 By default, `hash-cracker` enables optimized kernels, enables loopback, disables hardware monitoring, and shows cracked hashes on stdout.

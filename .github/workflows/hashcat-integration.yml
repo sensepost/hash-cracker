@@ -1,0 +1,40 @@
+name: Hashcat Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Hashcat device selector (for example, 1 or 1,2)
+        required: false
+        default: '1'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hashcat-integration
+  cancel-in-progress: false
+
+jobs:
+  hashcat-integration:
+    name: Real Hashcat smoke test
+    runs-on: [self-hosted, linux, x64, hashcat]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify Hashcat backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v hashcat
+          hashcat --version
+          hashcat -I
+
+      - name: Run real Hashcat integration
+        env:
+          HASHCAT_INTEGRATION_DEVICE: ${{ inputs.device }}
+          HASHCAT_INTEGRATION_REQUIRE_GPU: '1'
+        run: make test-integration
