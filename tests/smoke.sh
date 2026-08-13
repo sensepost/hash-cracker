@@ -1945,7 +1945,8 @@ assert_rc_eq 0
 assert_contains "Markov helper failed."
 
 BROKEN_POTFILE="$TMP_DIR/broken-potfile"
-mkdir -p "$BROKEN_POTFILE"
+: >"$BROKEN_POTFILE"
+chmod 000 "$BROKEN_POTFILE"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
@@ -1993,12 +1994,14 @@ run_case processor_16_extraction_failure bash -lc "./hash-cracker.sh --job 16"
 assert_rc_eq 1
 assert_contains "Username extraction failed."
 
+MISSING_POTFILE="$TMP_DIR/missing-potfile"
+mkdir -p "$MISSING_POTFILE"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
 HASHTYPE=1000
 HASHLIST=$TMP_DIR/input
-POTFILE=$BROKEN_POTFILE
+POTFILE=$MISSING_POTFILE
 WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
