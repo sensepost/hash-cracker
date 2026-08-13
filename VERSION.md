@@ -11,6 +11,7 @@
 
 - Pinned GitHub Actions to immutable commit references for repository policy compliance.
 - Made CI lint and format tool installation versioned and checksum-verified.
+- Updated pinned GitHub Actions to Node.js 24-compatible releases.
 
 ## v6.7.0 - Execution Confidence
 
