@@ -2555,10 +2555,10 @@ cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($FAKE_HASHCAT)
 DEVICE=1
 HASHTYPE=1000
-HASHLIST=input
-POTFILE=hash-cracker.pot
-WORDLIST=wordlists/ignis-1M.txt
-WORDLIST2=wordlists/ignis-1K.txt
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 
 rm -f "$CTRL_FIFO" "$CTRL_LOG" "$FAKE_PID_FILE"
