@@ -11,11 +11,12 @@ workflow remains local, deterministic, and GPU-optional.
   processor inputs, manifests, and campaign state receive restrictive creation
   modes; leaf symlink checks and legacy-manifest path compatibility are covered
   by regression tests.
+- **F2 — Fail-closed potfile validation (P2):** normal runs now require an
+  existing regular, readable, writable potfile and reject invalid paths before
+  Hashcat starts; dry-run handling remains non-mutating for a missing potfile.
 
 ## Planned
 
-- **F2 — Fail-closed potfile validation (P2):** reject missing, directory-valued,
-  unwritable, or uncreatable potfiles before Hashcat starts.
 - **F3 — Runtime contract validation (P2):** reject invalid processor modes and
   make self-test cover every job-specific helper, including Markov generation.
 - **F4 — Supported macOS portability (P2):** remove GNU-only filesystem

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Added fail-closed potfile validation before normal Hashcat execution.
+
 ## v6.9.0 - Private Artifact Lifecycle
 
 ### Added

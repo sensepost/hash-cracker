@@ -435,13 +435,12 @@ elif ! [ -x "$(command -v "$HASHCAT_BIN")" ]; then
 else
     status_ok "Hashcat is executable"
 fi
-if test -f "$POTFILE"; then
-    status_ok "Potfile $POTFILE present"
-elif [ "$DRYRUN" = ' ' ]; then
-    status_bad "Potfile not present, dry-run would create $POTFILE"
+if [ "$DRYRUN" = ' ' ] && [ ! -e "$POTFILE" ] && [ ! -L "$POTFILE" ]; then
+    status_bad "Potfile not present, dry-run will not create $POTFILE"
+elif validate_potfile "$POTFILE"; then
+    status_ok "Potfile $POTFILE is a readable, writable regular file"
 else
-    status_bad "Potfile not present, will create $POTFILE"
-    touch "$POTFILE"
+    ((COUNTER = COUNTER + 1))
 fi
 if [ "$COUNTER" -gt 0 ]; then
     status_error "Not all mandatory requirements are met. Please fix and try again."
