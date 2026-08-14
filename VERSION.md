@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Added private per-campaign artifact workspaces with restrictive permissions,
+  symlink checks, and legacy-manifest path compatibility.
+
+### Changed
+
+- Tightened permissions for newly created session logs, statistics exports,
+  campaign manifests, and campaign state files.
+
 ## v6.8.0 - Hardware Bridge
 
 ### Added

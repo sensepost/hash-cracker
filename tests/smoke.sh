@@ -201,6 +201,20 @@ assert_rc_eq 0
 run_case helper_campaign_plan_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; check_job_dependencies() { return 0; }; run_processor() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-failure.json'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
+run_case helper_campaign_plan_workspace_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; check_job_dependencies() { return 0; }; run_processor() { return 0; }; init_campaign_workspace() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-workspace-failure.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+CAMPAIGN_WORKSPACE_COMMAND_MANIFEST="$TMP_DIR/workspace-command-failure.json"
+: >"$CAMPAIGN_WORKSPACE_COMMAND_MANIFEST"
+run_case helper_campaign_workspace_command_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_artifact_args() { CAMPAIGN_ARTIFACT_ARGS=(); }; python3() { case \"\${2:-}\" in validate) return 0 ;; workspace) return 1 ;; esac; }; if run_campaign_execute '$CAMPAIGN_WORKSPACE_COMMAND_MANIFEST' Executing; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_workspace_secure_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_artifact_args() { CAMPAIGN_ARTIFACT_ARGS=(); }; python3() { case \"\${2:-}\" in validate) return 0 ;; workspace) printf '$TMP_DIR/private-workspace' ;; esac; }; ensure_private_directory() { return 1; }; if run_campaign_execute '$CAMPAIGN_WORKSPACE_COMMAND_MANIFEST' Executing; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_legacy_campaign_tempfile bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=legacy; CAMPAIGN_CURRENT_STEP=step-001; CAMPAIGN_TEMP_INDEX=0; path=\$(dryrun_tempfile input); case \"\$path\" in /tmp/hash-cracker-campaign-*) exit 0 ;; *) exit 1 ;; esac"
+assert_rc_eq 0
+
 run_case helper_campaign_command_start_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_start"
 assert_rc_eq 0
 
@@ -305,6 +319,37 @@ assert_rc_eq 0
 run_case helper_campaign_plan_command_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; run_processor() { return 0; }; mktemp() { case \"\${1:-}\" in *campaign-steps.*) /usr/bin/mktemp \"\$@\" ;; *campaign-commands.*) return 1 ;; *) /usr/bin/mktemp \"\$@\" ;; esac; }; if run_campaign_plan fixture '$TMP_DIR/plan-command-mktemp-failure.json'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
+run_case helper_private_directory_empty bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if ensure_private_directory ''; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+PRIVATE_DIRECTORY_FILE="$TMP_DIR/private-directory-file"
+printf 'not a directory\n' >"$PRIVATE_DIRECTORY_FILE"
+run_case helper_private_directory_file bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if ensure_private_directory '$PRIVATE_DIRECTORY_FILE'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+PRIVATE_DIRECTORY_PARENT_BLOCKER="$TMP_DIR/private-directory-parent-blocker"
+printf 'not a directory\n' >"$PRIVATE_DIRECTORY_PARENT_BLOCKER"
+run_case helper_private_directory_mkdir_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if ensure_private_directory '$PRIVATE_DIRECTORY_PARENT_BLOCKER/child'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_private_directory_owner_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; private_directory_owned() { return 1; }; if ensure_private_directory '$TMP_DIR/private-directory-owner-failure'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_private_directory_chmod_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; chmod() { return 1; }; if ensure_private_directory '$TMP_DIR/private-directory-chmod-failure'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+WORKSPACE_PARENT_BLOCKER="$TMP_DIR/workspace-parent-blocker"
+printf 'not a directory\n' >"$WORKSPACE_PARENT_BLOCKER"
+run_case helper_workspace_manifest_mkdir_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if campaign_workspace_for_manifest '$WORKSPACE_PARENT_BLOCKER/manifest.json'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+WORKSPACE_CD_FAILURE="$TMP_DIR/workspace-cd-failure/manifest.json"
+run_case helper_workspace_manifest_cd_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd() { return 1; }; if campaign_workspace_for_manifest '$WORKSPACE_CD_FAILURE'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_campaign_workspace_resolution_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_workspace_for_manifest() { return 1; }; if init_campaign_workspace fixture; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
 CAMPAIGN_EXECUTE_MKTEMP_MANIFEST="$TMP_DIR/execute-mktemp-failure.json"
 : >"$CAMPAIGN_EXECUTE_MKTEMP_MANIFEST"
 run_case helper_campaign_execute_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_artifact_args() { CAMPAIGN_ARTIFACT_ARGS=(); }; python3() { case \"\${2:-}\" in validate|mark-running) return 0 ;; next) printf '0|step-001|1|Fixture\\n' ;; esac; }; mktemp() { return 1; }; if run_campaign_execute '$CAMPAIGN_EXECUTE_MKTEMP_MANIFEST' Executing; then exit 1; else exit 0; fi"
@@ -320,10 +365,37 @@ run_case helper_session_log_link_failure bash -lc "source '$REPO_ROOT/hash-crack
 assert_rc_eq 0
 assert_contains "Unable to update latest session log link: $TMP_DIR/helper-link-logs/latest.log"
 
+DEFAULT_LOG_CWD="$TMP_DIR/default-log-cwd"
+mkdir -p "$DEFAULT_LOG_CWD"
+run_case helper_default_session_log_dir bash -lc "cd '$DEFAULT_LOG_CWD'; source '$REPO_ROOT/hash-cracker.sh'; unset SESSION_LOG_DIR; SESSION_STATS_LOGFILE=''; SESSION_LOG_DISABLED=0; init_session_stats_logfile; test -d logs"
+assert_rc_eq 0
+
+run_case helper_default_session_log_failure bash -lc "cd '$DEFAULT_LOG_CWD'; source '$REPO_ROOT/hash-cracker.sh'; unset SESSION_LOG_DIR; SESSION_STATS_LOGFILE=''; SESSION_LOG_DISABLED=0; ensure_private_directory() { return 1; }; if init_session_stats_logfile; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+run_case helper_session_cache_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; HASHLIST='$TMP_DIR/input'; POTFILE='$TMP_DIR/hash-cracker.pot'; mktemp() { return 1; }; if init_session_stats; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+
+FAILING_MKTEMP_BIN="$TMP_DIR/failing-mktemp-bin"
+mkdir -p "$FAILING_MKTEMP_BIN"
+cat >"$FAILING_MKTEMP_BIN/mktemp" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$FAILING_MKTEMP_BIN/mktemp"
+run_case session_cache_mktemp_cli_failure bash -lc "PATH='$FAILING_MKTEMP_BIN:\$PATH' ./hash-cracker.sh --dry-run --job 1"
+assert_rc_eq 1
+assert_contains "Unable to allocate private session statistics cache."
+
 HELPER_CACHE="$TMP_DIR/helper-cache"
 run_case helper_hashlist_refresh bash -lc "source ./hash-cracker.sh; HASHLIST='$TMP_DIR/input'; POTFILE=/dev/null; SESSION_POT_UNIQUE_CACHE='$HELPER_CACHE'; SESSION_POT_LINES_LAST=0; SESSION_POT_BYTES_LAST=0; SESSION_POT_LINES_BASE=0; SESSION_POT_UNIQUE_BASE=0; SESSION_POT_BYTES_BASE=0; SESSION_POT_UNIQUE_CUR=0; SESSION_HASHLIST_PATH_LAST='$TMP_DIR/old-hashlist'; refresh_session_stats"
 assert_rc_eq 0
 run_case helper_incremental_empty_delta bash -lc "source ./hash-cracker.sh; if update_unique_plaintexts_incremental 0; then exit 0; else exit 1; fi"
+assert_rc_eq 0
+
+HELPER_INCREMENTAL_POT="$TMP_DIR/helper-incremental-pot"
+printf 'hash:new\n' >"$HELPER_INCREMENTAL_POT"
+run_case helper_incremental_cache_creation bash -lc "source ./hash-cracker.sh; POTFILE='$HELPER_INCREMENTAL_POT'; SESSION_POT_UNIQUE_CACHE='$TMP_DIR/missing-incremental-cache'; SESSION_POT_UNIQUE_CUR=0; update_unique_plaintexts_incremental 1"
 assert_rc_eq 0
 
 run_case helper_missing_pack_files bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd '$TMP_DIR'; MACHINE=Linux; DRYRUN=' '; if check_job_dependencies 12; then exit 1; else exit 0; fi"
@@ -562,6 +634,18 @@ run_case stats_export bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --sta
 assert_rc_eq 0
 if [ ! -s "$STATS_EXPORT_PATH" ]; then
     fail_with_log "stats export file was not created" "$LAST_LOG"
+fi
+if ! python3 - "$STATS_EXPORT_PATH" <<'PY'; then
+import os
+import sys
+from pathlib import Path
+
+assert (Path(sys.argv[1]).stat().st_mode & 0o777) == 0o600
+logs = list(Path(os.environ["SESSION_LOG_DIR"]).glob("session-*.log"))
+assert logs
+assert all((path.stat().st_mode & 0o777) == 0o600 for path in logs)
+PY
+    fail_with_log "stats export was not created with private permissions" "$STATS_EXPORT_PATH"
 fi
 if ! grep -Fq '"generated_at"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing generated_at key" "$STATS_EXPORT_PATH"
@@ -858,18 +942,22 @@ assert_contains "Unable to create output directory: $STATS_EXPORT_BLOCKER"
 
 echo "[smoke] campaign planning captures reproducible command steps"
 CAMPAIGN_PATH="$TMP_DIR/quick-campaign.json"
-run_case campaign_plan bash -lc "./hash-cracker.sh --plan quick --output '$CAMPAIGN_PATH'"
+run_case campaign_plan bash -lc "umask 022; ./hash-cracker.sh --plan quick --output '$CAMPAIGN_PATH'"
 assert_rc_eq 0
 assert_contains "Campaign plan ready: $CAMPAIGN_PATH"
 if ! python3 - "$CAMPAIGN_PATH" <<'PY'; then
 import json
 import sys
+from pathlib import Path
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["schema_version"] == "2"
 assert manifest["status"] == "planned"
 assert manifest["campaign"]["jobs"] == [1, 9]
 assert manifest["campaign"]["session_prefix"].startswith("hc-")
+workspace = Path(manifest["campaign"]["workspace"])
+assert workspace.is_dir()
+assert (workspace.stat().st_mode & 0o777) == 0o700
 assert len(manifest["steps"]) == 2
 assert all(step["commands"] for step in manifest["steps"])
 assert all(
@@ -884,6 +972,13 @@ assert manifest["artifacts"]
 PY
     fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
 fi
+
+CAMPAIGN_WORKSPACE_SYMLINK_PATH="$TMP_DIR/symlink-campaign.json"
+mkdir -p "$CAMPAIGN_WORKSPACE_SYMLINK_PATH.state"
+ln -s "$TMP_DIR/input" "$CAMPAIGN_WORKSPACE_SYMLINK_PATH.state/workspace"
+run_case campaign_workspace_symlink bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if init_campaign_workspace '$CAMPAIGN_WORKSPACE_SYMLINK_PATH'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Refusing to use a symlink as a private directory"
 
 CAMPAIGN_ARTIFACT_HASHCAT="$TMP_DIR/campaign-artifact-hashcat"
 cat >"$CAMPAIGN_ARTIFACT_HASHCAT" <<'EOF'
@@ -1136,6 +1231,8 @@ from pathlib import Path
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["status"] == "paused"
 assert manifest["steps"][0]["state"] == "interrupted"
+workspace = Path(manifest["campaign"]["workspace"])
+assert (workspace.stat().st_mode & 0o777) == 0o700
 command = manifest["steps"][0]["commands"][0]
 assert command["state"] == "running"
 assert command["attempts"] == 1
@@ -1143,6 +1240,8 @@ assert command["session"]
 assert Path(command["restore_file"]).is_file()
 assert len(command["preserved_inputs"]) == 1
 assert Path(command["preserved_inputs"][0]).is_file()
+assert workspace in Path(command["preserved_inputs"][0]).parents
+assert all((path.stat().st_mode & 0o777) == 0o600 for path in workspace.iterdir() if path.is_file())
 PY
     fail_with_log "interrupted campaign state was invalid" "$LAST_LOG"
 fi
@@ -1158,6 +1257,7 @@ import sys
 from pathlib import Path
 
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+workspace = Path(manifest["campaign"]["workspace"])
 assert manifest["status"] == "completed"
 assert manifest["steps"][0]["state"] == "completed"
 assert manifest["steps"][0]["attempts"] == 2
@@ -1174,7 +1274,7 @@ assert len(logged) >= 2
 preserved_paths = [
     Path(argument)
     for argument in logged[0]
-    if argument.startswith("/tmp/hash-cracker-campaign-")
+    if str(workspace) in argument
 ]
 assert preserved_paths
 assert all(not path.exists() for path in preserved_paths)

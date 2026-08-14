@@ -37,6 +37,12 @@ as a warning and continues. Treat the resulting run as having incomplete audit
 evidence; a successful cracking command does not prove that a complete log was
 written.
 
+Files created by the CLI use a restrictive process umask. The default `logs/`
+directory is created with mode `0700`, and newly created session logs are
+created with mode `0600`. An explicitly configured log directory is not
+re-permissioned, but files created by the process still receive the restrictive
+file mode.
+
 ### JSON statistics exports
 
 `--stats-export PATH` writes the current statistics to `PATH` on each refresh
@@ -54,7 +60,13 @@ does not silently discard source text.
 Exports are written through a temporary file and replacement step. Failure to
 create the parent directory, write the temporary file, or replace the target is
 reported as an error and makes the command fail. A partially written JSON file
-is not treated as a successful export.
+is not treated as a successful export. Newly created exports receive mode
+`0600`.
+
+Campaign manifests created by the current CLI also contain a private artifact
+workspace under the manifest state directory. Generated processor inputs and
+interrupted-command state are kept there, and legacy manifests without this
+metadata continue to use their recorded paths.
 
 ## Integrity and limitations
 
