@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v6.9.0 - Private Artifact Lifecycle
+
 ### Added
 
 - Added private per-campaign artifact workspaces with restrictive permissions,
