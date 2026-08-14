@@ -2,6 +2,7 @@
 # Author: crypt0rr - https://github.com/crypt0rr/
 
 CAMPAIGN_EPHEMERAL_FILES=()
+CAMPAIGN_WORKSPACE=''
 
 function init_colors() {
     if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
@@ -634,6 +635,10 @@ function run_campaign_plan() {
     : >"$command_file"
     CAMPAIGN_MODE='plan'
     CAMPAIGN_COMMAND_FILE="$command_file"
+    if ! init_campaign_workspace "$output"; then
+        rm -f -- "$step_file" "$command_file"
+        return 1
+    fi
     status_heading "Planning campaign '$source' (jobs: $jobs)"
 
     IFS=',' read -ra job_ids <<<"$jobs"
@@ -667,6 +672,7 @@ function run_campaign_plan() {
     campaign_args=(
         python3 scripts/campaign.py create
         --output "$output"
+        --workspace "$CAMPAIGN_WORKSPACE"
         --name "$source"
         --kind "$kind"
         --release "$(release_version_text)"
@@ -712,6 +718,7 @@ function run_campaign_execute() {
     local state
     local update_rc
     local session_stats_line
+    local campaign_workspace
     local -a campaign_args
 
     if [ ! -f "$manifest" ]; then
@@ -737,6 +744,19 @@ function run_campaign_execute() {
     campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
     if ! "${campaign_args[@]}"; then
         return 1
+    fi
+
+    CAMPAIGN_WORKSPACE=''
+    if ! campaign_workspace="$(python3 scripts/campaign.py workspace --manifest "$manifest")"; then
+        status_error "Unable to resolve the campaign artifact workspace."
+        return 1
+    fi
+    if [ -n "$campaign_workspace" ]; then
+        if ! ensure_private_directory "$campaign_workspace"; then
+            status_error "Unable to secure the campaign artifact workspace: $campaign_workspace"
+            return 1
+        fi
+        CAMPAIGN_WORKSPACE="$campaign_workspace"
     fi
 
     status_heading "${action^} campaign: $manifest"
@@ -958,9 +978,14 @@ function dryrun_tempfile() {
         if [ -n "$campaign_key" ] && [ -n "${CAMPAIGN_CURRENT_STEP:-}" ]; then
             temp_index="${CAMPAIGN_TEMP_INDEX:-0}"
             CAMPAIGN_TEMP_INDEX=$((temp_index + 1))
-            campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
-            printf '/tmp/hash-cracker-campaign-%s-%s-%s-%s' \
-                "$campaign_id" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
+            if [ -n "${CAMPAIGN_WORKSPACE:-}" ]; then
+                printf '%s/%s-%s-%s' \
+                    "$CAMPAIGN_WORKSPACE" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
+            else
+                campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
+                printf '/tmp/hash-cracker-campaign-%s-%s-%s-%s' \
+                    "$campaign_id" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
+            fi
             return 0
         fi
     fi
@@ -1106,6 +1131,72 @@ function ensure_parent_dir() {
             return 1
         fi
     fi
+    return 0
+}
+
+function private_directory_owned() {
+    [ -O "$1" ]
+}
+
+function ensure_private_directory() {
+    local path="$1"
+
+    if [ -z "$path" ]; then
+        status_error "Unable to secure an empty directory path."
+        return 1
+    fi
+    if [ -L "$path" ]; then
+        status_error "Refusing to use a symlink as a private directory: $path"
+        return 1
+    fi
+    if [ -e "$path" ] && [ ! -d "$path" ]; then
+        status_error "Private directory path is not a directory: $path"
+        return 1
+    fi
+    if ! mkdir -p "$path"; then
+        status_error "Unable to create private directory: $path"
+        return 1
+    fi
+    if [ -L "$path" ] || ! private_directory_owned "$path"; then
+        status_error "Private directory is not owned by the current user: $path"
+        return 1
+    fi
+    if ! chmod 700 "$path"; then
+        status_error "Unable to restrict private directory permissions: $path"
+        return 1
+    fi
+    return 0
+}
+
+function campaign_workspace_for_manifest() {
+    local manifest="$1"
+    local manifest_dir
+    local manifest_name
+
+    manifest_dir=$(dirname "$manifest")
+    if ! mkdir -p "$manifest_dir"; then
+        return 1
+    fi
+    if ! manifest_dir=$(cd -P "$manifest_dir" 2>/dev/null && pwd -P); then
+        return 1
+    fi
+    manifest_name=$(basename "$manifest")
+    printf '%s/%s.state/workspace' "$manifest_dir" "$manifest_name"
+}
+
+function init_campaign_workspace() {
+    local manifest="$1"
+    local workspace
+
+    if ! workspace=$(campaign_workspace_for_manifest "$manifest") || [ -z "$workspace" ]; then
+        status_error "Unable to resolve the campaign artifact workspace: $manifest"
+        return 1
+    fi
+    if ! ensure_private_directory "$workspace"; then
+        status_error "Unable to secure the campaign artifact workspace: $workspace"
+        return 1
+    fi
+    CAMPAIGN_WORKSPACE="$workspace"
     return 0
 }
 
@@ -1304,6 +1395,12 @@ function init_session_stats_logfile() {
     local log_dir
     local session_stamp
     local keep_count
+    local default_logs=0
+
+    if [ -z "${SESSION_LOG_DIR:-}" ]; then
+        logs_dir='logs'
+        default_logs=1
+    fi
 
     SESSION_LOG_AVAILABLE=0
 
@@ -1330,7 +1427,13 @@ function init_session_stats_logfile() {
     session_stamp=$(date '+%Y%m%d-%H%M%S')
     SESSION_STATS_LOGFILE="$logs_dir/session-${session_stamp}-${BASHPID}.log"
 
-    if ! mkdir -p "$logs_dir"; then
+    if [ "$default_logs" -eq 1 ]; then
+        if ! ensure_private_directory "$logs_dir"; then
+            status_bad "Unable to secure session log directory: $logs_dir"
+            SESSION_STATS_LOGFILE=''
+            return 1
+        fi
+    elif ! mkdir -p "$logs_dir"; then
         status_bad "Unable to create session log directory: $logs_dir"
         SESSION_STATS_LOGFILE=''
         return 1
@@ -1431,10 +1534,14 @@ function init_session_stats() {
 
     SESSION_HASHLIST_PATH_LAST="$HASHLIST"
     SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
-    SESSION_POT_UNIQUE_CACHE="/tmp/hash-cracker-unique-${BASHPID}.cache"
+    if ! SESSION_POT_UNIQUE_CACHE=$(mktemp /tmp/hash-cracker-unique.XXXX); then
+        status_error "Unable to allocate private session statistics cache."
+        return 1
+    fi
     rebuild_unique_plaintext_cache
     SESSION_POT_UNIQUE_BASE="$SESSION_POT_UNIQUE_CUR"
-    init_session_stats_logfile
+    init_session_stats_logfile || true
+    return 0
 }
 
 function refresh_session_stats() {
@@ -1766,6 +1873,7 @@ fi
 
 run_early_list_mode "$@"
 init_colors
+umask 077
 trap cleanup_session_state EXIT
 source scripts/parameters.sh "$@"
 
@@ -1775,7 +1883,9 @@ if [ -n "$CAMPAIGN_PLAN" ]; then
 fi
 
 status_heading "Preparing session stats (counting potfile and input hashes)..."
-init_session_stats
+if ! init_session_stats; then
+    exit 1
+fi
 
 if [ -n "$CAMPAIGN_EXECUTE" ] || [ -n "$CAMPAIGN_RESUME" ]; then
     if [ -n "$CAMPAIGN_RESUME" ]; then

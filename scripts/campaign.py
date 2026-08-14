@@ -31,6 +31,23 @@ def resolved_path(value: str) -> str:
     return str(Path(value).expanduser().resolve(strict=False))
 
 
+def ensure_private_directory(path: Path) -> None:
+    """Create or tighten a directory used for private campaign state."""
+    if path.is_symlink():
+        raise CampaignError(f"private campaign directory is a symlink: {path}")
+    try:
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if path.is_symlink() or not path.is_dir():
+            raise CampaignError(f"private campaign path is not a directory: {path}")
+        if path.stat().st_uid != os.geteuid():
+            raise CampaignError(f"private campaign directory is not user-owned: {path}")
+        path.chmod(0o700)
+    except OSError as error:
+        raise CampaignError(
+            f"unable to secure private campaign directory {path}: {error}"
+        ) from error
+
+
 def resolved_executable(value: str) -> str:
     candidate = value
     if os.sep not in value:
@@ -123,6 +140,7 @@ def write_manifest(path: str, manifest: dict) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary_path, destination)
+        destination.chmod(0o600)
     finally:
         if temporary_path and temporary_path.exists():
             temporary_path.unlink()
@@ -284,20 +302,28 @@ def create_manifest(args: argparse.Namespace) -> None:
     artifacts = artifact_metadata(getattr(args, "artifact", []))
     validate_output_path(args, artifacts)
 
+    workspace = getattr(args, "workspace", None)
+    if workspace:
+        ensure_private_directory(Path(workspace))
+
+    campaign_metadata = {
+        "name": args.name,
+        "kind": args.kind,
+        "jobs": [step["job"] for step in steps],
+        "session_prefix": (
+            f"hc-{hashlib.sha256(resolved_path(args.output).encode()).hexdigest()[:12]}"
+        ),
+    }
+    if workspace:
+        campaign_metadata["workspace"] = resolved_path(workspace)
+
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "release": args.release,
         "created_at": timestamp(),
         "updated_at": timestamp(),
         "status": "planned",
-        "campaign": {
-            "name": args.name,
-            "kind": args.kind,
-            "jobs": [step["job"] for step in steps],
-            "session_prefix": (
-                f"hc-{hashlib.sha256(resolved_path(args.output).encode()).hexdigest()[:12]}"
-            ),
-        },
+        "campaign": campaign_metadata,
         "inputs": input_metadata(args),
         "runtime": runtime_metadata(args),
         "artifacts": artifacts,
@@ -306,6 +332,16 @@ def create_manifest(args: argparse.Namespace) -> None:
     write_manifest(args.output, manifest)
     print(f"Campaign plan written to {args.output}")
     print(f"Campaign: {args.name} | steps: {len(steps)} | status: planned")
+
+
+def print_workspace(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    workspace = manifest.get("campaign", {}).get("workspace")
+    if workspace is None:
+        return
+    if not isinstance(workspace, str) or not workspace:
+        raise CampaignError("campaign manifest has an invalid artifact workspace")
+    print(workspace)
 
 
 def validate_manifest(args: argparse.Namespace) -> None:
@@ -408,6 +444,8 @@ def campaign_state_dir(manifest_path: str) -> Path:
 def command_start(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
+    state_dir = campaign_state_dir(args.manifest)
+    ensure_private_directory(state_dir)
     try:
         command = step["commands"][args.command_index]
     except (IndexError, TypeError) as error:
@@ -455,14 +493,13 @@ def command_start(args: argparse.Namespace) -> None:
 
     restore_file = command.get("restore_file") or ""
     restore = int(was_running and bool(restore_file) and Path(restore_file).is_file())
-    state_dir = campaign_state_dir(args.manifest)
-    state_dir.mkdir(parents=True, exist_ok=True)
     argv_file = ""
     if was_running and command.get("executed_argv"):
         argv_file = str(state_dir / f"{command['session']}.argv")
         with Path(argv_file).open("wb") as stream:
             for argument in command["executed_argv"]:
                 stream.write(argument.encode() + b"\0")
+        Path(argv_file).chmod(0o600)
     step["current_command"] = args.command_index
     manifest["status"] = "running"
     write_manifest(args.manifest, manifest)
@@ -537,6 +574,8 @@ def preserve_command_inputs(args: argparse.Namespace) -> None:
 def command_finish(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
+    state_dir = campaign_state_dir(args.manifest)
+    ensure_private_directory(state_dir)
     try:
         command = step["commands"][args.command_index]
     except (IndexError, TypeError) as error:
@@ -552,9 +591,7 @@ def command_finish(args: argparse.Namespace) -> None:
     if args.state == "completed" and command.get("restore_file"):
         Path(command["restore_file"]).unlink(missing_ok=True)
     if args.state == "completed" and command.get("session"):
-        Path(campaign_state_dir(args.manifest) / f"{command['session']}.argv").unlink(
-            missing_ok=True
-        )
+        Path(state_dir / f"{command['session']}.argv").unlink(missing_ok=True)
     if args.state == "completed":
         for preserved in command.get("preserved_inputs", []):
             Path(preserved).unlink(missing_ok=True)
@@ -596,6 +633,7 @@ def parser() -> argparse.ArgumentParser:
 
     create = commands.add_parser("create")
     create.add_argument("--output", required=True)
+    create.add_argument("--workspace")
     create.add_argument("--name", required=True)
     create.add_argument("--kind", required=True)
     create.add_argument("--release", required=True)
@@ -631,6 +669,10 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("--showcracked", required=True)
     validate.add_argument("--artifact", action="append", default=[])
     validate.set_defaults(handler=validate_manifest)
+
+    workspace = commands.add_parser("workspace")
+    workspace.add_argument("--manifest", required=True)
+    workspace.set_defaults(handler=print_workspace)
 
     next_command = commands.add_parser("next")
     next_command.add_argument("--manifest", required=True)

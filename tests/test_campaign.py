@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -89,6 +91,49 @@ class CampaignContractTests(unittest.TestCase):
         artifacts = {item["path"]: item["sha256"] for item in manifest["artifacts"]}
         expected_digest = hashlib.sha256(self.artifact.read_bytes()).hexdigest()
         self.assertEqual(artifacts[str(self.artifact.resolve())], expected_digest)
+
+    def test_manifest_records_private_workspace(self) -> None:
+        args = self.create_args()
+        workspace = self.root / "workspace"
+        args.workspace = str(workspace)
+
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["campaign"]["workspace"], str(workspace.resolve()))
+        self.assertEqual(workspace.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.manifest.stat().st_mode & 0o777, 0o600)
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            campaign.print_workspace(argparse.Namespace(manifest=str(self.manifest)))
+        self.assertEqual(output.getvalue().strip(), str(workspace.resolve()))
+
+    def test_private_workspace_rejects_symlink_and_file(self) -> None:
+        target = self.root / "workspace-target"
+        target.mkdir()
+        link = self.root / "workspace-link"
+        link.symlink_to(target, target_is_directory=True)
+        with self.assertRaisesRegex(campaign.CampaignError, "is a symlink"):
+            campaign.ensure_private_directory(link)
+
+        file_path = self.root / "workspace-file"
+        file_path.write_text("not a directory\n", encoding="utf-8")
+        with self.assertRaises(campaign.CampaignError):
+            campaign.ensure_private_directory(file_path)
+
+    def test_print_workspace_supports_legacy_and_rejects_invalid_metadata(self) -> None:
+        campaign.create_manifest(self.create_args())
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            campaign.print_workspace(argparse.Namespace(manifest=str(self.manifest)))
+        self.assertEqual(output.getvalue(), "")
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        manifest["campaign"]["workspace"] = 123
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(campaign.CampaignError, "invalid artifact workspace"):
+            campaign.print_workspace(argparse.Namespace(manifest=str(self.manifest)))
 
     def test_validation_rejects_changed_artifact(self) -> None:
         args = self.create_args()
