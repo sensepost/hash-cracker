@@ -2119,7 +2119,10 @@ assert_rc_eq 0
 assert_contains "Markov helper failed."
 
 BROKEN_POTFILE="$TMP_DIR/broken-potfile"
-mkdir -p "$BROKEN_POTFILE"
+# These direct processor tests bypass startup validation. Keep the input a
+# regular file and force awk to fail so extraction behavior is deterministic
+# across awk implementations.
+: >"$BROKEN_POTFILE"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
@@ -2129,26 +2132,26 @@ POTFILE=$BROKEN_POTFILE
 WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
-run_case processor_14_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 14"
+run_case processor_14_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 14"
 assert_rc_eq 1
 assert_contains "Fingerprint plaintext extraction failed."
 
-run_case processor_9_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 9"
+run_case processor_9_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 9"
 assert_rc_eq 1
 assert_contains "Iteration plaintext extraction failed."
-run_case processor_10_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 10"
+run_case processor_10_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 10"
 assert_rc_eq 1
 assert_contains "Prefix/suffix plaintext extraction failed."
-run_case processor_11_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 11"
+run_case processor_11_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 11"
 assert_rc_eq 1
 assert_contains "Common-substring plaintext extraction failed."
-run_case processor_12_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 12"
+run_case processor_12_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 12"
 assert_rc_eq 1
 assert_contains "PACK rule plaintext extraction failed."
-run_case processor_13_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 13"
+run_case processor_13_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 13"
 assert_rc_eq 1
 assert_contains "PACK mask plaintext extraction failed."
-run_case processor_17_extraction_failure bash -lc "printf 'p\n1\n1\n0\n' | (source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 17)"
+run_case processor_17_extraction_failure bash -lc "printf 'p\n1\n1\n0\n' | (source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 17)"
 assert_rc_eq 1
 assert_contains "Markov source extraction failed."
 
