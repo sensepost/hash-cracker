@@ -48,6 +48,8 @@ These are only needed for specific menu options.
   - Needed for option `18`
 - `scripts/extensions/common-substr-linux`
   - Needed for options `10` and `11`
+- `scripts/extensions/mkpass-linux`
+  - Needed for option `17` (Markov password generation)
 
 #### macOS
 
@@ -60,6 +62,8 @@ These are only needed for specific menu options.
   - Needed for option `18`
 - `scripts/extensions/common-substr-mac`
   - Needed for options `10` and `11`
+- `scripts/extensions/mkpass-mac`
+  - Needed for option `17` (Markov password generation)
 
 Notes:
 

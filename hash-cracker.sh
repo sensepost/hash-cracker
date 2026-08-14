@@ -277,12 +277,34 @@ function dependency_fail() {
     return 1
 }
 
+function processor_select_wordlist_mode() {
+    local mode="${1:-}"
+
+    case "$mode" in
+        [Ss]) source scripts/selectors/wordlist.sh ;;
+        [Mm]) source scripts/selectors/multiple-wordlist.sh ;;
+        *)
+            status_error "Invalid wordlist mode '$mode'. Choose S or M."
+            return 1
+            ;;
+    esac
+}
+
+function markov_helper_path() {
+    if [ "$MACHINE" == "Mac" ]; then
+        printf '%s' "${MKPASS_BIN:-scripts/extensions/mkpass-mac}"
+    else
+        printf '%s' "${MKPASS_BIN:-scripts/extensions/mkpass-linux}"
+    fi
+}
+
 function check_job_dependencies() {
     local selected="$1"
     local common_substr_bin
     local python_bin
     local statsgen
     local maskgen
+    local markov_bin
 
     case "$selected" in
         10 | 11)
@@ -343,6 +365,15 @@ function check_job_dependencies() {
                 dependency_fail \
                     "Option 13 requires PACK files '$statsgen' and '$maskgen'." \
                     "restore the bundled PACK files under scripts/extensions/."
+                return 1
+            fi
+            ;;
+        17)
+            markov_bin="$(markov_helper_path)"
+            if [ ! -x "$markov_bin" ]; then
+                dependency_fail \
+                    "Option 17 requires Markov helper '$markov_bin'." \
+                    "restore the bundled mkpass helper or set MKPASS_BIN to an executable path."
                 return 1
             fi
             ;;
