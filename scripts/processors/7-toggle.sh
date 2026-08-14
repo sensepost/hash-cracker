@@ -10,10 +10,8 @@ processor_bootstrap
 # Single or multiple wordlist
 read -p "Single or Multiple wordlist mode? S/M: " MODE
 
-if [[ $MODE = [Ss] ]]; then
-    source scripts/selectors/wordlist.sh
-elif [[ $MODE = [Mm] ]]; then
-    source scripts/selectors/multiple-wordlist.sh
+if ! processor_select_wordlist_mode "$MODE"; then
+    exit 1
 fi
 
 # Rules

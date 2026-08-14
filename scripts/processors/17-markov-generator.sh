@@ -3,11 +3,7 @@
 
 # Requirements
 processor_bootstrap
-if [ "$MACHINE" == "Mac" ]; then
-    mkpass_bin="${MKPASS_BIN:-scripts/extensions/mkpass-mac}"
-else
-    mkpass_bin="${MKPASS_BIN:-scripts/extensions/mkpass-linux}"
-fi
+mkpass_bin="$(markov_helper_path)"
 
 # Rules
 source scripts/rules/rules.config

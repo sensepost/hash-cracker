@@ -434,6 +434,9 @@ run_case helper_missing_python_rulegen bash -lc "source '$REPO_ROOT/hash-cracker
 assert_rc_eq 0
 run_case helper_missing_python_maskgen bash -lc "source '$REPO_ROOT/hash-cracker.sh'; MACHINE=Linux; DRYRUN=''; PATH='$NO_PYTHON_PATH'; if check_job_dependencies 13; then exit 1; else exit 0; fi"
 assert_rc_eq 0
+run_case helper_missing_markov_helper bash -lc "source '$REPO_ROOT/hash-cracker.sh'; MACHINE=Linux; MKPASS_BIN='$TMP_DIR/missing-markov-helper'; if check_job_dependencies 17; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Option 17 requires Markov helper '$TMP_DIR/missing-markov-helper'."
 
 run_case helper_self_test_hashcat_available bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN=/bin/true; HASHLIST=/dev/null; WORDLIST=/dev/null; WORDLIST2=/dev/null; MACHINE=Linux; CEWL='$CEWL'; run_self_test >/dev/null 2>&1 || true"
 assert_rc_eq 0
@@ -1616,10 +1619,27 @@ assert_contains "Stacking with light rules done"
 run_case processor_2_invalid_mode bash -lc "printf '2\nx\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
 assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+assert_not_contains "Default processing with light rules done"
+
+run_case processor_3_invalid_mode bash -lc "printf '3\nx\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+assert_not_contains "Default processing with heavy rules done"
 
 run_case processor_6_invalid_mode bash -lc "printf '6\nx\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
 assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+assert_not_contains "Hybrid processing done"
+
+run_case processor_7_invalid_mode bash -lc "printf '7\nx\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+assert_not_contains "Toggle processing done"
+
+run_case processor_20_invalid_mode bash -lc "printf '20\nx\n0\n' | ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid wordlist mode 'x'. Choose S or M."
+assert_not_contains "Stacking with light rules done"
 
 echo "[smoke] processor input validation and alternate paths are exercised"
 cat >"$CONFIG_PATH" <<EOF
@@ -2481,6 +2501,12 @@ fi
 assert_contains "Option 18 requires CeWL executable"
 assert_contains "Self-test failed"
 
+MISSING_MKPASS="$TMP_DIR/missing-mkpass"
+run_case self_test_markov_failure bash -lc "MKPASS_BIN='$MISSING_MKPASS' ./hash-cracker.sh --self-test --dry-run"
+assert_rc_eq 1
+assert_contains "Option 17 requires Markov helper '$MISSING_MKPASS'."
+assert_contains "Self-test failed"
+
 MISSING_PRESET_COMMON="$TMP_DIR/missing-preset-common"
 run_case preset_dependency_failure bash -lc "COMMON_SUBSTR_BIN='$MISSING_PRESET_COMMON' ./hash-cracker.sh --dry-run --preset quick-plus"
 assert_rc_eq 1
@@ -2531,6 +2557,7 @@ if [ "$LAST_RC" -ne 0 ] && [ "$LAST_RC" -ne 1 ]; then
     exit 1
 fi
 assert_contains "Self-test: configuration and dependency checks"
+assert_contains "Option 17 (Markov-chain passwords generator): OK"
 if ! grep -Eq "Self-test (passed|failed)" "$LAST_LOG"; then
     echo "[FAIL] expected self-test summary line"
     cat "$LAST_LOG"
