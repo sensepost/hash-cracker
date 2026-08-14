@@ -53,7 +53,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.8.0 "Hardware Bridge"'
+    printf '%s' 'v6.9.0 "Private Artifact Lifecycle"'
 }
 
 function release_label_text() {
