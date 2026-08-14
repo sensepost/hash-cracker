@@ -27,8 +27,12 @@ chmod +x hash-cracker.sh
 At startup, `hash-cracker` checks that:
 
 - `HASHCAT` points to an executable `hashcat` binary
-- `POTFILE` exists, or can be created
+- `POTFILE` is an existing regular file with read/write access
 - the required config keys are set in `hash-cracker.conf`
+
+Normal runs fail before Hashcat starts if the potfile is missing, a directory,
+or cannot be read and written. Dry-run mode reports a missing potfile without
+creating or modifying it.
 
 ### Optional Dependencies
 
@@ -73,7 +77,7 @@ The file must live in the repository root and define these settings:
 - `DEVICE` - value passed to `hashcat -d`
 - `HASHTYPE` - hash mode, for example `1000` for NTLM
 - `HASHLIST` - file containing target hashes
-- `POTFILE` - potfile path to use or create
+- `POTFILE` - path to an existing readable/writable potfile
 - `WORDLIST` - primary wordlist path
 - `WORDLIST2` - secondary wordlist path used by combinator-style workflows
 

@@ -154,6 +154,31 @@ printf 'hash:first\nhash:second\nhash:first\n' >"$HELPER_POTFILE"
 run_case helper_potfile_counts bash -lc "source ./hash-cracker.sh; POTFILE='$HELPER_POTFILE'; [ \"\$(count_potfile_unique_plaintexts)\" = 2 ] && POTFILE='$TMP_DIR/missing-helper-potfile' && [ \"\$(count_potfile_unique_plaintexts)\" = 0 ]"
 assert_rc_eq 0
 
+run_case helper_validate_potfile_success bash -lc "source ./hash-cracker.sh; validate_potfile '$TMP_DIR/hash-cracker.pot'"
+assert_rc_eq 0
+
+run_case helper_validate_potfile_empty bash -lc "source ./hash-cracker.sh; if validate_potfile ''; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Potfile path is empty."
+
+run_case helper_validate_potfile_missing bash -lc "source ./hash-cracker.sh; if validate_potfile '$TMP_DIR/missing-validation-potfile'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Potfile is missing: $TMP_DIR/missing-validation-potfile"
+
+VALIDATION_DIRECTORY_POTFILE="$TMP_DIR/validation-directory-potfile"
+mkdir -p "$VALIDATION_DIRECTORY_POTFILE"
+run_case helper_validate_potfile_directory bash -lc "source ./hash-cracker.sh; if validate_potfile '$VALIDATION_DIRECTORY_POTFILE'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Potfile is not a regular file: $VALIDATION_DIRECTORY_POTFILE"
+
+run_case helper_validate_potfile_unreadable bash -lc "source ./hash-cracker.sh; potfile_is_readable() { return 1; }; if validate_potfile '$TMP_DIR/hash-cracker.pot'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Potfile is not readable: $TMP_DIR/hash-cracker.pot"
+
+run_case helper_validate_potfile_unwritable bash -lc "source ./hash-cracker.sh; potfile_is_writable() { return 1; }; if validate_potfile '$TMP_DIR/hash-cracker.pot'; then exit 1; else exit 0; fi"
+assert_rc_eq 0
+assert_contains "Potfile is not writable: $TMP_DIR/hash-cracker.pot"
+
 HELPER_PRUNE_DIR="$TMP_DIR/helper-prune"
 mkdir -p "$HELPER_PRUNE_DIR"
 touch "$HELPER_PRUNE_DIR/session-20200101-000000-1.log"
@@ -735,7 +760,7 @@ WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 run_case missing_potfile bash -lc "./hash-cracker.sh --dry-run --job 1"
 assert_rc_eq 0
-assert_contains "Potfile not present, dry-run would create $MISSING_POTFILE"
+assert_contains "Potfile not present, dry-run will not create $MISSING_POTFILE"
 if [ -e "$MISSING_POTFILE" ]; then
     fail_with_log "dry-run unexpectedly created the missing potfile" "$LAST_LOG"
 fi
@@ -784,8 +809,9 @@ assert_rc_eq 1
 assert_contains "Hashcat is not available/executable"
 assert_contains "Not all mandatory requirements are met"
 
-NORMAL_MISSING_POTFILE="$TMP_DIR/normal-missing-potfile"
-rm -f -- "$NORMAL_MISSING_POTFILE"
+NORMAL_MISSING_POTFILE_PARENT="$TMP_DIR/normal-missing-parent"
+NORMAL_MISSING_POTFILE="$NORMAL_MISSING_POTFILE_PARENT/potfile"
+rm -rf -- "$NORMAL_MISSING_POTFILE_PARENT"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
@@ -796,11 +822,39 @@ WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 run_case normal_missing_potfile bash -lc "./hash-cracker.sh --job 1"
-assert_rc_eq 0
-assert_contains "Potfile not present, will create $NORMAL_MISSING_POTFILE"
-if [ ! -f "$NORMAL_MISSING_POTFILE" ]; then
-    fail_with_log "normal execution did not create the missing potfile" "$LAST_LOG"
+assert_rc_eq 1
+assert_contains "Potfile is missing: $NORMAL_MISSING_POTFILE"
+if [ -e "$NORMAL_MISSING_POTFILE_PARENT" ]; then
+    fail_with_log "normal execution unexpectedly created the missing potfile parent" "$LAST_LOG"
 fi
+
+NORMAL_DIRECTORY_POTFILE="$TMP_DIR/normal-directory-potfile"
+mkdir -p "$NORMAL_DIRECTORY_POTFILE"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$NORMAL_DIRECTORY_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case normal_directory_potfile bash -lc "./hash-cracker.sh --job 1"
+assert_rc_eq 1
+assert_contains "Potfile is not a regular file: $NORMAL_DIRECTORY_POTFILE"
+
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case normal_unwritable_potfile bash -lc "source '$REPO_ROOT/hash-cracker.sh'; potfile_is_writable() { return 1; }; source '$REPO_ROOT/scripts/parameters.sh' --job 1"
+assert_rc_eq 1
+assert_contains "Potfile is not writable: $TMP_DIR/hash-cracker.pot"
 
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
@@ -2065,8 +2119,10 @@ assert_rc_eq 0
 assert_contains "Markov helper failed."
 
 BROKEN_POTFILE="$TMP_DIR/broken-potfile"
+# These direct processor tests bypass startup validation. Keep the input a
+# regular file and force awk to fail so extraction behavior is deterministic
+# across awk implementations.
 : >"$BROKEN_POTFILE"
-chmod 000 "$BROKEN_POTFILE"
 cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($TMP_DIR/fake-hashcat)
 DEVICE=1
@@ -2076,27 +2132,27 @@ POTFILE=$BROKEN_POTFILE
 WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
-run_case processor_14_extraction_failure bash -lc "./hash-cracker.sh --job 14"
+run_case processor_14_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 14"
 assert_rc_eq 1
 assert_contains "Fingerprint plaintext extraction failed."
 
-run_case processor_9_extraction_failure bash -lc "./hash-cracker.sh --job 9"
+run_case processor_9_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 9"
 assert_rc_eq 1
 assert_contains "Iteration plaintext extraction failed."
-run_case processor_10_extraction_failure bash -lc "./hash-cracker.sh --job 10"
+run_case processor_10_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 10"
 assert_rc_eq 1
 assert_contains "Prefix/suffix plaintext extraction failed."
-run_case processor_11_extraction_failure bash -lc "./hash-cracker.sh --job 11"
+run_case processor_11_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 11"
 assert_rc_eq 1
 assert_contains "Common-substring plaintext extraction failed."
-run_case processor_12_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 12"
+run_case processor_12_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 12"
 assert_rc_eq 1
 assert_contains "PACK rule plaintext extraction failed."
-run_case processor_13_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 13"
+run_case processor_13_extraction_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 13"
 assert_rc_eq 1
 assert_contains "PACK mask plaintext extraction failed."
-run_case processor_17_extraction_failure bash -lc "printf '17\np\n1\n1\n0\n' | ./hash-cracker.sh"
-assert_rc_eq 0
+run_case processor_17_extraction_failure bash -lc "printf 'p\n1\n1\n0\n' | (source '$REPO_ROOT/hash-cracker.sh'; awk() { return 1; }; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 17)"
+assert_rc_eq 1
 assert_contains "Markov source extraction failed."
 
 BROKEN_HASHLIST="$TMP_DIR/broken-hashlist"
@@ -2127,7 +2183,10 @@ WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 run_case processor_19_missing_potfile_failure bash -lc "./hash-cracker.sh --job 19"
 assert_rc_eq 1
-assert_contains "Digit-removal source potfile is missing"
+assert_contains "Potfile is not a regular file: $MISSING_POTFILE"
+run_case processor_19_source_missing_potfile_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; MACHINE=Linux; run_processor 19"
+assert_rc_eq 1
+assert_contains "Digit-removal source potfile is missing: $MISSING_POTFILE"
 
 printf 'hash:$HEX[zz]\n' >"$TMP_DIR/hash-cracker.pot"
 restore_config
@@ -2496,10 +2555,10 @@ cat >"$CONFIG_PATH" <<EOF
 HASHCAT=($FAKE_HASHCAT)
 DEVICE=1
 HASHTYPE=1000
-HASHLIST=input
-POTFILE=hash-cracker.pot
-WORDLIST=wordlists/ignis-1M.txt
-WORDLIST2=wordlists/ignis-1K.txt
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
 
 rm -f "$CTRL_FIFO" "$CTRL_LOG" "$FAKE_PID_FILE"

@@ -1134,6 +1134,40 @@ function ensure_parent_dir() {
     return 0
 }
 
+function potfile_is_readable() {
+    [ -r "$1" ]
+}
+
+function potfile_is_writable() {
+    [ -w "$1" ]
+}
+
+function validate_potfile() {
+    local path="${1:-${POTFILE:-}}"
+
+    if [ -z "$path" ]; then
+        status_error "Potfile path is empty."
+        return 1
+    fi
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        status_error "Potfile is missing: $path"
+        return 1
+    fi
+    if [ ! -f "$path" ]; then
+        status_error "Potfile is not a regular file: $path"
+        return 1
+    fi
+    if ! potfile_is_readable "$path"; then
+        status_error "Potfile is not readable: $path"
+        return 1
+    fi
+    if ! potfile_is_writable "$path"; then
+        status_error "Potfile is not writable: $path"
+        return 1
+    fi
+    return 0
+}
+
 function private_directory_owned() {
     [ -O "$1" ]
 }
