@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v6.10.0 - Portability Guardrails
+
 ### Fixed
 
 - Added fail-closed potfile validation before normal Hashcat execution.

@@ -53,7 +53,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.9.0 "Private Artifact Lifecycle"'
+    printf '%s' 'v6.10.0 "Portability Guardrails"'
 }
 
 function release_label_text() {

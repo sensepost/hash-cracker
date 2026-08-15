@@ -1420,8 +1420,8 @@ run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-c
 assert_rc_eq 1
 assert_contains "Common-substring helper preprocessing failed."
 assert_not_contains "Substring processing done"
-if ! grep -Fq '"release": "v6.9.0 \"Private Artifact Lifecycle\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.9.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.10.0 \"Portability Guardrails\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.10.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
