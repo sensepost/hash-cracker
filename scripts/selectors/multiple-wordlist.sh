@@ -1,12 +1,28 @@
 #!/bin/bash
 # Author: crypt0rr - https://github.com/crypt0rr/
+
+function directory_has_entries() {
+    local directory="$1"
+    local entry
+
+    [ -d "$directory" ] || return 1
+
+    for entry in "$directory"/* "$directory"/.[!.]* "$directory"/..?*; do
+        if [ -e "$entry" ] || [ -L "$entry" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 if ! [[ $START = '8' ]]; then
     while true; do
         if ! read -e -p "Enter path to a wordlist directory or a single wordlist file: " WORDLIST; then
             echo "Unable to read a wordlist path."
             exit 1
         fi
-        if [ -d "$WORDLIST" ] && [ -n "$(find "$WORDLIST" -mindepth 1 -print -quit 2>/dev/null)" ]; then
+        if directory_has_entries "$WORDLIST"; then
             echo "Directory" "$WORDLIST" "selected."
             break
         elif [ -f "$WORDLIST" ]; then

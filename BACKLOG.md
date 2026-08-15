@@ -17,18 +17,21 @@ workflow remains local, deterministic, and GPU-optional.
 - **F3 — Runtime contract validation (P2):** wordlist-mode processors now
   reject invalid selections consistently, and self-test validates the Markov
   helper alongside the other job-specific dependencies.
+- **F5 — Interactive EOF handling (P3):** the menu now exits cleanly when
+  standard input closes instead of repeatedly redrawing the menu.
+- **Campaign manifest trust (Px):** manifest-controlled workspaces and state
+  paths are confined to the private campaign sidecar; legacy preserved inputs
+  are limited to user-owned, generated temporary-file names.
 
 ## Planned
 
-- **F4 — Supported macOS portability (P2):** remove GNU-only filesystem
-  assumptions and validate the documented Apple Silicon paths on a real target.
-- **F5 — Interactive EOF handling (P3):** terminate the menu promptly when stdin
-  closes instead of spinning.
+- **F4 — Supported macOS portability (P2):** portable temporary-file,
+  session-log, and wordlist-selector paths are implemented and covered by
+  simulated Darwin/no-GNU-`find` tests; validate the documented Apple Silicon
+  paths on a real target before marking this item complete.
 
 ## Validate or defer
 
-- **Campaign manifest trust (Px):** decide whether manifests may come from an
-  untrusted user or automation before constraining cleanup paths.
 - **Bundled-helper coverage boundary (Px):** decide whether PACK helpers need
   separate first-party contract coverage or remain integration-only assets.
 - **GPU integration:** run the manual real-Hashcat workflow when a suitable

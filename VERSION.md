@@ -5,6 +5,13 @@
 ### Fixed
 
 - Added fail-closed potfile validation before normal Hashcat execution.
+- Added consistent runtime validation for wordlist-mode processors and the
+  Markov helper dependency.
+- Standardized runtime temporary paths on `TMPDIR` and removed GNU-only
+  filesystem probes from session-log and multi-wordlist paths.
+- Made the interactive menu exit cleanly when standard input reaches EOF.
+- Confined manifest-controlled campaign workspaces and cleanup paths to
+  private campaign state, with a restricted legacy temporary-file fallback.
 
 ## v6.9.0 - Private Artifact Lifecycle
 

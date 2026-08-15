@@ -205,6 +205,28 @@ function current_epoch_seconds() {
     date '+%s'
 }
 
+function temporary_path() {
+    local name="$1"
+    local tmp_dir="${TMPDIR:-/tmp}"
+
+    tmp_dir="${tmp_dir%/}"
+    if [ -z "$tmp_dir" ]; then
+        tmp_dir='/'
+    fi
+
+    if [ "$tmp_dir" = '/' ]; then
+        printf '/%s' "$name"
+    else
+        printf '%s/%s' "$tmp_dir" "$name"
+    fi
+}
+
+function temporary_file_template() {
+    local tag="${1:-tmp}"
+
+    temporary_path "hash-cracker-${tag}.XXXX"
+}
+
 function format_duration() {
     local seconds="$1"
     local hours
@@ -494,7 +516,7 @@ function campaign_command_record() {
     if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
         return 0
     fi
-    if ! argv_file=$(mktemp /tmp/hash-cracker-campaign-argv.XXXX); then
+    if ! argv_file=$(mktemp "$(temporary_file_template campaign-argv)"); then
         status_error "Unable to allocate campaign command argument storage."
         return 1
     fi
@@ -653,11 +675,11 @@ function run_campaign_plan() {
         return 1
     fi
 
-    if ! step_file=$(mktemp /tmp/hash-cracker-campaign-steps.XXXX); then
+    if ! step_file=$(mktemp "$(temporary_file_template campaign-steps)"); then
         status_error "Unable to allocate campaign planning state."
         return 1
     fi
-    if ! command_file=$(mktemp /tmp/hash-cracker-campaign-commands.XXXX); then
+    if ! command_file=$(mktemp "$(temporary_file_template campaign-commands)"); then
         rm -f -- "$step_file"
         status_error "Unable to allocate campaign command state."
         return 1
@@ -812,7 +834,7 @@ function run_campaign_execute() {
             return 1
         fi
 
-        if ! command_file=$(mktemp /tmp/hash-cracker-campaign-executed.XXXX); then
+        if ! command_file=$(mktemp "$(temporary_file_template campaign-executed)"); then
             status_error "Unable to allocate campaign execution state."
             return 1
         fi
@@ -1014,16 +1036,15 @@ function dryrun_tempfile() {
                     "$CAMPAIGN_WORKSPACE" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
             else
                 campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
-                printf '/tmp/hash-cracker-campaign-%s-%s-%s-%s' \
-                    "$campaign_id" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
+                temporary_path "hash-cracker-campaign-${campaign_id}-${CAMPAIGN_CURRENT_STEP}-${tag}-${temp_index}"
             fi
             return 0
         fi
     fi
     if dry_run_enabled; then
-        printf '/tmp/hash-cracker-dryrun-%s-%d-%d' "$tag" "$BASHPID" "$RANDOM"
+        temporary_path "hash-cracker-dryrun-${tag}-${BASHPID}-${RANDOM}"
     else
-        mktemp /tmp/hash-cracker-tmp.XXXX
+        mktemp "$(temporary_file_template tmp)"
     fi
 }
 
@@ -1094,8 +1115,8 @@ function update_unique_plaintexts_incremental() {
         return 0
     fi
 
-    tmp_delta="$(mktemp /tmp/hash-cracker-unique-delta.XXXX)"
-    tmp_merge="$(mktemp /tmp/hash-cracker-unique-merge.XXXX)"
+    tmp_delta="$(mktemp "$(temporary_file_template unique-delta)")"
+    tmp_merge="$(mktemp "$(temporary_file_template unique-merge)")"
 
     tail -n "$delta_lines" "$POTFILE" | awk -F: 'NF {print $NF}' | LC_ALL=C sort -u >"$tmp_delta"
     if [ ! -s "$tmp_delta" ]; then
@@ -1327,13 +1348,26 @@ function export_session_stats_history_json() {
                         "$(json_escape "$message")"
                 fi
             done <"$file"
-        done < <(find "$logs_dir" -maxdepth 1 -type f -name 'session-*.log' -print | LC_ALL=C sort)
+        done < <(session_log_paths "$logs_dir")
     fi
 
     if [ "$first" = '0' ]; then
         printf '\n  '
     fi
     printf ']'
+}
+
+function session_log_paths() {
+    local logs_dir="$1"
+    local path
+
+    [ -d "$logs_dir" ] || return 0
+
+    for path in "$logs_dir"/session-*.log; do
+        if [ -f "$path" ] && [ ! -L "$path" ]; then
+            printf '%s\n' "$path"
+        fi
+    done | LC_ALL=C sort
 }
 
 function export_session_stats_json() {
@@ -1439,7 +1473,7 @@ function prune_session_logs() {
         return 0
     fi
 
-    files=$(find "$logs_dir" -maxdepth 1 -type f -name 'session-*.log' -print | sort)
+    files=$(session_log_paths "$logs_dir")
     if [ -z "$files" ]; then
         return 0
     fi
@@ -1599,7 +1633,7 @@ function init_session_stats() {
 
     SESSION_HASHLIST_PATH_LAST="$HASHLIST"
     SESSION_HASHLIST_INPUT_UNIQUE=$(count_hashlist_unique_entries)
-    if ! SESSION_POT_UNIQUE_CACHE=$(mktemp /tmp/hash-cracker-unique.XXXX); then
+    if ! SESSION_POT_UNIQUE_CACHE=$(mktemp "$(temporary_file_template unique)"); then
         status_error "Unable to allocate private session statistics cache."
         return 1
     fi
@@ -1871,6 +1905,7 @@ function menu() {
     local end_time
     local duration
     local rc
+    local menu_prompt
 
     while true; do
         refresh_session_stats
@@ -1884,9 +1919,14 @@ function menu() {
         fi
 
         if [ "$DRYRUN" = ' ' ]; then
-            read -r -p "Select job [0-22,99] or type exit [DRY-RUN MODE]: " START
+            menu_prompt="Select job [0-22,99] or type exit [DRY-RUN MODE]: "
         else
-            read -r -p "Select job [0-22,99] or type exit: " START
+            menu_prompt="Select job [0-22,99] or type exit: "
+        fi
+
+        if ! read -r -p "$menu_prompt" START; then
+            echo "Input closed. Bye..."
+            return 0
         fi
         START="${START#"${START%%[![:space:]]*}"}"
         START="${START%"${START##*[![:space:]]}"}"
