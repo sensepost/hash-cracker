@@ -94,7 +94,7 @@ class CampaignContractTests(unittest.TestCase):
 
     def test_manifest_records_private_workspace(self) -> None:
         args = self.create_args()
-        workspace = self.root / "workspace"
+        workspace = Path(f"{self.manifest}.state") / "workspace"
         args.workspace = str(workspace)
 
         campaign.create_manifest(args)
@@ -121,6 +121,77 @@ class CampaignContractTests(unittest.TestCase):
         file_path.write_text("not a directory\n", encoding="utf-8")
         with self.assertRaises(campaign.CampaignError):
             campaign.ensure_private_directory(file_path)
+
+    def test_manifest_rejects_workspace_escape(self) -> None:
+        args = self.create_args()
+        args.workspace = str(Path(f"{self.manifest}.state") / "workspace")
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        manifest["campaign"]["workspace"] = str(self.root / "outside-workspace")
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(campaign.CampaignError, "escapes private state"):
+            campaign.load_manifest(str(self.manifest))
+
+    def test_manifest_rejects_restore_path_escape(self) -> None:
+        args = self.create_args()
+        args.workspace = str(Path(f"{self.manifest}.state") / "workspace")
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        command = manifest["steps"][0]["commands"][0]
+        command["session"] = "hc-safe-session"
+        command["restore_file"] = str(self.root / "outside.restore")
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(campaign.CampaignError, "escapes private state"):
+            campaign.load_manifest(str(self.manifest))
+
+    def test_manifest_rejects_preserved_input_escape(self) -> None:
+        args = self.create_args()
+        args.workspace = str(Path(f"{self.manifest}.state") / "workspace")
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        manifest["steps"][0]["commands"][0]["preserved_inputs"] = [
+            str(self.root / "outside-input")
+        ]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(campaign.CampaignError, "escapes private state"):
+            campaign.load_manifest(str(self.manifest))
+
+    def test_manifest_rejects_unsafe_session_component(self) -> None:
+        args = self.create_args()
+        args.workspace = str(Path(f"{self.manifest}.state") / "workspace")
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        manifest["steps"][0]["commands"][0]["session"] = "../outside"
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(campaign.CampaignError, "invalid command session"):
+            campaign.load_manifest(str(self.manifest))
+
+    def test_legacy_preserved_inputs_are_limited_to_generated_temp_files(self) -> None:
+        campaign.create_manifest(self.create_args())
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        legacy_input = self.root / "hash-cracker-campaign-step-input"
+        legacy_input.write_text("temporary input\n", encoding="utf-8")
+        manifest["steps"][0]["commands"][0]["preserved_inputs"] = [
+            str(legacy_input)
+        ]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        campaign.load_manifest(str(self.manifest))
+
+        manifest["steps"][0]["commands"][0]["preserved_inputs"] = [
+            str(self.root / "ordinary-user-file")
+        ]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(campaign.CampaignError, "generated legacy input"):
+            campaign.load_manifest(str(self.manifest))
 
     def test_print_workspace_supports_legacy_and_rejects_invalid_metadata(self) -> None:
         campaign.create_manifest(self.create_args())

@@ -8,6 +8,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import sys
@@ -17,6 +18,8 @@ from pathlib import Path
 
 SCHEMA_VERSION = "2"
 LEGACY_SCHEMA_VERSION = "1"
+SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+LEGACY_TEMPFILE_PREFIX = "hash-cracker-campaign-"
 
 
 class CampaignError(Exception):
@@ -29,6 +32,123 @@ def timestamp() -> str:
 
 def resolved_path(value: str) -> str:
     return str(Path(value).expanduser().resolve(strict=False))
+
+
+def campaign_state_dir(manifest_path: str) -> Path:
+    return Path(f"{Path(manifest_path).expanduser().resolve(strict=False)}.state")
+
+
+def path_within(path: Path, root: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(root.resolve(strict=False))
+    except ValueError:
+        return False
+    return True
+
+
+def validate_component(value: object, label: str) -> None:
+    if not isinstance(value, str) or not value or not SAFE_COMPONENT.fullmatch(value):
+        raise CampaignError(f"campaign manifest has an invalid {label}")
+
+
+def validate_state_path(
+    value: object, label: str, root: Path, *, allow_root: bool = False
+) -> Path:
+    if not isinstance(value, str) or not value:
+        raise CampaignError(f"campaign manifest has an invalid {label}")
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute() or candidate.is_symlink():
+        raise CampaignError(f"campaign manifest {label} escapes private state")
+    resolved = candidate.resolve(strict=False)
+    resolved_root = root.resolve(strict=False)
+    if not path_within(resolved, resolved_root) or (
+        not allow_root and resolved == resolved_root
+    ):
+        raise CampaignError(f"campaign manifest {label} escapes private state")
+    return resolved
+
+
+def validate_legacy_temp_path(value: object, label: str) -> Path:
+    if not isinstance(value, str) or not value:
+        raise CampaignError(f"campaign manifest has an invalid {label}")
+    candidate = Path(value).expanduser()
+    if (
+        not candidate.is_absolute()
+        or candidate.is_symlink()
+        or not candidate.name.startswith(LEGACY_TEMPFILE_PREFIX)
+    ):
+        raise CampaignError(f"campaign manifest {label} is not a generated legacy input")
+    resolved = candidate.resolve(strict=False)
+    if resolved.exists():
+        try:
+            metadata = resolved.stat()
+        except OSError as error:
+            raise CampaignError(f"campaign manifest cannot inspect {label}") from error
+        if not resolved.is_file() or metadata.st_uid != os.geteuid():
+            raise CampaignError(f"campaign manifest {label} is not a private file")
+    return resolved
+
+
+def validate_manifest_state(manifest_path: str, manifest: dict) -> None:
+    """Reject manifest-controlled paths that could escape campaign state."""
+    state_dir = campaign_state_dir(manifest_path)
+    if state_dir.is_symlink() or (state_dir.exists() and not state_dir.is_dir()):
+        raise CampaignError("campaign state directory is not a private directory")
+
+    campaign = manifest["campaign"]
+    validate_component(campaign.get("session_prefix"), "session prefix")
+    workspace = campaign.get("workspace")
+    workspace_root = None
+    if workspace is not None:
+        workspace_root = validate_state_path(
+            workspace, "artifact workspace", state_dir
+        )
+
+    for step in manifest["steps"]:
+        validate_component(step["id"], "step id")
+        for command in step["commands"]:
+            for field in ("argv", "executed_argv"):
+                value = command.get(field)
+                if value is not None and (
+                    not isinstance(value, list)
+                    or not all(isinstance(argument, str) for argument in value)
+                ):
+                    raise CampaignError(
+                        f"campaign command has invalid {field}: {step['id']}"
+                    )
+
+            session = command.get("session")
+            if session is not None:
+                validate_component(session, "command session")
+
+            restore_file = command.get("restore_file")
+            if restore_file is not None:
+                restore_path = validate_state_path(
+                    restore_file, "restore file", state_dir
+                )
+                if session is not None:
+                    expected_restore = (state_dir / f"{session}.restore").resolve(
+                        strict=False
+                    )
+                    if restore_path != expected_restore:
+                        raise CampaignError(
+                            "campaign manifest restore file does not match its session"
+                        )
+
+            preserved_inputs = command.get("preserved_inputs")
+            if not isinstance(preserved_inputs, list) or not all(
+                isinstance(value, str) for value in preserved_inputs
+            ):
+                raise CampaignError(
+                    f"campaign command has invalid preserved inputs: {step['id']}"
+                )
+            for value in preserved_inputs:
+                if workspace_root is not None:
+                    validate_state_path(
+                        value, "preserved input", workspace_root
+                    )
+                else:
+                    validate_legacy_temp_path(value, "preserved input")
 
 
 def ensure_private_directory(path: Path) -> None:
@@ -115,6 +235,7 @@ def load_manifest(path: str) -> dict:
             command.setdefault("executed_preview", None)
             command.setdefault("executed_argv", None)
             command.setdefault("preserved_inputs", [])
+    validate_manifest_state(path, manifest)
     return manifest
 
 
@@ -304,7 +425,10 @@ def create_manifest(args: argparse.Namespace) -> None:
 
     workspace = getattr(args, "workspace", None)
     if workspace:
-        ensure_private_directory(Path(workspace))
+        workspace_path = validate_state_path(
+            workspace, "artifact workspace", campaign_state_dir(args.output)
+        )
+        ensure_private_directory(workspace_path)
 
     campaign_metadata = {
         "name": args.name,
@@ -435,10 +559,6 @@ def mark_running(args: argparse.Namespace) -> None:
     step["exit_code"] = None
     manifest["status"] = "running"
     write_manifest(args.manifest, manifest)
-
-
-def campaign_state_dir(manifest_path: str) -> Path:
-    return Path(f"{Path(manifest_path).expanduser().resolve(strict=False)}.state")
 
 
 def command_start(args: argparse.Namespace) -> None:

@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-TMP_DIR="$(mktemp -d /tmp/hash-cracker-smoke.XXXX)"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hash-cracker-smoke.XXXX")"
 CONFIG_PATH="$TMP_DIR/hash-cracker.conf"
 export HASH_CRACKER_CONFIG="$CONFIG_PATH"
 export SESSION_LOG_DIR="$TMP_DIR/logs"
@@ -70,6 +70,14 @@ done
 exec '$REAL_AWK' "\$@"
 EOF
 chmod +x "$EDGE_AWK_BIN/awk"
+
+FIND_FAIL_BIN="$TMP_DIR/find-failure-bin"
+mkdir -p "$FIND_FAIL_BIN"
+cat >"$FIND_FAIL_BIN/find" <<'EOF'
+#!/usr/bin/env bash
+exit 127
+EOF
+chmod +x "$FIND_FAIL_BIN/find"
 
 restore_config() {
     cat >"$CONFIG_PATH" <<EOF
@@ -237,7 +245,18 @@ assert_rc_eq 0
 run_case helper_campaign_workspace_secure_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_artifact_args() { CAMPAIGN_ARTIFACT_ARGS=(); }; python3() { case \"\${2:-}\" in validate) return 0 ;; workspace) printf '$TMP_DIR/private-workspace' ;; esac; }; ensure_private_directory() { return 1; }; if run_campaign_execute '$CAMPAIGN_WORKSPACE_COMMAND_MANIFEST' Executing; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
-run_case helper_legacy_campaign_tempfile bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=legacy; CAMPAIGN_CURRENT_STEP=step-001; CAMPAIGN_TEMP_INDEX=0; path=\$(dryrun_tempfile input); case \"\$path\" in /tmp/hash-cracker-campaign-*) exit 0 ;; *) exit 1 ;; esac"
+PORTABLE_TMP_DIR="$TMP_DIR/portable-tmp"
+mkdir -p "$PORTABLE_TMP_DIR"
+run_case helper_temporary_path bash -lc "source '$REPO_ROOT/hash-cracker.sh'; TMPDIR='$PORTABLE_TMP_DIR/'; test \"\$(temporary_path marker)\" = '$PORTABLE_TMP_DIR/marker'; test \"\$(temporary_file_template custom)\" = '$PORTABLE_TMP_DIR/hash-cracker-custom.XXXX'"
+assert_rc_eq 0
+run_case helper_temporary_path_root bash -lc "source '$REPO_ROOT/hash-cracker.sh'; TMPDIR='/'; test \"\$(temporary_path marker)\" = '/marker'"
+assert_rc_eq 0
+run_case helper_temporary_file_allocation bash -lc "source '$REPO_ROOT/hash-cracker.sh'; TMPDIR='$PORTABLE_TMP_DIR/'; DRYRUN=''; path=\$(dryrun_tempfile allocation); case \"\$path\" in '$PORTABLE_TMP_DIR'/hash-cracker-tmp.*) test -f \"\$path\" ;; *) exit 1 ;; esac; rm -f -- \"\$path\""
+assert_rc_eq 0
+INVALID_TMP_DIR="$TMP_DIR/missing-tmpdir"
+run_case helper_invalid_tmpdir bash -lc "source '$REPO_ROOT/hash-cracker.sh'; TMPDIR='$INVALID_TMP_DIR'; DRYRUN=''; if path=\$(dryrun_tempfile invalid); then exit 1; else exit 0; fi"
+assert_rc_eq 0
+run_case helper_legacy_campaign_tempfile bash -lc "source '$REPO_ROOT/hash-cracker.sh'; TMPDIR='$PORTABLE_TMP_DIR/'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=legacy; CAMPAIGN_CURRENT_STEP=step-001; CAMPAIGN_TEMP_INDEX=0; path=\$(dryrun_tempfile input); case \"\$path\" in '$PORTABLE_TMP_DIR'/hash-cracker-campaign-*) exit 0 ;; *) exit 1 ;; esac"
 assert_rc_eq 0
 
 run_case helper_campaign_command_start_noop bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=plan; campaign_command_start"
@@ -335,7 +354,7 @@ assert_rc_eq 0
 run_case helper_campaign_command_record_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; mktemp() { return 1; }; if campaign_command_record 0 preview argument; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
-run_case helper_campaign_command_record_printf_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; mktemp() { /usr/bin/mktemp \"\$@\"; }; printf() { return 1; }; if campaign_command_record 0 preview argument; then exit 1; else exit 0; fi"
+run_case helper_campaign_command_record_printf_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CAMPAIGN_MODE=execute; CAMPAIGN_MANIFEST=fixture; mktemp() { /usr/bin/mktemp \"\$@\"; }; printf() { if [ \"\${1:-}\" = '%s\\0' ]; then return 1; else builtin printf \"\$@\"; fi; }; if campaign_command_record 0 preview argument; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
 run_case helper_campaign_plan_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_jobs_for_source() { printf '1'; }; mktemp() { return 1; }; if run_campaign_plan fixture '$TMP_DIR/plan-mktemp-failure.json'; then exit 1; else exit 0; fi"
@@ -690,7 +709,7 @@ fi
 
 echo "[smoke] stats export scope all includes history entries"
 STATS_EXPORT_ALL_PATH="$TMP_DIR/stats-export-all.json"
-run_case stats_export_all bash -lc "printf '0\n' | ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_ALL_PATH\" --stats-export-scope all"
+run_case stats_export_all bash -lc "printf '0\n' | PATH='$FIND_FAIL_BIN:$PATH' ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_ALL_PATH\" --stats-export-scope all"
 assert_rc_eq 0
 if ! grep -Fq '"export_scope": "all"' "$STATS_EXPORT_ALL_PATH"; then
     fail_with_log "stats export scope all missing export_scope marker" "$STATS_EXPORT_ALL_PATH"
@@ -701,6 +720,15 @@ fi
 if ! grep -Fq '"message": "Session stats:' "$STATS_EXPORT_ALL_PATH"; then
     fail_with_log "stats export scope all missing parsed session stats message entries" "$STATS_EXPORT_ALL_PATH"
 fi
+
+SESSION_PATHS_DIR="$TMP_DIR/session-paths"
+mkdir -p "$SESSION_PATHS_DIR/session-20200104-directory.log"
+printf '[2020-01-01] first\n' >"$SESSION_PATHS_DIR/session-20200101-first.log"
+printf '[2020-01-02] second\n' >"$SESSION_PATHS_DIR/session-20200102-second.log"
+ln -s "$SESSION_PATHS_DIR/session-20200101-first.log" "$SESSION_PATHS_DIR/session-20200100-symlink.log"
+ln -s "$SESSION_PATHS_DIR/missing.log" "$SESSION_PATHS_DIR/session-20200103-broken.log"
+run_case helper_session_log_paths bash -lc "source '$REPO_ROOT/hash-cracker.sh'; output=\$(session_log_paths '$SESSION_PATHS_DIR'); case \"\$output\" in *session-20200101-first.log*session-20200102-second.log*) ;; *) exit 1 ;; esac; case \"\$output\" in *symlink*|*broken*|*directory*) exit 1 ;; esac"
+assert_rc_eq 0
 
 echo "[smoke] session logging controls are isolated and observable"
 NO_LOG_EXPORT="$TMP_DIR/no-log-stats.json"
@@ -714,9 +742,9 @@ fi
 RETENTION_LOG_DIR="$TMP_DIR/retention-logs"
 mkdir -p "$RETENTION_LOG_DIR"
 touch "$RETENTION_LOG_DIR/session-20200101-000000-1.log" "$RETENTION_LOG_DIR/session-20200102-000000-2.log"
-run_case session_log_retention bash -lc "printf '0\n' | SESSION_LOG_DIR='$RETENTION_LOG_DIR' ./hash-cracker.sh --dry-run --session-log-keep 1"
+run_case session_log_retention bash -lc "printf '0\n' | PATH='$FIND_FAIL_BIN:$PATH' SESSION_LOG_DIR='$RETENTION_LOG_DIR' ./hash-cracker.sh --dry-run --session-log-keep 1"
 assert_rc_eq 0
-if [ "$(find "$RETENTION_LOG_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc -l | tr -d '[:space:]')" -ne 1 ]; then
+if [ -e "$RETENTION_LOG_DIR/session-20200101-000000-1.log" ] || [ -e "$RETENTION_LOG_DIR/session-20200102-000000-2.log" ]; then
     fail_with_log "session log retention did not keep one log" "$LAST_LOG"
 fi
 if [ ! -L "$RETENTION_LOG_DIR/latest.log" ]; then
@@ -733,7 +761,7 @@ mkdir -p "$EXPLICIT_RETENTION_DIR"
 touch "$EXPLICIT_RETENTION_DIR/session-20200101-000000-1.log" "$EXPLICIT_RETENTION_DIR/session-20200102-000000-2.log"
 run_case explicit_session_log_retention bash -lc "printf '0\n' | SESSION_LOG_DIR='$EXPLICIT_RETENTION_DIR' SESSION_STATS_LOGFILE='$EXPLICIT_RETENTION_LOG' ./hash-cracker.sh --dry-run --session-log-keep 1"
 assert_rc_eq 0
-if [ "$(find "$EXPLICIT_RETENTION_DIR" -maxdepth 1 -type f -name 'session-*.log' | wc -l | tr -d '[:space:]')" -ne 2 ]; then
+if [ ! -f "$EXPLICIT_RETENTION_DIR/session-20200101-000000-1.log" ] || [ ! -f "$EXPLICIT_RETENTION_DIR/session-20200102-000000-2.log" ]; then
     fail_with_log "explicit session log path was unexpectedly pruned" "$LAST_LOG"
 fi
 if [ -L "$EXPLICIT_RETENTION_DIR/latest.log" ]; then
@@ -901,6 +929,11 @@ assert_rc_eq 0
 assert_contains "0. Exit"
 assert_contains "99. Session stats dashboard"
 assert_contains "Bye..."
+
+echo "[smoke] menu exits cleanly when stdin closes"
+run_case menu_eof bash -lc "timeout 2 ./hash-cracker.sh --dry-run </dev/null"
+assert_rc_eq 0
+assert_contains "Input closed. Bye..."
 
 echo "[smoke] list-jobs mode prints options and exits"
 run_case list_jobs bash -lc "./hash-cracker.sh --dry-run --list-jobs"
@@ -1842,6 +1875,36 @@ assert_contains "Optimised kernels disabled"
 assert_contains "Loopback disabled"
 assert_contains "Hardware monitoring enabled"
 assert_contains "STDOUT cracked hashes disabled"
+
+echo "[smoke] filesystem selectors work without GNU find"
+EMPTY_WORDLIST_DIR="$TMP_DIR/empty-wordlists"
+MULTI_WORDLIST_DIR="$TMP_DIR/multiple-wordlists"
+mkdir -p "$EMPTY_WORDLIST_DIR"
+mkdir -p "$MULTI_WORDLIST_DIR"
+printf 'hidden-wordlist\n' >"$MULTI_WORDLIST_DIR/.hidden-wordlist"
+cat >"$CONFIG_PATH" <<EOF
+HASHCAT=($TMP_DIR/fake-hashcat)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$MULTI_WORDLIST_DIR
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case processor_15_without_find bash -lc "printf '15\n$EMPTY_WORDLIST_DIR\n$MULTI_WORDLIST_DIR\n0\n' | PATH='$FIND_FAIL_BIN:$PATH' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Input must be a non-empty directory or an existing file, try again."
+assert_contains "Directory $MULTI_WORDLIST_DIR selected."
+assert_contains "Multiple wordlists done"
+restore_config
+
+BROKEN_WORDLIST_DIR="$TMP_DIR/broken-wordlists"
+mkdir -p "$BROKEN_WORDLIST_DIR"
+ln -s "$BROKEN_WORDLIST_DIR/missing-wordlist" "$BROKEN_WORDLIST_DIR/.broken-wordlist"
+run_case processor_15_broken_symlink_without_find bash -lc "printf '15\n$BROKEN_WORDLIST_DIR\n0\n' | PATH='$FIND_FAIL_BIN:$PATH' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Directory $BROKEN_WORDLIST_DIR selected."
+restore_config
 
 echo "[smoke] Linux and macOS dependency selectors cover fallback paths"
 PLATFORM_BIN="$TMP_DIR/platform-bin"
