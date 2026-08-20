@@ -8,6 +8,14 @@ on:
         required: false
         default: '1'
         type: string
+      require_gpu:
+        description: Require Hashcat to report a GPU backend (set to 0 for CPU OpenCL)
+        required: false
+        default: '1'
+        type: choice
+        options:
+          - '1'
+          - '0'
 
 permissions:
   contents: read
@@ -36,5 +44,5 @@ jobs:
       - name: Run real Hashcat integration
         env:
           HASHCAT_INTEGRATION_DEVICE: ${{ inputs.device }}
-          HASHCAT_INTEGRATION_REQUIRE_GPU: '1'
+          HASHCAT_INTEGRATION_REQUIRE_GPU: ${{ inputs.require_gpu }}
         run: make test-integration

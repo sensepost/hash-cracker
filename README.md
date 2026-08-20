@@ -239,17 +239,19 @@ HASHCAT_INTEGRATION_REQUIRE_GPU=1 \
 make test-integration
 ```
 
-The check creates isolated temporary inputs, runs the real Hashcat-backed
-combinator path against a known MD5 test value, and verifies the cracked result
-in a temporary potfile. It does not use the developer configuration or modify
-repository data. `HASHCAT_INTEGRATION_REQUIRE_GPU=0` permits a CPU OpenCL
-backend for local validation.
+The check creates isolated temporary inputs, runs real Hashcat-backed mask,
+wordlist/rules, hybrid, and combinator paths against known MD5 test values,
+and verifies the cracked results in a temporary potfile. It does not use the
+developer configuration or modify repository data. `HASHCAT_INTEGRATION_REQUIRE_GPU=0`
+permits a CPU OpenCL backend for local validation.
 
 The manual [Hashcat Integration workflow](.github/workflows/hashcat-integration.yml)
 targets a trusted self-hosted Linux runner with the labels `self-hosted`,
 `linux`, `x64`, and `hashcat`. It is intentionally manual-only because real
 Hashcat execution and self-hosted runners are outside the deterministic default
-CI contract.
+CI contract. The dispatch form defaults to GPU validation; selecting `0` for
+`require_gpu` validates the same cases on a CPU OpenCL backend when the runner
+provides one.
 
 ## Flags
 
