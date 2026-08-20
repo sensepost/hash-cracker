@@ -21,11 +21,11 @@ else
         status_error "Digit-removal source potfile is missing: $POTFILE"
         exit 1
     fi
-    if ! cut -d: -f2- "$POTFILE" | awk '!/^\$HEX\[/' | sed 's/[0-9]//g' >"$tmp"; then
+    if ! awk -F: '{print $NF}' "$POTFILE" | awk '!/^\$HEX\[/' | sed 's/[0-9]//g' >"$tmp"; then
         status_error "Unable to generate digit-removal candidates from the potfile."
         exit 1
     fi
-    if ! cut -d: -f2- "$POTFILE" | LC_ALL=C awk '
+    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C awk '
         function hex_digit(value) {
             return index("0123456789abcdef", tolower(value)) - 1
         }

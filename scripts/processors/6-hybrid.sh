@@ -8,7 +8,7 @@ trap 'processor_interrupt' INT TERM
 processor_bootstrap
 
 # Single or multiple wordlist
-read -p "Single or Multiple wordlist mode? S/M: " MODE
+read_prompt "Single or Multiple wordlist mode? S/M: " MODE "Unable to read the wordlist mode." || exit 1
 
 if ! processor_select_wordlist_mode "$MODE"; then
     exit 1

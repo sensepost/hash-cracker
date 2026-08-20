@@ -14,7 +14,7 @@ trap 'processor_interrupt "$tmp"' INT TERM
 trap 'processor_cleanup "$tmp"' EXIT
 
 # Logic
-read -p "Enter a word (e.g. company name): " WORD
+read_prompt "Enter a word (e.g. company name): " WORD "Unable to read the custom word." || exit 1
 if dry_run_enabled; then
     dryrun_note "would write custom word input to $tmp"
 else

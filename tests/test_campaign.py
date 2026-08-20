@@ -193,6 +193,80 @@ class CampaignContractTests(unittest.TestCase):
         with self.assertRaisesRegex(campaign.CampaignError, "generated legacy input"):
             campaign.load_manifest(str(self.manifest))
 
+        manifest["steps"][0]["commands"][0]["preserved_inputs"] = [
+            "/etc/hash-cracker-campaign-outside"
+        ]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(campaign.CampaignError, "outside the temporary root"):
+            campaign.load_manifest(str(self.manifest))
+
+    def test_negative_step_and_command_indexes_are_rejected(self) -> None:
+        campaign.create_manifest(self.create_args())
+        manifest = campaign.load_manifest(str(self.manifest))
+
+        with self.assertRaisesRegex(campaign.CampaignError, "invalid campaign step index"):
+            campaign.get_step(manifest, -1, "step-001")
+        with self.assertRaisesRegex(campaign.CampaignError, "invalid campaign command index"):
+            campaign.get_command(manifest["steps"][0], -1)
+
+    def test_resumed_command_history_is_deduplicated(self) -> None:
+        campaign.create_manifest(self.create_args())
+        first_commands = self.root / "first-commands"
+        first_commands.write_text(
+            json.dumps(
+                {
+                    "step_id": "step-001",
+                    "preview": f"{self.hashcat} --session=first",
+                    "argv": [str(self.hashcat), "--session=first", "--restore-file-path=/tmp/first"],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        campaign.update_step(
+            argparse.Namespace(
+                manifest=str(self.manifest),
+                index=0,
+                step_id="step-001",
+                state="interrupted",
+                exit_code=130,
+                duration=1,
+                commands_file=str(first_commands),
+            )
+        )
+
+        resumed_commands = self.root / "resumed-commands"
+        resumed_commands.write_text(
+            json.dumps(
+                {
+                    "step_id": "step-001",
+                    "preview": f"{self.hashcat} --session=first --restore",
+                    "argv": [
+                        str(self.hashcat),
+                        "--session=first",
+                        "--restore-file-path=/tmp/first",
+                        "--restore",
+                    ],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        campaign.update_step(
+            argparse.Namespace(
+                manifest=str(self.manifest),
+                index=0,
+                step_id="step-001",
+                state="completed",
+                exit_code=0,
+                duration=1,
+                commands_file=str(resumed_commands),
+            )
+        )
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        self.assertEqual(len(manifest["steps"][0]["executed_commands"]), 1)
+
     def test_print_workspace_supports_legacy_and_rejects_invalid_metadata(self) -> None:
         campaign.create_manifest(self.create_args())
         output = io.StringIO()

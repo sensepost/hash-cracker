@@ -25,7 +25,7 @@ if [ "$1" == '-h' ] || [ "$1" == '--help' ]; then
     echo -e "\t--execute PATH\n\t\t Execute a campaign manifest from its first incomplete step"
     echo -e "\t--resume PATH\n\t\t Resume an interrupted or failed campaign manifest"
     echo -e "\t--self-test / --doctor\n\t\t Run non-interactive dependency and configuration checks, then exit"
-    exit 1
+    exit 0
 elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "Information about the modules"
     echo "1. Brute force: A commonly known set of brute force tasks"
@@ -49,7 +49,8 @@ elif [ "$1" == '-m' ] || [ "$1" == '--module-info' ]; then
     echo "19. Will take the potfile, strip the digits from the cleartexts and perform a hybrid attack accordingly, thereafter some rules to finish the job."
     echo "20. Using the stacking58.rule with a rule stacked on top of it to create even more variation on the randomness."
     echo "21. You can specify a lenght you want to brute-force, this will use the '?a' setting so the full charspace. Incremental approach is optional."
-    exit 1
+    echo "22. Directory of word lists plain and then with buka_400k"
+    exit 0
 elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
     TYPELIST="scripts/extensions/hashtypes"
     if [ -z "$2" ]; then
@@ -57,7 +58,7 @@ elif [ "$1" == '-s' ] || [ "$1" == '--search' ]; then
         exit 1
     fi
     grep -i -- "$2" "$TYPELIST" | sort
-    exit 1
+    exit "${PIPESTATUS[0]}"
 fi
 
 # Dynamic Parameters
@@ -266,6 +267,10 @@ if [ -n "$CAMPAIGN_EXECUTE" ] && { [ -n "${PRESETMODE:-}" ] || [ -n "${JOBMODE:-
 fi
 if [ -n "$CAMPAIGN_RESUME" ] && { [ -n "${PRESETMODE:-}" ] || [ -n "${JOBMODE:-}" ]; }; then
     status_error "Use either --execute/--resume or --preset/--job, not both."
+    exit 1
+fi
+if [ "${DRYRUN:-}" = ' ' ] && { [ -n "$CAMPAIGN_EXECUTE" ] || [ -n "$CAMPAIGN_RESUME" ]; }; then
+    status_error "Use --plan for dry-run campaign previews; --dry-run cannot be combined with --execute or --resume."
     exit 1
 fi
 if [ -n "$CAMPAIGN_PLAN" ]; then

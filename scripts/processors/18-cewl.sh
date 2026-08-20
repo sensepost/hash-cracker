@@ -5,19 +5,19 @@
 trap 'processor_interrupt' INT TERM
 
 # Logic
-read -p "Please enter the full URL to spider (e.g. https://kb.offsec.nl): " URL
-read -p "Output name for the CeWL wordlist: " CEWLLIST
+read_prompt "Please enter the full URL to spider (e.g. https://kb.offsec.nl): " URL "Unable to read the CeWL URL." || exit 1
+read_prompt "Output name for the CeWL wordlist: " CEWLLIST "Unable to read the CeWL output path." || exit 1
 
-read -p "Depth to spider to (0-9): " DEPTH
-until [[ "$DEPTH" =~ ^([0-9]|[1-9][0-9])$ ]]; do
+read_prompt "Depth to spider to (0-9): " DEPTH "Unable to read the CeWL depth." || exit 1
+while ! [[ "$DEPTH" =~ ^([0-9]|[1-9][0-9])$ ]]; do
     echo "Please only use 0-99."
-    read -p "Depth to spider to (0-99): " DEPTH
+    read_prompt "Depth to spider to (0-99): " DEPTH "Unable to read the CeWL depth." || exit 1
 done
 
-read -p "Minimum word length (1-9): " LENGTH
-until [[ "$LENGTH" =~ ^([1-9]|[1-9][0-9])$ ]]; do
+read_prompt "Minimum word length (1-9): " LENGTH "Unable to read the CeWL minimum word length." || exit 1
+while ! [[ "$LENGTH" =~ ^([1-9]|[1-9][0-9])$ ]]; do
     echo "Please only use 1-99."
-    read -p "Minimum word length (1-99): " LENGTH
+    read_prompt "Minimum word length (1-99): " LENGTH "Unable to read the CeWL minimum word length." || exit 1
 done
 
 echo -e "\nCeWL is going to start, this will take some time..."

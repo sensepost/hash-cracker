@@ -34,6 +34,20 @@ function status_heading() {
     printf '%b%s%b\n' "$COLOR_CYAN" "$1" "$COLOR_RESET"
 }
 
+function read_prompt() {
+    local prompt="$1"
+    local variable="$2"
+    local failure_message="${3:-Unable to read interactive input.}"
+    local response
+
+    if ! read -r -p "$prompt" response; then
+        status_error "$failure_message"
+        return 1
+    fi
+    printf -v "$variable" '%s' "$response"
+    return 0
+}
+
 function banner_center_line() {
     local text="$1"
     local inner_width=91
@@ -53,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.10.0 "Portability Guardrails"'
+    printf '%s' 'v6.11.0 "Review Hardening"'
 }
 
 function release_label_text() {
@@ -432,6 +446,7 @@ function run_processor() {
     (
         HASHCAT_FAILURE=0
         PROCESSOR_FAILURE=0
+        START="$selected"
         set -o pipefail
         # shellcheck source=/dev/null
         source "$selected_processor"
@@ -812,7 +827,7 @@ function run_campaign_execute() {
         CAMPAIGN_WORKSPACE="$campaign_workspace"
     fi
 
-    status_heading "${action^} campaign: $manifest"
+    status_heading "$action campaign: $manifest"
     while true; do
         next_line="$(python3 scripts/campaign.py next --manifest "$manifest")"
         next_rc=$?
@@ -1036,7 +1051,7 @@ function dryrun_tempfile() {
                     "$CAMPAIGN_WORKSPACE" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
             else
                 campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
-                temporary_path "hash-cracker-campaign-${campaign_id}-${CAMPAIGN_CURRENT_STEP}-${tag}-${temp_index}"
+                mktemp "$(temporary_path "hash-cracker-campaign-${campaign_id}-${CAMPAIGN_CURRENT_STEP}-${tag}-${temp_index}.XXXX")"
             fi
             return 0
         fi
@@ -1068,7 +1083,7 @@ function count_file_bytes() {
 
 function count_potfile_unique_plaintexts() {
     if [ -f "$POTFILE" ]; then
-        awk -F: 'NF {print $NF}' "$POTFILE" | sort -u | wc -l | tr -d '[:space:]'
+        awk -F: 'NF {print $NF}' "$POTFILE" | LC_ALL=C sort -u | wc -l | tr -d '[:space:]'
     else
         echo 0
     fi
@@ -1076,7 +1091,7 @@ function count_potfile_unique_plaintexts() {
 
 function count_hashlist_unique_entries() {
     if [ -f "$HASHLIST" ]; then
-        awk 'NF {print}' "$HASHLIST" | sort -u | wc -l | tr -d '[:space:]'
+        awk 'NF {print}' "$HASHLIST" | LC_ALL=C sort -u | wc -l | tr -d '[:space:]'
     else
         echo 0
     fi
@@ -1126,6 +1141,7 @@ function update_unique_plaintexts_incremental() {
 
     if [ ! -f "$SESSION_POT_UNIQUE_CACHE" ]; then
         : >"$SESSION_POT_UNIQUE_CACHE"
+        stats_debug_note "Stats refresh mode: incremental (cache missing; cache recreated)"
     fi
 
     new_unique_lines=$(LC_ALL=C comm -13 "$SESSION_POT_UNIQUE_CACHE" "$tmp_delta" | wc -l | tr -d '[:space:]')
@@ -1164,12 +1180,34 @@ function stats_debug_note() {
 
 function json_escape() {
     local s="$1"
-    s=${s//\\/\\\\}
-    s=${s//\"/\\\"}
-    s=${s//$'\n'/\\n}
-    s=${s//$'\r'/\\r}
-    s=${s//$'\t'/\\t}
-    printf '%s' "$s"
+    local escaped=''
+    local i
+    local char
+    local code
+    local hex
+    local LC_ALL=C
+
+    for ((i = 0; i < ${#s}; i++)); do
+        char=${s:i:1}
+        case "$char" in
+            \\) escaped+='\\' ;;
+            '"') escaped+='\"' ;;
+            $'\n') escaped+='\n' ;;
+            $'\r') escaped+='\r' ;;
+            $'\t') escaped+='\t' ;;
+            *)
+                printf -v code '%d' "'$char"
+                if [ "$code" -lt 32 ]; then
+                    printf -v hex '%02x' "$code"
+                    escaped+="\\u00$hex"
+                else
+                    escaped+="$char"
+                fi
+                ;;
+        esac
+    done
+
+    printf '%s' "$escaped"
 }
 
 function ensure_parent_dir() {
@@ -1327,9 +1365,9 @@ function export_session_stats_history_json() {
                 fi
 
                 if [[ "$message" =~ ^Session\ stats:\ new\ ([+-]?[0-9]+)\ lines,\ ([+-]?[0-9]+)\ unique,\ ([+-]?[0-9]+)\ bytes\ \|\ total\ cracked\ passwords\ in\ potfile:\ ([0-9]+)\ lines\ \|\ input\ hashes:\ ([0-9]+)\ unique$ ]]; then
-                    new_lines="${BASH_REMATCH[1]}"
-                    new_unique="${BASH_REMATCH[2]}"
-                    growth_bytes="${BASH_REMATCH[3]}"
+                    new_lines="${BASH_REMATCH[1]#+}"
+                    new_unique="${BASH_REMATCH[2]#+}"
+                    growth_bytes="${BASH_REMATCH[3]#+}"
                     total_lines="${BASH_REMATCH[4]}"
                     input_unique="${BASH_REMATCH[5]}"
                     printf '\n    { "timestamp": "%s", "source": "%s", "message": "%s", "session": { "new_cracks_lines": %s, "new_unique": %s, "growth_bytes": %s }, "potfile": { "total_cracked_lines": %s }, "input_hashes": { "unique": %s } }' \
@@ -1406,7 +1444,10 @@ function export_session_stats_json() {
         return 1
     fi
 
-    tmp_path="${out_path}.tmp.$$"
+    if ! tmp_path=$(mktemp "${out_path}.XXXXXX"); then
+        status_error "Unable to allocate stats export staging file: $out_path"
+        return 1
+    fi
 
     if ! cat >"$tmp_path" <<EOF; then
 {
@@ -1767,7 +1808,7 @@ function run_single_job_mode() {
     fi
 
     case "$selected" in
-        4 | 5 | 8 | 15 | 17 | 18 | 21 | 22)
+        2 | 3 | 4 | 5 | 6 | 7 | 8 | 15 | 17 | 18 | 20 | 21 | 22)
             if [ ! -t 0 ]; then
                 status_error "Job $selected requires interactive input and cannot run in non-interactive --job mode."
                 status_heading "Use --list-jobs and choose a non-prompting job, or run interactively."

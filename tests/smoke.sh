@@ -157,6 +157,10 @@ echo "[smoke] sourceable helpers cover defensive branches"
 run_case helper_negative_duration bash -lc 'source ./hash-cracker.sh; [ "$(format_duration -1)" = "00:00:00" ]'
 assert_rc_eq 0
 
+run_case helper_read_prompt_eof bash -lc "source '$REPO_ROOT/hash-cracker.sh'; exec </dev/null; if read_prompt 'fixture prompt' VALUE 'Unable to read fixture input.'; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+assert_contains "Unable to read fixture input."
+
 HELPER_POTFILE="$TMP_DIR/helper-potfile"
 printf 'hash:first\nhash:second\nhash:first\n' >"$HELPER_POTFILE"
 run_case helper_potfile_counts bash -lc "source ./hash-cracker.sh; POTFILE='$HELPER_POTFILE'; [ \"\$(count_potfile_unique_plaintexts)\" = 2 ] && POTFILE='$TMP_DIR/missing-helper-potfile' && [ \"\$(count_potfile_unique_plaintexts)\" = 0 ]"
@@ -401,6 +405,9 @@ assert_rc_eq 0
 
 run_case helper_stats_export_cat_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATSEXPORT='$TMP_DIR/helper-cat-export.json'; SESSION_LOG_DISABLED=1; SESSION_LOG_AVAILABLE=0; SESSION_NEW_CRACKS=0; SESSION_NEW_UNIQUE=0; SESSION_GROWTH_BYTES=0; SESSION_POT_LINES_CUR=0; SESSION_POT_UNIQUE_CUR=0; SESSION_POT_BYTES_CUR=0; SESSION_HASHLIST_INPUT_UNIQUE=0; cat() { return 1; }; if export_session_stats_json; then exit 1; else test \"\$?\" -eq 1; fi"
 assert_rc_eq 0
+run_case helper_stats_export_mktemp_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATSEXPORT='$TMP_DIR/helper-mktemp-export.json'; SESSION_LOG_DISABLED=1; SESSION_LOG_AVAILABLE=0; SESSION_NEW_CRACKS=0; SESSION_NEW_UNIQUE=0; SESSION_GROWTH_BYTES=0; SESSION_POT_LINES_CUR=0; SESSION_POT_UNIQUE_CUR=0; SESSION_POT_BYTES_CUR=0; SESSION_HASHLIST_INPUT_UNIQUE=0; mktemp() { return 1; }; if export_session_stats_json; then exit 1; else test \"\$?\" -eq 1; fi"
+assert_rc_eq 0
+assert_contains "Unable to allocate stats export staging file"
 
 run_case helper_stats_export_mv_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATSEXPORT='$TMP_DIR/helper-mv-export.json'; SESSION_LOG_DISABLED=1; SESSION_LOG_AVAILABLE=0; SESSION_NEW_CRACKS=0; SESSION_NEW_UNIQUE=0; SESSION_GROWTH_BYTES=0; SESSION_POT_LINES_CUR=0; SESSION_POT_UNIQUE_CUR=0; SESSION_POT_BYTES_CUR=0; SESSION_HASHLIST_INPUT_UNIQUE=0; mv() { return 1; }; if export_session_stats_json; then exit 1; else test \"\$?\" -eq 1; fi"
 assert_rc_eq 0
@@ -457,10 +464,32 @@ run_case helper_missing_markov_helper bash -lc "source '$REPO_ROOT/hash-cracker.
 assert_rc_eq 0
 assert_contains "Option 17 requires Markov helper '$TMP_DIR/missing-markov-helper'."
 
-run_case helper_self_test_hashcat_available bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN=/bin/true; HASHLIST=/dev/null; WORDLIST=/dev/null; WORDLIST2=/dev/null; MACHINE=Linux; CEWL='$CEWL'; run_self_test >/dev/null 2>&1 || true"
+run_case helper_self_test_hashcat_available bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN=/bin/true; HASHLIST='$TMP_DIR/input'; WORDLIST='$TMP_DIR/wordlist.txt'; WORDLIST2='$TMP_DIR/wordlist2.txt'; MACHINE=Linux; CEWL='$CEWL'; check_job_dependencies() { return 0; }; run_self_test"
 assert_rc_eq 0
-run_case helper_self_test_hashcat_missing bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN='$TMP_DIR/missing-helper-hashcat'; HASHLIST=/dev/null; WORDLIST=/dev/null; WORDLIST2=/dev/null; MACHINE=Linux; CEWL='$CEWL'; run_self_test >/dev/null 2>&1 || true"
+assert_contains "Self-test passed: all checks succeeded."
+run_case helper_self_test_hashcat_missing bash -lc "source '$REPO_ROOT/hash-cracker.sh'; DRYRUN=''; HASHCAT_BIN='$TMP_DIR/missing-helper-hashcat'; HASHLIST='$TMP_DIR/input'; WORDLIST='$TMP_DIR/wordlist.txt'; WORDLIST2='$TMP_DIR/wordlist2.txt'; MACHINE=Linux; CEWL='$CEWL'; check_job_dependencies() { return 0; }; run_self_test"
+assert_rc_eq 1
+assert_contains "HASHCAT executable missing/unusable"
+assert_contains "Self-test failed: 1 issue(s) found."
+
+DIGIT_CONFIG="$TMP_DIR/digitremover.conf"
+DIGIT_POTFILE="$TMP_DIR/digitremover.pot"
+DIGIT_CAPTURE="$TMP_DIR/digitremover-candidates"
+printf 'user::domain:challenge:proof:pass123\n' >"$DIGIT_POTFILE"
+cat >"$DIGIT_CONFIG" <<EOF
+HASHCAT=$TMP_DIR/fake-hashcat
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$DIGIT_POTFILE
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+run_case digitremover_potfile_extraction bash -lc "source '$REPO_ROOT/hash-cracker.sh'; STATICCONFIG=true; CONFIGFILE='$DIGIT_CONFIG'; CAPTURE='$DIGIT_CAPTURE'; run_hashcat() { local argument; for argument in \"\$@\"; do if [ -f \"\$argument\" ] && [ \"\$argument\" != \"\$HASHLIST\" ] && [ \"\$argument\" != \"\$POTFILE\" ] && [ ! -f \"\$CAPTURE\" ]; then cat \"\$argument\" >\"\$CAPTURE\"; return 0; fi; done; return 0; }; source '$REPO_ROOT/scripts/processors/19-digitremover.sh'"
 assert_rc_eq 0
+if ! grep -Fxq 'pass' "$DIGIT_CAPTURE"; then
+    fail_with_log "digit-remover did not extract the final potfile field" "$LAST_LOG"
+fi
 
 run_case parameters_list_jobs_case bash -lc "source '$REPO_ROOT/hash-cracker.sh'; source '$REPO_ROOT/scripts/parameters.sh' --list-jobs"
 assert_rc_eq 0
@@ -469,7 +498,7 @@ assert_rc_eq 0
 
 echo "[smoke] help output includes self-test flag"
 run_case help bash -lc "./hash-cracker.sh --help"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "--self-test / --doctor"
 assert_contains "--stats-debug"
 assert_contains "--stats-export-scope [latest|all]"
@@ -573,12 +602,13 @@ assert_contains "Invalid campaign preset: nope"
 
 echo "[smoke] early informational and CLI validation modes are deterministic"
 run_case module_info bash -lc "./hash-cracker.sh --module-info"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "Information about the modules"
 assert_contains "14. Fingerprint attack"
+assert_contains "22. Directory of word lists plain and then with buka_400k"
 
 run_case search_hash_type bash -lc "./hash-cracker.sh --search ntlm"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "1000 | NTLM"
 
 run_case search_missing_value bash -lc "./hash-cracker.sh --search"
@@ -622,15 +652,15 @@ assert_rc_eq 1
 assert_contains "Invalid value for --session-log-keep. Expected a non-negative integer."
 
 run_case short_help bash -lc "./hash-cracker.sh -h"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "Usage: ./hash-cracker.sh [FLAG]"
 
 run_case short_module_info bash -lc "./hash-cracker.sh -m"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "Information about the modules"
 
 run_case short_search bash -lc "./hash-cracker.sh -s ntlm"
-assert_rc_eq 1
+assert_rc_eq 0
 assert_contains "1000 | NTLM"
 
 run_case doctor_alias bash -lc "./hash-cracker.sh --doctor --dry-run"
@@ -683,10 +713,12 @@ if [ ! -s "$STATS_EXPORT_PATH" ]; then
     fail_with_log "stats export file was not created" "$LAST_LOG"
 fi
 if ! python3 - "$STATS_EXPORT_PATH" <<'PY'; then
+import json
 import os
 import sys
 from pathlib import Path
 
+json.load(open(sys.argv[1], encoding="utf-8"))
 assert (Path(sys.argv[1]).stat().st_mode & 0o777) == 0o600
 logs = list(Path(os.environ["SESSION_LOG_DIR"]).glob("session-*.log"))
 assert logs
@@ -706,11 +738,21 @@ fi
 if ! grep -Fq '"potfile_totals"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing potfile_totals object" "$STATS_EXPORT_PATH"
 fi
+run_case helper_json_escape_controls bash -lc 'source ./hash-cracker.sh; value=$(printf "quote\\\" slash\\\\ newline\\n control\\001 cr\\r tab\\t"); escaped=$(json_escape "$value"); printf "\\\"%s\\\"" "$escaped" | python3 -c "import json,sys; json.load(sys.stdin)"'
+assert_rc_eq 0
 
 echo "[smoke] stats export scope all includes history entries"
 STATS_EXPORT_ALL_PATH="$TMP_DIR/stats-export-all.json"
 run_case stats_export_all bash -lc "printf '0\n' | PATH='$FIND_FAIL_BIN:$PATH' ./hash-cracker.sh --dry-run --stats-export \"$STATS_EXPORT_ALL_PATH\" --stats-export-scope all"
 assert_rc_eq 0
+if ! python3 - "$STATS_EXPORT_ALL_PATH" <<'PY'; then
+import json
+import sys
+
+json.load(open(sys.argv[1], encoding="utf-8"))
+PY
+    fail_with_log "stats export scope all was not valid JSON" "$STATS_EXPORT_ALL_PATH"
+fi
 if ! grep -Fq '"export_scope": "all"' "$STATS_EXPORT_ALL_PATH"; then
     fail_with_log "stats export scope all missing export_scope marker" "$STATS_EXPORT_ALL_PATH"
 fi
@@ -1061,6 +1103,21 @@ assert manifest["inputs"]["potfile"]["mutable"] is True
 assert manifest["artifacts"]
 PY
     fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
+fi
+
+CAMPAIGN_DRYRUN_SNAPSHOT="$TMP_DIR/dryrun-campaign.snapshot"
+cp "$CAMPAIGN_PATH" "$CAMPAIGN_DRYRUN_SNAPSHOT"
+run_case campaign_dryrun_execute bash -lc "./hash-cracker.sh --dry-run --execute '$CAMPAIGN_PATH'"
+assert_rc_eq 1
+assert_contains "--dry-run cannot be combined with --execute or --resume"
+if ! cmp -s "$CAMPAIGN_DRYRUN_SNAPSHOT" "$CAMPAIGN_PATH"; then
+    fail_with_log "dry-run execute validation changed the campaign manifest" "$LAST_LOG"
+fi
+run_case campaign_dryrun_resume bash -lc "./hash-cracker.sh --dry-run --resume '$CAMPAIGN_PATH'"
+assert_rc_eq 1
+assert_contains "--dry-run cannot be combined with --execute or --resume"
+if ! cmp -s "$CAMPAIGN_DRYRUN_SNAPSHOT" "$CAMPAIGN_PATH"; then
+    fail_with_log "dry-run resume validation changed the campaign manifest" "$LAST_LOG"
 fi
 
 CAMPAIGN_WORKSPACE_SYMLINK_PATH="$TMP_DIR/symlink-campaign.json"
@@ -1420,8 +1477,8 @@ run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-c
 assert_rc_eq 1
 assert_contains "Common-substring helper preprocessing failed."
 assert_not_contains "Substring processing done"
-if ! grep -Fq '"release": "v6.10.0 \"Portability Guardrails\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.10.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.11.0 \"Review Hardening\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.11.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
@@ -1438,6 +1495,19 @@ echo "[smoke] prompting --job in non-interactive mode fails clearly"
 run_case single_job_prompting bash -lc "./hash-cracker.sh --dry-run --job 8"
 assert_rc_eq 1
 assert_contains "requires interactive input and cannot run in non-interactive --job mode"
+
+for PROMPTING_JOB in 2 3 4 5 6 7 8 15 17 18 20 21 22; do
+    run_case "single_job_prompting_${PROMPTING_JOB}" bash -lc "./hash-cracker.sh --dry-run --job '$PROMPTING_JOB'"
+    assert_rc_eq 1
+    assert_contains "Job $PROMPTING_JOB requires interactive input and cannot run in non-interactive --job mode"
+done
+
+echo "[smoke] direct job 8 dispatch uses both configured wordlists"
+run_case single_job_combinator_tty script -qefc "./hash-cracker.sh --dry-run --job 8" /dev/null
+assert_rc_eq 0
+assert_contains "Wordlist 1: $TMP_DIR/wordlist.txt"
+assert_contains "Wordlist 2: $TMP_DIR/wordlist2.txt"
+assert_contains "Combinator processing done"
 
 echo "[smoke] invalid option recovers back to menu"
 run_case invalid_option bash -lc "printf '999\n0\n' | ./hash-cracker.sh --dry-run"
@@ -1768,6 +1838,10 @@ assert_rc_eq 0
 assert_contains "Not a valid hashtype number"
 assert_contains "Hashtype"
 
+run_case selector_hashtype_eof bash -lc "printf '' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashtype.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read a hashtype."
+
 run_case selector_hashlist bash -lc "printf '$TMP_DIR/input\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashlist.sh'"
 assert_rc_eq 0
 assert_contains "Hashlist $TMP_DIR/input selected."
@@ -1776,6 +1850,10 @@ run_case selector_hashlist_invalid bash -lc "printf '$TMP_DIR/no-input\n$TMP_DIR
 assert_rc_eq 0
 assert_contains "File does not exist, try again."
 assert_contains "Hashlist $TMP_DIR/input selected."
+
+run_case selector_hashlist_eof bash -lc "printf '' | bash -c 'STATICCONFIG=false; source scripts/selectors/hashlist.sh'"
+assert_rc_eq 1
+assert_contains "Unable to read a hashlist path."
 
 run_case selector_wordlist bash -lc "printf '$TMP_DIR/wordlist.txt\n' | bash -c 'STATICCONFIG=false; source scripts/selectors/wordlist.sh'"
 assert_rc_eq 0
@@ -2405,7 +2483,7 @@ assert_contains "Stats refresh mode: full recount"
 NO_CACHE_HASHCAT="$TMP_DIR/no-cache-hashcat"
 cat >"$NO_CACHE_HASHCAT" <<EOF
 #!/usr/bin/env bash
-rm -f -- /tmp/hash-cracker-unique-*.cache
+rm -f -- "\${TMPDIR:-/tmp}/hash-cracker-unique."*
 printf 'hash:cache-rebuild\n' >>"$TMP_DIR/hash-cracker.pot"
 EOF
 chmod +x "$NO_CACHE_HASHCAT"
@@ -2422,6 +2500,7 @@ EOF
 run_case stats_missing_cache bash -lc "./hash-cracker.sh --stats-debug --job 1"
 assert_rc_eq 0
 assert_contains "Stats refresh mode: incremental"
+assert_contains "cache missing; cache recreated"
 
 ROTATING_HASHCAT="$TMP_DIR/rotating-hashcat"
 cat >"$ROTATING_HASHCAT" <<EOF
@@ -2465,14 +2544,27 @@ MALFORMED_LOG_DIR="$TMP_DIR/malformed-logs"
 mkdir -p "$MALFORMED_LOG_DIR"
 printf 'unbracketed history line\n[2020-01-01 00:00:00+0000] ordinary history line\n' \
     >"$MALFORMED_LOG_DIR/session-20200101-000000-1.log"
+printf 'control " slash \\ raw\001 tab\t cr\r\n' \
+    >>"$MALFORMED_LOG_DIR/session-20200101-000000-1.log"
 MALFORMED_EXPORT="$TMP_DIR/malformed-history.json"
 run_case malformed_history_export bash -lc "printf '0\n' | SESSION_LOG_DIR='$MALFORMED_LOG_DIR' ./hash-cracker.sh --dry-run --no-session-log --stats-export '$MALFORMED_EXPORT' --stats-export-scope all"
 assert_rc_eq 0
+if ! python3 - "$MALFORMED_EXPORT" <<'PY'; then
+import json
+import sys
+
+json.load(open(sys.argv[1], encoding="utf-8"))
+PY
+    fail_with_log "malformed history export was not valid JSON" "$MALFORMED_EXPORT"
+fi
 if ! grep -Fq 'unbracketed history line' "$MALFORMED_EXPORT"; then
     fail_with_log "stats export omitted malformed history entries" "$MALFORMED_EXPORT"
 fi
 if ! grep -Fq 'ordinary history line' "$MALFORMED_EXPORT"; then
     fail_with_log "stats export omitted rotated log entries" "$MALFORMED_EXPORT"
+fi
+if ! grep -Fq 'control \" slash \\ raw' "$MALFORMED_EXPORT"; then
+    fail_with_log "stats export omitted control-character history entries" "$MALFORMED_EXPORT"
 fi
 
 restore_config

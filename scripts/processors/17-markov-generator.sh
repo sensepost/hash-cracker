@@ -32,8 +32,8 @@ while true; do
     echo -e "Try again...\n"
 done
 
-read -p "Minimum password (length) character limit: " NGRAM
-read -p "Amount of passwords to create: " AMOUNT
+read_prompt "Minimum password (length) character limit: " NGRAM "Unable to read the Markov minimum length." || exit 1
+read_prompt "Amount of passwords to create: " AMOUNT "Unable to read the Markov password amount." || exit 1
 
 if dry_run_enabled; then
     dryrun_note "would extract unique source words from $LIST into $tmp"
@@ -43,20 +43,13 @@ if dry_run_enabled; then
         dryrun_note "would run mkpass-linux with ngram=$NGRAM amount=$AMOUNT into $tmp2"
     fi
 else
-    if ! cat "$LIST" | awk -F: '{print $NF}' | sort -u | tee "$tmp" &>/dev/null; then
+    if ! cat "$LIST" | awk -F: '{print $NF}' | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
         status_error "Markov source extraction failed."
         exit 1
     fi
-    if [ "$MACHINE" == "Mac" ]; then
-        if ! "$mkpass_bin" -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null; then
-            status_error "Markov helper failed."
-            exit 1
-        fi
-    else
-        if ! "$mkpass_bin" -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null; then
-            status_error "Markov helper failed."
-            exit 1
-        fi
+    if ! "$mkpass_bin" -infile "$tmp" -ngram "$NGRAM" -m "$AMOUNT" | tee "$tmp2" &>/dev/null; then
+        status_error "Markov helper failed."
+        exit 1
     fi
     processor_require_file "$tmp2" "Markov output" || exit 1
     rm -f -- "$tmp"
