@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v6.12.0 - Real Integration
+
+### Added
+
+- Expanded the opt-in real Hashcat integration check to cover mask,
+  wordlist/rules, hybrid, and combinator attack paths, with a manual CPU
+  OpenCL option.
+
 ## v6.11.0 - Review Hardening
 
 ### Fixed

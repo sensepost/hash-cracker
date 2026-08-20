@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.11.0 "Review Hardening"'
+    printf '%s' 'v6.12.0 "Real Integration"'
 }
 
 function release_label_text() {
