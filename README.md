@@ -217,7 +217,7 @@ Run the smoke suite with Bash coverage (requires `python3`):
 make coverage
 ```
 
-The report is written to `coverage/` and includes HTML and JSON output, including executable-line and function coverage. Coverage uses Bash’s execution trace so nested `bash -lc` test cases and sourced processor scripts are attributed to the application files. The measured line set excludes shell-only syntax, here-document data, and embedded `awk` source that Bash cannot execute or trace as Bash lines. On the first CI run, `coverage/coverage-baseline-candidate.txt` records the measured baseline. To enforce that baseline locally, copy that value to `coverage-baseline.txt`; subsequent coverage runs fail if executable-line coverage decreases.
+The report is written to `coverage/` and includes HTML and JSON output, including executable-line and function coverage. Coverage uses Bash’s execution trace so nested `bash -lc` test cases and sourced processor scripts are attributed to the application files. The measured application scope excludes bundled wordlists, rules, and third-party helper binaries; it also excludes shell-only syntax, here-document data, and embedded `awk` source that Bash cannot execute or trace as Bash lines. The committed `coverage-baseline.txt` and `function-coverage-baseline.txt` files establish the measured line and function baselines. If either baseline is missing, the run writes a candidate under `coverage/`; otherwise, subsequent coverage runs fail if either metric decreases.
 
 Python campaign coverage is measured separately with:
 

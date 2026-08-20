@@ -14,13 +14,9 @@ trap 'processor_cleanup "$tmp" "$tmp2" "$tmp3"' EXIT
 # Logic
 if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
-    if [ "$MACHINE" == "Mac" ]; then
-        dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
-    else
-        dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
-    fi
+    dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
 else
-    if ! cat "$POTFILE" | awk -F: '{print $NF}' | sort -u | tee "$tmp" &>/dev/null; then
+    if ! cat "$POTFILE" | awk -F: '{print $NF}' | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
         status_error "PACK mask plaintext extraction failed."
         exit 1
     fi

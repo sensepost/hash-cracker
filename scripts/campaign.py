@@ -79,6 +79,8 @@ def validate_legacy_temp_path(value: object, label: str) -> Path:
     ):
         raise CampaignError(f"campaign manifest {label} is not a generated legacy input")
     resolved = candidate.resolve(strict=False)
+    if not path_within(resolved, Path(tempfile.gettempdir())):
+        raise CampaignError(f"campaign manifest {label} is outside the temporary root")
     if resolved.exists():
         try:
             metadata = resolved.stat()
@@ -202,6 +204,9 @@ def load_manifest(path: str) -> dict:
         )
     if not isinstance(manifest.get("steps"), list) or not manifest["steps"]:
         raise CampaignError("campaign manifest has no steps")
+    for field in ("inputs", "runtime"):
+        if not isinstance(manifest.get(field), dict):
+            raise CampaignError(f"campaign manifest has invalid {field}")
     campaign = manifest.setdefault("campaign", {})
     if not isinstance(campaign, dict):
         raise CampaignError("campaign manifest has invalid campaign metadata")
@@ -216,9 +221,14 @@ def load_manifest(path: str) -> dict:
             if field not in step:
                 raise CampaignError(f"campaign step is missing '{field}'")
         step.setdefault("commands", [])
+        step.setdefault("executed_commands", [])
         step.setdefault("current_command", None)
         if not isinstance(step["commands"], list):
             raise CampaignError(f"campaign step has invalid commands: {step['id']}")
+        if not isinstance(step["executed_commands"], list):
+            raise CampaignError(
+                f"campaign step has invalid executed commands: {step['id']}"
+            )
         for command in step["commands"]:
             if not isinstance(command, dict):
                 raise CampaignError(
@@ -349,6 +359,20 @@ def read_commands(path: str) -> dict[str, list[dict]]:
             raise CampaignError(f"invalid campaign command record: {raw_line}") from error
         commands.setdefault(step_id, []).append(command_record(preview))
     return commands
+
+
+def command_history_key(command: dict) -> tuple:
+    argv = command.get("argv")
+    if isinstance(argv, list) and all(isinstance(value, str) for value in argv):
+        stable_argv = tuple(
+            value
+            for value in argv
+            if value != "--restore"
+            and not value.startswith("--session=")
+            and not value.startswith("--restore-file-path=")
+        )
+        return ("argv", stable_argv)
+    return ("preview", command.get("preview"))
 
 
 def input_metadata(args: argparse.Namespace) -> dict:
@@ -538,15 +562,26 @@ def next_step(args: argparse.Namespace) -> int:
 
 
 def get_step(manifest: dict, index: int, step_id: str) -> dict:
-    try:
-        step = manifest["steps"][index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(f"invalid campaign step index: {index}") from error
+    if not isinstance(index, int) or index < 0 or index >= len(manifest["steps"]):
+        raise CampaignError(f"invalid campaign step index: {index}")
+    step = manifest["steps"][index]
     if step["id"] != step_id:
         raise CampaignError(
             f"campaign step mismatch: expected {step['id']}, got {step_id}"
         )
     return step
+
+
+def get_command(step: dict, command_index: int) -> dict:
+    commands = step.get("commands")
+    if (
+        not isinstance(command_index, int)
+        or command_index < 0
+        or not isinstance(commands, list)
+        or command_index >= len(commands)
+    ):
+        raise CampaignError(f"invalid campaign command index: {command_index}")
+    return commands[command_index]
 
 
 def mark_running(args: argparse.Namespace) -> None:
@@ -566,12 +601,7 @@ def command_start(args: argparse.Namespace) -> None:
     step = get_step(manifest, args.index, args.step_id)
     state_dir = campaign_state_dir(args.manifest)
     ensure_private_directory(state_dir)
-    try:
-        command = step["commands"][args.command_index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(
-            f"invalid campaign command index: {args.command_index}"
-        ) from error
+    command = get_command(step, args.command_index)
 
     for previous in step["commands"][: args.command_index]:
         if previous.get("state") not in ("completed", "failed"):
@@ -629,12 +659,7 @@ def command_start(args: argparse.Namespace) -> None:
 def record_command(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
-    try:
-        command = step["commands"][args.command_index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(
-            f"invalid campaign command index: {args.command_index}"
-        ) from error
+    command = get_command(step, args.command_index)
     if getattr(args, "argv_file", None):
         try:
             raw_args = Path(args.argv_file).read_bytes()
@@ -678,12 +703,7 @@ def record_command(args: argparse.Namespace) -> None:
 def preserve_command_inputs(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
-    try:
-        command = step["commands"][args.command_index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(
-            f"invalid campaign command index: {args.command_index}"
-        ) from error
+    command = get_command(step, args.command_index)
     preserved = command.setdefault("preserved_inputs", [])
     for value in args.path:
         if Path(value).is_file() and value not in preserved:
@@ -696,12 +716,7 @@ def command_finish(args: argparse.Namespace) -> None:
     step = get_step(manifest, args.index, args.step_id)
     state_dir = campaign_state_dir(args.manifest)
     ensure_private_directory(state_dir)
-    try:
-        command = step["commands"][args.command_index]
-    except (IndexError, TypeError) as error:
-        raise CampaignError(
-            f"invalid campaign command index: {args.command_index}"
-        ) from error
+    command = get_command(step, args.command_index)
     if command.get("state") == "completed":
         return
     command["state"] = args.state
@@ -730,7 +745,14 @@ def update_step(args: argparse.Namespace) -> None:
     step["duration_seconds"] = args.duration
     step["finished_at"] = timestamp()
     if args.commands_file and Path(args.commands_file).is_file():
-        step["executed_commands"].extend(read_commands(args.commands_file).get(step["id"], []))
+        existing = step.setdefault("executed_commands", [])
+        for command in read_commands(args.commands_file).get(step["id"], []):
+            command_key = command_history_key(command)
+            if not any(
+                command_history_key(record) == command_key
+                for record in existing
+            ):
+                existing.append(command)
 
     if args.state == "completed":
         manifest["status"] = (
@@ -859,15 +881,7 @@ def main() -> int:
     args = parser().parse_args()
     try:
         result = args.handler(args)
-    except (
-        CampaignError,
-        OSError,
-        UnicodeError,
-        ValueError,
-        KeyError,
-        TypeError,
-        AttributeError,
-    ) as error:
+    except (CampaignError, OSError, UnicodeError) as error:
         print(f"campaign: {error}", file=sys.stderr)
         return 1
     return result if isinstance(result, int) else 0

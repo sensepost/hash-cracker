@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## v6.11.0 - Review Hardening
+
+### Fixed
+
+- Corrected direct combinator dispatch and made interactive processor prompts
+  fail clearly when standard input closes.
+- Rejected unsafe dry-run campaign execution, invalid campaign indexes, and
+  legacy preserved-input paths outside the temporary root.
+- Made campaign command history resume-safe, deterministic, and resistant to
+  duplicate records.
+- Fixed digit-remover potfile extraction for salted and multi-field entries.
+- Made stats JSON valid for signed deltas, control characters, and all-history
+  exports; staging is now symlink-safe.
+- Standardized locale-sensitive sorting and removed an unused search helper.
+
+### Added
+
+- Added focused smoke and campaign tests for CLI controls, dependency and
+  self-test outcomes, stats exports, potfile rotation, and all 22 processors.
+- Added a committed Bash function-coverage baseline alongside the executable
+  line-coverage baseline.
+
 ## v6.10.0 - Portability Guardrails
 
 ### Fixed

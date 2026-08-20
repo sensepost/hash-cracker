@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COVERAGE_DIR="${COVERAGE_DIR:-$REPO_ROOT/coverage}"
 BASELINE_FILE="${COVERAGE_BASELINE_FILE:-$REPO_ROOT/coverage-baseline.txt}"
+FUNCTION_BASELINE_FILE="${COVERAGE_FUNCTION_BASELINE_FILE:-$REPO_ROOT/function-coverage-baseline.txt}"
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "python3 is required for Bash coverage reporting." >&2
@@ -33,7 +34,7 @@ HASH_CRACKER_TRACE_FILE="$TRACE_FILE" \
     BASH_ENV="$TRACE_INIT" \
     bash "$REPO_ROOT/tests/smoke.sh"
 
-python3 - "$REPO_ROOT" "$TRACE_FILE" "$COVERAGE_DIR" "$BASELINE_FILE" <<'PY'
+python3 - "$REPO_ROOT" "$TRACE_FILE" "$COVERAGE_DIR" "$BASELINE_FILE" "$FUNCTION_BASELINE_FILE" <<'PY'
 import datetime as dt
 import html
 import json
@@ -329,14 +330,52 @@ print(f"Bash executable-line coverage: {percent:.2f}%")
 print(f"Bash function coverage: {function_percent:.2f}%")
 print(f"Coverage report: {output_dir}")
 
-if baseline_path.is_file() and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", baseline_path.read_text().strip()):
-    baseline = float(baseline_path.read_text().strip())
-    reported_percent = float(f"{percent:.2f}")
-    if reported_percent < baseline:
-        print(f"Coverage regressed: {percent:.2f}% < baseline {baseline:.2f}%", file=sys.stderr)
-        raise SystemExit(1)
-    print(f"Coverage baseline satisfied: {baseline:.2f}%")
-else:
+def read_baseline(path):
+    if not path.is_file():
+        return None
+    value = path.read_text().strip()
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
+        return None
+    return float(value)
+
+
+baseline = read_baseline(baseline_path)
+function_baseline_path = Path(sys.argv[5])
+function_baseline = read_baseline(function_baseline_path)
+line_regressed = False
+function_regressed = False
+
+if baseline is None:
     (output_dir / "coverage-baseline-candidate.txt").write_text(f"{percent:.2f}\n")
     print(f"No committed coverage baseline found; candidate written to {output_dir}/coverage-baseline-candidate.txt")
+else:
+    reported_percent = float(f"{percent:.2f}")
+    line_regressed = reported_percent < baseline
+    if line_regressed:
+        print(f"Coverage regressed: {percent:.2f}% < baseline {baseline:.2f}%", file=sys.stderr)
+    else:
+        print(f"Coverage baseline satisfied: {baseline:.2f}%")
+
+if function_baseline is None:
+    (output_dir / "function-coverage-baseline-candidate.txt").write_text(
+        f"{function_percent:.2f}\n"
+    )
+    print(
+        "No committed function coverage baseline found; candidate written to "
+        f"{output_dir}/function-coverage-baseline-candidate.txt"
+    )
+else:
+    reported_function_percent = float(f"{function_percent:.2f}")
+    function_regressed = reported_function_percent < function_baseline
+    if function_regressed:
+        print(
+            f"Function coverage regressed: {function_percent:.2f}% < "
+            f"baseline {function_baseline:.2f}%",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Function coverage baseline satisfied: {function_baseline:.2f}%")
+
+if line_regressed or function_regressed:
+    raise SystemExit(1)
 PY

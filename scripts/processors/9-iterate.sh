@@ -17,7 +17,7 @@ trap 'processor_cleanup "$tmp"' EXIT
 if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
 else
-    if ! awk -F: '{print $NF}' "$POTFILE" | sort -u >"$tmp"; then
+    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
         status_error "Iteration plaintext extraction failed."
         exit 1
     fi

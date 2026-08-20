@@ -24,7 +24,7 @@ if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
     dryrun_note "would generate fingerprint fragments up to $fingerprint_segment_max chars, producing combinator candidates up to $fingerprint_candidate_max chars"
 else
-    if ! awk -F: '{print $NF}' "$POTFILE" | sort -u >"$tmp"; then
+    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
         status_error "Fingerprint plaintext extraction failed."
         exit 1
     fi
@@ -51,7 +51,7 @@ else
                 }
             }
         }
-    ' "$tmp" | sort -u >"$tmp2" && rm -f -- "$tmp"; then
+    ' "$tmp" | LC_ALL=C sort -u >"$tmp2" && rm -f -- "$tmp"; then
         status_error "Fingerprint generation failed."
         exit 1
     fi
