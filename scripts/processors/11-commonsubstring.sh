@@ -20,6 +20,10 @@ if dry_run_enabled; then
     else
         dryrun_note "would run common-substr-linux generation into $tmp4"
     fi
+elif campaign_reuse_preserved_inputs "$tmp4"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! awk -F: '{print $NF}' "$POTFILE" >"$tmp2"; then
         status_error "Common-substring plaintext extraction failed."
@@ -37,7 +41,4 @@ else
 fi
 
 hashcat_base -a1 "$tmp4" "$tmp4"
-if ! dry_run_enabled; then
-    rm -f -- "$tmp4"
-fi
 echo -e "\nSubstring processing done\n"

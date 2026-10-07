@@ -16,6 +16,10 @@ trap 'processor_cleanup "$tmp"' EXIT
 # Digitfilter
 if dry_run_enabled; then
     dryrun_note "would generate digit-stripped candidate list from $POTFILE into $tmp"
+elif campaign_reuse_preserved_inputs "$tmp"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if [ ! -f "$POTFILE" ]; then
         status_error "Digit-removal source potfile is missing: $POTFILE"
@@ -65,7 +69,4 @@ hashcat_base -a6 "$tmp" '?a?a' --increment
 for RULE in "${RULELIST[@]}"; do
     hashcat_base "$tmp" -r "$RULE"
 done
-if ! dry_run_enabled; then
-    rm -f -- "$tmp"
-fi
 echo -e "\nDigit removal / Hybrid processing done\n"

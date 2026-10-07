@@ -15,6 +15,10 @@ trap 'processor_cleanup "$tmp" "$tmp2" "$tmp3"' EXIT
 if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
     dryrun_note "would run python3 statsgen/maskgen to produce $tmp3"
+elif campaign_reuse_preserved_inputs "$tmp3"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! cat "$POTFILE" | awk -F: '{print $NF}' | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
         status_error "PACK mask plaintext extraction failed."
@@ -43,7 +47,4 @@ else
 fi
 
 hashcat_base -a 3 "$tmp3"
-if ! dry_run_enabled; then
-    rm -f -- "$tmp" "$tmp2" "$tmp3"
-fi
 echo -e "\nPACK mask processing done\n"

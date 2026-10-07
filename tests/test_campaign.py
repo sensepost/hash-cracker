@@ -9,7 +9,10 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -79,6 +82,7 @@ class CampaignContractTests(unittest.TestCase):
             loopback=" ",
             hwmon=" ",
             showcracked=" ",
+            fingerprint_segment_max="8",
             artifact=[str(self.artifact)],
         )
 
@@ -91,6 +95,68 @@ class CampaignContractTests(unittest.TestCase):
         artifacts = {item["path"]: item["sha256"] for item in manifest["artifacts"]}
         expected_digest = hashlib.sha256(self.artifact.read_bytes()).hexdigest()
         self.assertEqual(artifacts[str(self.artifact.resolve())], expected_digest)
+
+    def test_manifest_records_rule_artifact_fingerprints(self) -> None:
+        rule = self.root / "rules" / "fixture.rule"
+        rule.parent.mkdir()
+        rule.write_text("$1\n", encoding="utf-8")
+        args = self.create_args()
+        args.artifact.append(str(rule))
+
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        artifacts = {item["path"]: item["sha256"] for item in manifest["artifacts"]}
+        self.assertEqual(artifacts[str(rule.resolve())], campaign.file_fingerprint(str(rule)))
+
+    def test_validation_rejects_changed_rule_artifact(self) -> None:
+        rule = self.root / "rules" / "fixture.rule"
+        rule.parent.mkdir()
+        rule.write_text("$1\n", encoding="utf-8")
+        args = self.create_args()
+        args.artifact.append(str(rule))
+        campaign.create_manifest(args)
+
+        rule.write_text("$2\n", encoding="utf-8")
+        with self.assertRaisesRegex(campaign.CampaignError, "campaign artifact changed"):
+            campaign.validate_manifest(
+                argparse.Namespace(**vars(args), manifest=str(self.manifest))
+            )
+
+    def test_manifest_records_fingerprint_runtime_setting(self) -> None:
+        args = self.create_args()
+        campaign.create_manifest(args)
+
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["runtime"]["fingerprint_segment_max"], "8")
+
+        args.manifest = str(self.manifest)
+        args.fingerprint_segment_max = "1"
+        with self.assertRaisesRegex(campaign.CampaignError, "fingerprint_segment_max"):
+            campaign.validate_manifest(args)
+
+    def test_validation_allows_legacy_missing_fingerprint_setting(self) -> None:
+        args = self.create_args()
+        campaign.create_manifest(args)
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        del manifest["runtime"]["fingerprint_segment_max"]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        campaign.validate_manifest(
+            argparse.Namespace(**vars(args), manifest=str(self.manifest))
+        )
+
+    def test_validation_rejects_missing_existing_runtime_field(self) -> None:
+        args = self.create_args()
+        campaign.create_manifest(args)
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        del manifest["runtime"]["kernel"]
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(campaign.CampaignError, "runtime changed for kernel"):
+            campaign.validate_manifest(
+                argparse.Namespace(**vars(args), manifest=str(self.manifest))
+            )
 
     def test_manifest_records_private_workspace(self) -> None:
         args = self.create_args()
@@ -121,6 +187,105 @@ class CampaignContractTests(unittest.TestCase):
         file_path.write_text("not a directory\n", encoding="utf-8")
         with self.assertRaises(campaign.CampaignError):
             campaign.ensure_private_directory(file_path)
+
+    def test_campaign_lock_refuses_competitor_and_releases(self) -> None:
+        args = self.create_args()
+        args.workspace = str(Path(f"{self.manifest}.state") / "workspace")
+        campaign.create_manifest(args)
+        state_dir = Path(f"{self.manifest}.state")
+        ready = state_dir / "first.ready"
+        release = state_dir / "first.release"
+
+        def lock_command(
+            manifest_path: Path,
+            ready_path: Path,
+            release_path: Path,
+            owner_pid: int | None = None,
+        ) -> list[str]:
+            return [
+                "python3",
+                str(CAMPAIGN_PATH),
+                "lock-hold",
+                "--manifest",
+                str(manifest_path),
+                "--ready",
+                str(ready_path),
+                "--release",
+                str(release_path),
+                "--owner",
+                str(owner_pid or os.getpid()),
+            ]
+
+        owner = subprocess.Popen(lock_command(self.manifest, ready, release))
+        try:
+            deadline = time.monotonic() + 5
+            while not ready.is_file() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(ready.is_file(), "campaign lock owner did not report readiness")
+            self.assertEqual(ready.read_text(encoding="utf-8").strip(), "acquired")
+
+            other_manifest = self.root / "other-campaign.json"
+            other_args = self.create_args(output=other_manifest)
+            other_args.workspace = str(Path(f"{other_manifest}.state") / "workspace")
+            campaign.create_manifest(other_args)
+            other_state_dir = Path(f"{other_manifest}.state")
+            other_ready = other_state_dir / "other.ready"
+            other_release = other_state_dir / "other.release"
+            other_owner = subprocess.Popen(
+                lock_command(other_manifest, other_ready, other_release)
+            )
+            try:
+                deadline = time.monotonic() + 5
+                while not other_ready.is_file() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(other_ready.is_file(), "distinct campaign lock was blocked")
+                self.assertEqual(
+                    other_ready.read_text(encoding="utf-8").strip(), "acquired"
+                )
+            finally:
+                other_release.touch()
+                other_owner.wait(timeout=5)
+            self.assertEqual(other_owner.returncode, 0)
+
+            competitor_ready = state_dir / "second.ready"
+            competitor = subprocess.run(
+                lock_command(
+                    self.manifest, competitor_ready, state_dir / "second.release"
+                ),
+                check=False,
+            )
+            self.assertEqual(competitor.returncode, 1)
+            self.assertEqual(competitor_ready.read_text(encoding="utf-8").strip(), "busy")
+        finally:
+            release.touch()
+            owner.wait(timeout=5)
+        self.assertEqual(owner.returncode, 0)
+
+        ready.unlink()
+        release.unlink()
+        stale_ready = state_dir / "stale.ready"
+        stale_release = state_dir / "stale.release"
+        stale = subprocess.run(
+            lock_command(self.manifest, stale_ready, stale_release, 2**31 - 1),
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(stale.returncode, 0)
+        self.assertEqual(stale_ready.read_text(encoding="utf-8").strip(), "acquired")
+        stale_ready.unlink()
+
+        reacquired = subprocess.Popen(lock_command(self.manifest, ready, release))
+        try:
+            deadline = time.monotonic() + 5
+            while not ready.is_file() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(ready.is_file(), "campaign lock was not reacquired")
+            self.assertEqual(ready.read_text(encoding="utf-8").strip(), "acquired")
+        finally:
+            release.touch()
+            reacquired.wait(timeout=5)
+        self.assertEqual(reacquired.returncode, 0)
+        self.assertEqual(ready.read_text(encoding="utf-8").strip(), "acquired")
 
     def test_manifest_rejects_workspace_escape(self) -> None:
         args = self.create_args()

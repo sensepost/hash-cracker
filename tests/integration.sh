@@ -136,6 +136,24 @@ set_hash_case "$HASH"
 run_hash_cracker wordlist-rules $'S\n' "$WORDLIST_COMMAND"
 assert_cracked wordlist-rules "$HASH" password
 
+NO_MATCH_HASH='15f5435928a7b9d8cdec668bb8e26851'
+set_hash_case "$NO_MATCH_HASH"
+run_hash_cracker wordlist-rules-exhausted $'S\n' "$WORDLIST_COMMAND"
+if ! grep -Fq 'Hashcat attack exhausted its candidates.' "$TMP_DIR/wordlist-rules-exhausted.log"; then
+    echo "[integration] no-match Hashcat exhaustion was not reported as a completed search." >&2
+    cat "$TMP_DIR/wordlist-rules-exhausted.log" >&2
+    exit 1
+fi
+if ! grep -Fq 'Job 2 (Light rules) completed in ' "$TMP_DIR/wordlist-rules-exhausted.log"; then
+    echo "[integration] no-match wordlist job did not complete normally." >&2
+    cat "$TMP_DIR/wordlist-rules-exhausted.log" >&2
+    exit 1
+fi
+if grep -Fxq "${NO_MATCH_HASH}:password" "$POTFILE"; then
+    echo "[integration] no-match fixture unexpectedly appeared in the potfile." >&2
+    exit 1
+fi
+
 printf -v MASK_COMMAND 'env HOME=%q HASH_CRACKER_CONFIG=%q SESSION_LOG_DIR=%q NO_COLOR=1 ./hash-cracker.sh --job 21' \
     "$TMP_DIR/home" "$CONFIG_PATH" "$LOG_DIR"
 set_hash_case "$MASK_HASH"

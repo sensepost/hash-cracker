@@ -23,6 +23,10 @@ trap 'processor_cleanup "$tmp" "$tmp2"' EXIT
 if dry_run_enabled; then
     dryrun_note "would extract unique plaintexts from $POTFILE to $tmp"
     dryrun_note "would generate fingerprint fragments up to $fingerprint_segment_max chars, producing combinator candidates up to $fingerprint_candidate_max chars"
+elif campaign_reuse_preserved_inputs "$tmp2"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
         status_error "Fingerprint plaintext extraction failed."
@@ -59,7 +63,4 @@ else
 fi
 
 hashcat_base -a 1 "$tmp2" "$tmp2"
-if ! dry_run_enabled; then
-    rm -f -- "$tmp2"
-fi
 echo -e "\nFingerprint attack done\n"
