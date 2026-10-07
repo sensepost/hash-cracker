@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -13,6 +14,7 @@ import shlex
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -394,7 +396,7 @@ def input_metadata(args: argparse.Namespace) -> dict:
 
 
 def runtime_metadata(args: argparse.Namespace) -> dict:
-    return {
+    runtime = {
         "hashcat": args.hashcat,
         "hashtype": args.hashtype,
         "machine": args.machine,
@@ -403,6 +405,10 @@ def runtime_metadata(args: argparse.Namespace) -> dict:
         "hwmon": args.hwmon,
         "showcracked": args.showcracked,
     }
+    fingerprint_segment_max = getattr(args, "fingerprint_segment_max", None)
+    if fingerprint_segment_max is not None:
+        runtime["fingerprint_segment_max"] = fingerprint_segment_max
+    return runtime
 
 
 def artifact_metadata(paths: list[str]) -> list[dict[str, str]]:
@@ -542,6 +548,8 @@ def validate_manifest(args: argparse.Namespace) -> None:
             )
     expected_runtime = manifest.get("runtime", {})
     for name, current_value in runtime_metadata(args).items():
+        if name == "fingerprint_segment_max" and name not in expected_runtime:
+            continue
         if expected_runtime.get(name) != current_value:
             raise CampaignError(
                 f"campaign runtime changed for {name}: "
@@ -623,9 +631,6 @@ def command_start(args: argparse.Namespace) -> None:
             Path(
                 campaign_state_dir(args.manifest) / f"{command['session']}.argv"
             ).unlink(missing_ok=True)
-        for preserved in command.get("preserved_inputs", []):
-            Path(preserved).unlink(missing_ok=True)
-        command["preserved_inputs"] = []
         command["attempts"] = int(command.get("attempts", 0)) + 1
         command["session"] = (
             f"{manifest['campaign']['session_prefix']}-"
@@ -728,10 +733,6 @@ def command_finish(args: argparse.Namespace) -> None:
     if args.state == "completed" and command.get("session"):
         Path(state_dir / f"{command['session']}.argv").unlink(missing_ok=True)
     if args.state == "completed":
-        for preserved in command.get("preserved_inputs", []):
-            Path(preserved).unlink(missing_ok=True)
-        command["preserved_inputs"] = []
-    if args.state == "completed":
         step["current_command"] = None
     write_manifest(args.manifest, manifest)
 
@@ -755,6 +756,19 @@ def update_step(args: argparse.Namespace) -> None:
                 existing.append(command)
 
     if args.state == "completed":
+        preserved_inputs = {
+            value
+            for command in step.get("commands", [])
+            for value in command.get("preserved_inputs", [])
+        }
+        workspace_value = manifest.get("campaign", {}).get("workspace")
+        workspace_root = (
+            Path(workspace_value).resolve(strict=False)
+            if isinstance(workspace_value, str)
+            else None
+        )
+        for command in step.get("commands", []):
+            command["preserved_inputs"] = []
         manifest["status"] = (
             "completed"
             if all(item.get("state") == "completed" for item in manifest["steps"])
@@ -765,6 +779,85 @@ def update_step(args: argparse.Namespace) -> None:
     else:
         manifest["status"] = "failed"
     write_manifest(args.manifest, manifest)
+    if args.state == "completed":
+        removable_directories = set()
+        for value in preserved_inputs:
+            path = Path(value)
+            path.unlink(missing_ok=True)
+            if workspace_root is not None and path_within(path.parent, workspace_root):
+                parent = path.parent.resolve(strict=False)
+                while parent != workspace_root and path_within(parent, workspace_root):
+                    removable_directories.add(parent)
+                    parent = parent.parent
+        for directory in sorted(
+            removable_directories, key=lambda item: len(item.parts), reverse=True
+        ):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+
+
+def path_is_preserved(args: argparse.Namespace) -> int:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    if any(
+        args.path in command.get("preserved_inputs", [])
+        for command in step.get("commands", [])
+    ):
+        return 0
+    return 1
+
+
+def input_is_preserved(args: argparse.Namespace) -> int:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    command_index = step.get("current_command")
+    commands = step.get("commands", [])
+    if (
+        isinstance(command_index, int)
+        and 0 <= command_index < len(commands)
+        and commands[command_index].get("state") == "running"
+        and args.path in commands[command_index].get("preserved_inputs", [])
+    ):
+        return 0
+    return 1
+
+
+def hold_campaign_lock(args: argparse.Namespace) -> int:
+    """Hold an exclusive campaign lock until its shell owner releases it."""
+    manifest_path = Path(args.manifest).expanduser().resolve(strict=False)
+    state_dir = campaign_state_dir(str(manifest_path))
+    ensure_private_directory(state_dir)
+    ready_path = validate_state_path(args.ready, "lock readiness file", state_dir)
+    release_path = validate_state_path(args.release, "lock release file", state_dir)
+    lock_path = state_dir / "campaign.lock"
+    if lock_path.is_symlink():
+        raise CampaignError("campaign lock path must not be a symlink")
+    flags = os.O_CREAT | os.O_RDWR
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(lock_path, flags, 0o600)
+    try:
+        if os.fstat(descriptor).st_uid != os.geteuid():
+            raise CampaignError("campaign lock file is not user-owned")
+        os.fchmod(descriptor, 0o600)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            ready_path.write_text("busy\n", encoding="utf-8")
+            return 1
+        ready_path.write_text("acquired\n", encoding="utf-8")
+        while not release_path.exists():
+            try:
+                os.kill(args.owner, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError:
+                pass
+            time.sleep(0.1)
+    finally:
+        os.close(descriptor)
+    return 0
 
 
 def parser() -> argparse.ArgumentParser:
@@ -793,6 +886,7 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--loopback", required=True)
     create.add_argument("--hwmon", required=True)
     create.add_argument("--showcracked", required=True)
+    create.add_argument("--fingerprint-segment-max")
     create.add_argument("--artifact", action="append", default=[])
     create.set_defaults(handler=create_manifest)
 
@@ -809,6 +903,7 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("--loopback", required=True)
     validate.add_argument("--hwmon", required=True)
     validate.add_argument("--showcracked", required=True)
+    validate.add_argument("--fingerprint-segment-max")
     validate.add_argument("--artifact", action="append", default=[])
     validate.set_defaults(handler=validate_manifest)
 
@@ -873,6 +968,27 @@ def parser() -> argparse.ArgumentParser:
     command_preserve_parser.add_argument("--command-index", type=int, required=True)
     command_preserve_parser.add_argument("--path", action="append", required=True)
     command_preserve_parser.set_defaults(handler=preserve_command_inputs)
+
+    preserved_parser = commands.add_parser("path-preserved")
+    preserved_parser.add_argument("--manifest", required=True)
+    preserved_parser.add_argument("--index", type=int, required=True)
+    preserved_parser.add_argument("--step-id", required=True)
+    preserved_parser.add_argument("--path", required=True)
+    preserved_parser.set_defaults(handler=path_is_preserved)
+
+    input_preserved_parser = commands.add_parser("input-preserved")
+    input_preserved_parser.add_argument("--manifest", required=True)
+    input_preserved_parser.add_argument("--index", type=int, required=True)
+    input_preserved_parser.add_argument("--step-id", required=True)
+    input_preserved_parser.add_argument("--path", required=True)
+    input_preserved_parser.set_defaults(handler=input_is_preserved)
+
+    lock_parser = commands.add_parser("lock-hold")
+    lock_parser.add_argument("--manifest", required=True)
+    lock_parser.add_argument("--ready", required=True)
+    lock_parser.add_argument("--release", required=True)
+    lock_parser.add_argument("--owner", type=int, required=True)
+    lock_parser.set_defaults(handler=hold_campaign_lock)
 
     return command_parser
 

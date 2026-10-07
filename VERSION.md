@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## v6.13.0 - Execution Reliability
+
+### Fixed
+
+- Prevented stats exports from overwriting active inputs, Hashcat, session logs,
+  or campaign manifests, including through path aliases. (#91)
+- Preserved interrupted campaign candidate files unchanged until their step
+  completes, so resume reuses the original inputs. (#92)
+- Treated Hashcat's exhausted-candidates exit code as a successful attack
+  outcome while retaining its raw code in campaign history. (#93)
+- Fingerprinted rule-file contents and recorded `FINGERPRINT_SEGMENT_MAX` in
+  campaign runtime metadata to detect resume drift. (#94, #95)
+- Replaced the unsupported single-writer campaign assumption with an exclusive
+  ownership lock that rejects a competing planner or executor. (#96)
+- Corrected README references to missing coverage baselines and a removed audit
+  document. (#97)
+
 ## v6.12.0 - Real Integration
 
 ### Added

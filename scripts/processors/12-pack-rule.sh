@@ -28,6 +28,10 @@ rulegen_absolute_path="$(cd "$(dirname "$rulegen_path")" && pwd)/$(basename "$ru
 if dry_run_enabled; then
     dryrun_note "would extract plaintexts from $POTFILE to $tmp"
     dryrun_note "would run python3 $rulegen_path $tmp in $pack_workdir"
+elif campaign_reuse_preserved_inputs "$tmp" "$pack_rule_path"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null; then
         status_error "PACK rule plaintext extraction failed."
@@ -47,7 +51,4 @@ fi
 source scripts/selectors/wordlist.sh
 
 hashcat_base "$WORDLIST" -r "$pack_rule_path" "$LOOPBACK"
-if ! dry_run_enabled; then
-    rm -f -- "$pack_rule_path" "$tmp"
-fi
 echo -e "\nPACK rule processing done\n"

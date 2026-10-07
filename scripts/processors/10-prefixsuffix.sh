@@ -21,6 +21,10 @@ if dry_run_enabled; then
     else
         dryrun_note "would run common-substr-linux prefix/suffix generation into $tmp3 and $tmp4"
     fi
+elif campaign_reuse_preserved_inputs "$tmp3" "$tmp4"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null; then
         status_error "Prefix/suffix plaintext extraction failed."
@@ -41,7 +45,4 @@ fi
 
 hashcat_base -a1 "$tmp3" "$tmp4"
 hashcat_base -a1 "$tmp4" "$tmp3"
-if ! dry_run_enabled; then
-    rm -f -- "$tmp3" "$tmp4"
-fi
 echo -e "\nPrefix suffix processing done\n"

@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.12.0 "Real Integration"'
+    printf '%s' 'v6.13.0 "Execution Reliability"'
 }
 
 function release_label_text() {
@@ -593,7 +593,7 @@ function campaign_command_finish() {
     if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
         return 0
     fi
-    if [ "$rc" -eq 0 ]; then
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then
         state='completed'
     fi
     if ! python3 scripts/campaign.py command-finish \
@@ -644,7 +644,7 @@ function campaign_artifact_paths() {
         scripts/extensions/hashtypes
     find scripts/processors scripts/selectors scripts/rules \
         scripts/extensions/pack-linux scripts/extensions/pack-mac \
-        -type f \( -name '*.sh' -o -name '*.config' -o -name '*.py' \) -print 2>/dev/null | LC_ALL=C sort
+        -type f \( -name '*.sh' -o -name '*.config' -o -name '*.py' -o -name '*.rule' \) -print 2>/dev/null | LC_ALL=C sort
     for path in \
         "${COMMON_SUBSTR_BIN:-}" \
         "${EXPANDER_BIN:-}" \
@@ -682,6 +682,10 @@ function run_campaign_plan() {
     local kind='preset'
     local -a job_ids
     local -a campaign_args
+
+    if ! campaign_acquire_lock "$output"; then
+        return 1
+    fi
 
     if [[ "$source" =~ ^[0-9]+$ ]]; then
         kind='job'
@@ -758,6 +762,7 @@ function run_campaign_plan() {
         --loopback="$LOOPBACK"
         --hwmon="$HWMON"
         --showcracked="$SHOWCRACKED"
+        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX:-8}"
     )
     campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
     "${campaign_args[@]}"
@@ -793,6 +798,12 @@ function run_campaign_execute() {
         status_error "Campaign manifest not found: $manifest"
         return 1
     fi
+    if ! campaign_acquire_lock "$manifest"; then
+        return 1
+    fi
+    if ! validate_stats_export_path; then
+        return 1
+    fi
     campaign_artifact_args
     campaign_args=(
         python3 scripts/campaign.py validate
@@ -808,6 +819,7 @@ function run_campaign_execute() {
         --loopback="$LOOPBACK"
         --hwmon="$HWMON"
         --showcracked="$SHOWCRACKED"
+        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX:-8}"
     )
     campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
     if ! "${campaign_args[@]}"; then
@@ -967,6 +979,47 @@ function processor_require_file() {
     return 0
 }
 
+function campaign_reuse_preserved_inputs() {
+    local path
+    local any_preserved=0
+    local all_preserved=1
+
+    CAMPAIGN_INPUT_REUSE_ERROR=0
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
+        return 1
+    fi
+    for path in "$@"; do
+        if python3 scripts/campaign.py input-preserved \
+            --manifest "$CAMPAIGN_MANIFEST" \
+            --index "$CAMPAIGN_STEP_INDEX" \
+            --step-id "$CAMPAIGN_STEP_ID" \
+            --path "$path"; then
+            any_preserved=1
+        else
+            all_preserved=0
+        fi
+    done
+    if [ "$any_preserved" -eq 0 ]; then
+        return 1
+    fi
+    if [ "$all_preserved" -ne 1 ]; then
+        status_error "Interrupted campaign has only some of the generated inputs required by its command."
+        # shellcheck disable=SC2034
+        CAMPAIGN_INPUT_REUSE_ERROR=1
+        return 2
+    fi
+    for path in "$@"; do
+        if [ ! -f "$path" ]; then
+            status_error "Interrupted campaign input is missing and cannot be restored: $path"
+            # shellcheck disable=SC2034
+            CAMPAIGN_INPUT_REUSE_ERROR=1
+            return 2
+        fi
+    done
+    status_heading "Reusing preserved campaign input(s) for the interrupted command."
+    return 0
+}
+
 function processor_bootstrap() {
     if [[ "$STATICCONFIG" = true ]]; then
         # shellcheck source=/dev/null
@@ -1002,6 +1055,13 @@ function campaign_path_preserved() {
             return 0
         fi
     done
+    if python3 scripts/campaign.py path-preserved \
+        --manifest "$CAMPAIGN_MANIFEST" \
+        --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" \
+        --path "$path" >/dev/null 2>&1; then
+        return 0
+    fi
     return 1
 }
 
@@ -1108,6 +1168,7 @@ function cleanup_session_state() {
             rm -f -- "$path" 2>/dev/null || true
         fi
     done
+    campaign_release_lock
 }
 
 function rebuild_unique_plaintext_cache() {
@@ -1308,6 +1369,90 @@ function campaign_workspace_for_manifest() {
     printf '%s/%s.state/workspace' "$manifest_dir" "$manifest_name"
 }
 
+function campaign_state_path() {
+    local manifest="$1"
+    local manifest_dir
+    local manifest_name
+
+    manifest_dir=$(dirname "$manifest")
+    if ! mkdir -p "$manifest_dir"; then
+        return 1
+    fi
+    if ! manifest_dir=$(cd -P "$manifest_dir" 2>/dev/null && pwd -P); then
+        return 1
+    fi
+    manifest_name=$(basename "$manifest")
+    printf '%s/%s.state' "$manifest_dir" "$manifest_name"
+}
+
+function campaign_acquire_lock() {
+    local manifest="$1"
+    local state_dir
+    local lock_status=''
+    local attempt
+
+    if [ -n "${CAMPAIGN_LOCK_PID:-}" ]; then
+        return 0
+    fi
+    if ! state_dir=$(campaign_state_path "$manifest"); then
+        status_error "Unable to resolve campaign lock directory for: $manifest"
+        return 1
+    fi
+    if ! ensure_private_directory "$state_dir"; then
+        return 1
+    fi
+    CAMPAIGN_LOCK_READY="$state_dir/lock-ready-$BASHPID-$RANDOM"
+    CAMPAIGN_LOCK_RELEASE="$state_dir/lock-release-$BASHPID-$RANDOM"
+    python3 scripts/campaign.py lock-hold \
+        --manifest "$manifest" \
+        --ready "$CAMPAIGN_LOCK_READY" \
+        --release "$CAMPAIGN_LOCK_RELEASE" \
+        --owner "$$" >/dev/null 2>&1 &
+    CAMPAIGN_LOCK_PID=$!
+
+    for ((attempt = 0; attempt < 200; attempt++)); do
+        if [ -f "$CAMPAIGN_LOCK_READY" ]; then
+            lock_status=$(cat "$CAMPAIGN_LOCK_READY")
+            break
+        fi
+        if ! kill -0 "$CAMPAIGN_LOCK_PID" 2>/dev/null; then
+            wait "$CAMPAIGN_LOCK_PID" 2>/dev/null || true
+            CAMPAIGN_LOCK_PID=''
+            rm -f -- "$CAMPAIGN_LOCK_READY" "$CAMPAIGN_LOCK_RELEASE"
+            status_error "Unable to acquire campaign ownership lock: $manifest"
+            return 1
+        fi
+        sleep 0.05
+    done
+
+    if [ "$lock_status" != 'acquired' ]; then
+        if [ -z "$lock_status" ]; then
+            kill "$CAMPAIGN_LOCK_PID" 2>/dev/null || true
+            wait "$CAMPAIGN_LOCK_PID" 2>/dev/null || true
+        else
+            wait "$CAMPAIGN_LOCK_PID" 2>/dev/null || true
+        fi
+        rm -f -- "$CAMPAIGN_LOCK_READY" "$CAMPAIGN_LOCK_RELEASE"
+        CAMPAIGN_LOCK_PID=''
+        CAMPAIGN_LOCK_READY=''
+        CAMPAIGN_LOCK_RELEASE=''
+        status_error "Campaign is already owned by another process: $manifest"
+        return 1
+    fi
+    return 0
+}
+
+function campaign_release_lock() {
+    if [ -n "${CAMPAIGN_LOCK_PID:-}" ]; then
+        : >"$CAMPAIGN_LOCK_RELEASE" 2>/dev/null || true
+        wait "$CAMPAIGN_LOCK_PID" 2>/dev/null || true
+        rm -f -- "$CAMPAIGN_LOCK_READY" "$CAMPAIGN_LOCK_RELEASE"
+    fi
+    CAMPAIGN_LOCK_PID=''
+    CAMPAIGN_LOCK_READY=''
+    CAMPAIGN_LOCK_RELEASE=''
+}
+
 function init_campaign_workspace() {
     local manifest="$1"
     local workspace
@@ -1330,6 +1475,65 @@ function stats_export_scope() {
         latest | all) printf '%s' "$scope" ;;
         *) printf 'latest' ;;
     esac
+}
+
+function stats_paths_alias() {
+    local output="$1"
+    local protected="$2"
+    local output_parent
+    local protected_parent
+    local output_name
+    local protected_name
+    local output_canonical
+    local protected_canonical
+
+    if [ -e "$output" ] && [ -e "$protected" ] && [ "$output" -ef "$protected" ]; then
+        return 0
+    fi
+    output_parent="${output%/*}"
+    protected_parent="${protected%/*}"
+    output_name="${output##*/}"
+    protected_name="${protected##*/}"
+    [ "$output_parent" != "$output" ] || output_parent='.'
+    [ "$protected_parent" != "$protected" ] || protected_parent='.'
+    [ -n "$output_parent" ] || output_parent='/'
+    [ -n "$protected_parent" ] || protected_parent='/'
+    output_parent=$(cd -P -- "$output_parent" 2>/dev/null && pwd -P) || return 1
+    protected_parent=$(cd -P -- "$protected_parent" 2>/dev/null && pwd -P) || return 1
+    output_canonical="$output_parent/$output_name"
+    protected_canonical="$protected_parent/$protected_name"
+    [ "$output_canonical" = "$protected_canonical" ]
+}
+
+function validate_stats_export_path() {
+    local path
+    local resolved_hashcat="${HASHCAT_BIN:-}"
+    local -a protected_paths
+
+    [ -n "${STATSEXPORT:-}" ] || return 0
+    if [ -n "$resolved_hashcat" ]; then
+        resolved_hashcat=$(command -v "$HASHCAT_BIN" 2>/dev/null || printf '%s' "$HASHCAT_BIN")
+    fi
+    protected_paths=(
+        "${CONFIGFILE:-}"
+        "${HASHLIST:-}"
+        "${POTFILE:-}"
+        "${WORDLIST:-}"
+        "${WORDLIST2:-}"
+        "${HASHCAT_BIN:-}"
+        "$resolved_hashcat"
+        "${SESSION_STATS_LOGFILE:-}"
+        "${CAMPAIGN_OUTPUT:-}"
+        "${CAMPAIGN_EXECUTE:-}"
+        "${CAMPAIGN_RESUME:-}"
+    )
+    for path in "${protected_paths[@]}"; do
+        if [ -n "$path" ] && stats_paths_alias "$STATSEXPORT" "$path"; then
+            status_error "Stats export path conflicts with protected input or campaign state: $path"
+            return 1
+        fi
+    done
+    return 0
 }
 
 function export_session_stats_history_json() {
@@ -1419,6 +1623,10 @@ function export_session_stats_json() {
 
     if [ -z "$out_path" ]; then
         return 0
+    fi
+
+    if ! validate_stats_export_path; then
+        return 1
     fi
 
     if ! ensure_parent_dir "$out_path"; then

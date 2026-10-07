@@ -2,6 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REAL_PYTHON3="$(command -v python3)"
+export REAL_PYTHON3
+unset FINGERPRINT_SEGMENT_MAX
 cd "$REPO_ROOT"
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hash-cracker-smoke.XXXX")"
@@ -729,6 +732,29 @@ fi
 if ! grep -Fq '"generated_at"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing generated_at key" "$STATS_EXPORT_PATH"
 fi
+
+echo "[smoke] stats export rejects aliases of protected files"
+ln -s "$TMP_DIR/hash-cracker.pot" "$TMP_DIR/protected-pot-alias"
+ln "$TMP_DIR/hash-cracker.pot" "$TMP_DIR/protected-pot-hardlink"
+for protected_path in \
+    "$TMP_DIR/hash-cracker.pot" \
+    "$TMP_DIR/./hash-cracker.pot" \
+    "$TMP_DIR/protected-pot-alias" \
+    "$TMP_DIR/protected-pot-hardlink" \
+    "$TMP_DIR/input" \
+    "$TMP_DIR/wordlist.txt" \
+    "$TMP_DIR/wordlist2.txt" \
+    "$CONFIG_PATH" \
+    "$TMP_DIR/fake-hashcat"; do
+    protected_snapshot="$TMP_DIR/protected-snapshot"
+    cp -L "$protected_path" "$protected_snapshot"
+    run_case stats_export_collision bash -lc "./hash-cracker.sh --dry-run --job 99 --stats-export '$protected_path'"
+    assert_rc_eq 1
+    assert_contains "Stats export path conflicts with protected input or campaign state:"
+    if ! cmp -s "$protected_snapshot" "$protected_path"; then
+        fail_with_log "stats export changed a protected path: $protected_path" "$LAST_LOG"
+    fi
+done
 if ! grep -Fq '"schema_version": "1"' "$STATS_EXPORT_PATH"; then
     fail_with_log "stats export missing schema_version" "$STATS_EXPORT_PATH"
 fi
@@ -1101,8 +1127,54 @@ assert all(
 )
 assert manifest["inputs"]["potfile"]["mutable"] is True
 assert manifest["artifacts"]
+artifact_paths = {item["path"] for item in manifest["artifacts"]}
+rule_paths = set()
+for step in manifest["steps"]:
+    for command in step["commands"]:
+        argv = command.get("argv", [])
+        for index, argument in enumerate(argv[:-1]):
+            if argument == "-r":
+                rule_paths.add(str(Path(argv[index + 1]).resolve()))
+assert rule_paths
+assert rule_paths <= artifact_paths
 PY
     fail_with_log "campaign plan manifest was invalid" "$LAST_LOG"
+fi
+
+CAMPAIGN_STATS_COLLISION_SNAPSHOT="$TMP_DIR/campaign-stats-collision.snapshot"
+cp "$CAMPAIGN_PATH" "$CAMPAIGN_STATS_COLLISION_SNAPSHOT"
+run_case campaign_stats_export_collision bash -lc "./hash-cracker.sh --execute '$CAMPAIGN_PATH' --stats-export '$CAMPAIGN_PATH'"
+assert_rc_eq 1
+assert_contains "Stats export path conflicts with protected input or campaign state: $CAMPAIGN_PATH"
+if ! cmp -s "$CAMPAIGN_STATS_COLLISION_SNAPSHOT" "$CAMPAIGN_PATH"; then
+    fail_with_log "stats export changed the active campaign manifest" "$LAST_LOG"
+fi
+
+CAMPAIGN_LOCK_READY="$CAMPAIGN_PATH.state/smoke-lock-ready"
+CAMPAIGN_LOCK_RELEASE="$CAMPAIGN_PATH.state/smoke-lock-release"
+python3 scripts/campaign.py lock-hold \
+    --manifest "$CAMPAIGN_PATH" \
+    --ready "$CAMPAIGN_LOCK_READY" \
+    --release "$CAMPAIGN_LOCK_RELEASE" \
+    --owner "$$" >/dev/null 2>&1 &
+CAMPAIGN_TEST_LOCK_PID=$!
+for ((lock_attempt = 0; lock_attempt < 100; lock_attempt++)); do
+    [ -f "$CAMPAIGN_LOCK_READY" ] && break
+    sleep 0.01
+done
+if [ ! -f "$CAMPAIGN_LOCK_READY" ] || [ "$(cat "$CAMPAIGN_LOCK_READY")" != 'acquired' ]; then
+    fail_with_log "test campaign lock was not acquired" "$LAST_LOG"
+fi
+CAMPAIGN_LOCK_SNAPSHOT="$TMP_DIR/campaign-lock.snapshot"
+cp "$CAMPAIGN_PATH" "$CAMPAIGN_LOCK_SNAPSHOT"
+run_case campaign_concurrent_lock bash -lc "./hash-cracker.sh --execute '$CAMPAIGN_PATH'"
+assert_rc_eq 1
+assert_contains "Campaign is already owned by another process: $CAMPAIGN_PATH"
+: >"$CAMPAIGN_LOCK_RELEASE"
+wait "$CAMPAIGN_TEST_LOCK_PID"
+rm -f -- "$CAMPAIGN_LOCK_READY" "$CAMPAIGN_LOCK_RELEASE"
+if ! cmp -s "$CAMPAIGN_LOCK_SNAPSHOT" "$CAMPAIGN_PATH"; then
+    fail_with_log "competing campaign execution changed the manifest" "$LAST_LOG"
 fi
 
 CAMPAIGN_DRYRUN_SNAPSHOT="$TMP_DIR/dryrun-campaign.snapshot"
@@ -1151,6 +1223,25 @@ run_case campaign_artifact_drift bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFA
 assert_rc_eq 1
 assert_contains "campaign artifact changed:"
 
+CAMPAIGN_TUNING_PATH="$TMP_DIR/fingerprint-tuning-campaign.json"
+run_case campaign_fingerprint_tuning_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' ./hash-cracker.sh --plan 14 --output '$CAMPAIGN_TUNING_PATH'"
+assert_rc_eq 0
+run_case campaign_fingerprint_tuning_drift bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=1 ./hash-cracker.sh --execute '$CAMPAIGN_TUNING_PATH'"
+assert_rc_eq 1
+assert_contains "campaign runtime changed for fingerprint_segment_max"
+run_case campaign_fingerprint_tuning_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=8 ./hash-cracker.sh --execute '$CAMPAIGN_TUNING_PATH'"
+assert_rc_eq 0
+if ! python3 - "$CAMPAIGN_TUNING_PATH" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+assert manifest["runtime"]["fingerprint_segment_max"] == "8"
+assert manifest["status"] == "completed"
+PY
+    fail_with_log "fingerprint tuning campaign state was invalid" "$LAST_LOG"
+fi
+
 CAMPAIGN_JOB_PATH="$TMP_DIR/job-campaign.json"
 run_case campaign_plan_equals bash -lc "./hash-cracker.sh --plan=1 --output='$CAMPAIGN_JOB_PATH'"
 assert_rc_eq 0
@@ -1184,6 +1275,58 @@ fi
 run_case campaign_resume_equals bash -lc "SESSION_LOG_DIR='$TMP_DIR/campaign-logs' ./hash-cracker.sh --resume='$CAMPAIGN_PATH'"
 assert_rc_eq 0
 assert_contains "Campaign has no incomplete steps: $CAMPAIGN_PATH"
+
+CAMPAIGN_EXHAUST_HASHCAT="$TMP_DIR/campaign-exhaust-hashcat"
+export CAMPAIGN_EXHAUST_COUNT="$TMP_DIR/campaign-exhaust-count"
+rm -f "$CAMPAIGN_EXHAUST_COUNT"
+cat >"$CAMPAIGN_EXHAUST_HASHCAT" <<'EOF'
+#!/usr/bin/env bash
+printf 'exhausted\n' >>"$CAMPAIGN_EXHAUST_COUNT"
+exit 1
+EOF
+chmod +x "$CAMPAIGN_EXHAUST_HASHCAT"
+CAMPAIGN_EXHAUST_CONFIG="$TMP_DIR/campaign-exhaust.conf"
+cat >"$CAMPAIGN_EXHAUST_CONFIG" <<EOF
+HASHCAT=($CAMPAIGN_EXHAUST_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+CAMPAIGN_EXHAUST_PATH="$TMP_DIR/exhausted-campaign.json"
+run_case campaign_exhaust_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_EXHAUST_CONFIG' ./hash-cracker.sh --plan 9 --output '$CAMPAIGN_EXHAUST_PATH'"
+assert_rc_eq 0
+run_case campaign_exhaust_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_EXHAUST_CONFIG' ./hash-cracker.sh --execute '$CAMPAIGN_EXHAUST_PATH'"
+assert_rc_eq 0
+assert_contains "Hashcat attack exhausted its candidates."
+if ! python3 - "$CAMPAIGN_EXHAUST_PATH" "$CAMPAIGN_EXHAUST_COUNT" <<'PY'; then
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+commands = manifest["steps"][0]["commands"]
+assert manifest["status"] == "completed"
+assert manifest["steps"][0]["state"] == "completed"
+assert commands
+assert all(command["state"] == "completed" for command in commands)
+assert all(command["exit_code"] == 1 for command in commands)
+assert len(open(sys.argv[2], encoding="utf-8").read().splitlines()) == len(commands)
+PY
+    fail_with_log "Hashcat exhaustion was not recorded as successful campaign work" "$LAST_LOG"
+fi
+campaign_exhaust_calls=$(wc -l <"$CAMPAIGN_EXHAUST_COUNT" | tr -d '[:space:]')
+run_case campaign_exhaust_resume bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_EXHAUST_CONFIG' ./hash-cracker.sh --resume '$CAMPAIGN_EXHAUST_PATH'"
+assert_rc_eq 0
+campaign_exhaust_calls_after=$(wc -l <"$CAMPAIGN_EXHAUST_COUNT" | tr -d '[:space:]')
+if [ "$campaign_exhaust_calls_after" -ne "$campaign_exhaust_calls" ]; then
+    fail_with_log "completed exhausted campaign was rerun on resume" "$LAST_LOG"
+fi
+run_case preset_exhaustion bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_EXHAUST_CONFIG' ./hash-cracker.sh --preset quick"
+assert_rc_eq 0
+assert_contains "Preset 'quick': running job 9 (Iterate results)"
+assert_contains "Preset 'quick' completed."
 
 CAMPAIGN_FAIL_HASHCAT="$TMP_DIR/campaign-failing-hashcat"
 CAMPAIGN_FAIL_COUNT="$TMP_DIR/campaign-failing-count"
@@ -1269,6 +1412,9 @@ CAMPAIGN_NEXT_FAILURE_BIN="$TMP_DIR/campaign-next-failure-bin"
 mkdir -p "$CAMPAIGN_NEXT_FAILURE_BIN"
 cat >"$CAMPAIGN_NEXT_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
+if [ "${2:-}" = 'lock-hold' ]; then
+    exec "$REAL_PYTHON3" "$@"
+fi
 case "${2:-}" in
     validate) exit 0 ;;
     next) exit 1 ;;
@@ -1285,6 +1431,9 @@ CAMPAIGN_MARK_RUNNING_FAILURE_BIN="$TMP_DIR/campaign-mark-running-failure-bin"
 mkdir -p "$CAMPAIGN_MARK_RUNNING_FAILURE_BIN"
 cat >"$CAMPAIGN_MARK_RUNNING_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
+if [ "${2:-}" = 'lock-hold' ]; then
+    exec "$REAL_PYTHON3" "$@"
+fi
 case "${2:-}" in
     validate) exit 0 ;;
     next) printf '0|step-001-job-1|1|Brute force\n' ;;
@@ -1301,6 +1450,9 @@ CAMPAIGN_DEPENDENCY_FAILURE_BIN="$TMP_DIR/campaign-dependency-failure-bin"
 mkdir -p "$CAMPAIGN_DEPENDENCY_FAILURE_BIN"
 cat >"$CAMPAIGN_DEPENDENCY_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
+if [ "${2:-}" = 'lock-hold' ]; then
+    exec "$REAL_PYTHON3" "$@"
+fi
 if [ "${1:-}" = '-c' ]; then
     exit 1
 fi
@@ -1320,6 +1472,9 @@ CAMPAIGN_UPDATE_FAILURE_BIN="$TMP_DIR/campaign-update-failure-bin"
 mkdir -p "$CAMPAIGN_UPDATE_FAILURE_BIN"
 cat >"$CAMPAIGN_UPDATE_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
+if [ "${2:-}" = 'lock-hold' ]; then
+    exec "$REAL_PYTHON3" "$@"
+fi
 case "${2:-}" in
     validate) exit 0 ;;
     next) printf '0|step-001-job-1|1|Brute force\n' ;;
@@ -1334,12 +1489,43 @@ assert_rc_eq 1
 
 CAMPAIGN_INTERRUPT_HASHCAT="$TMP_DIR/campaign-interrupt-hashcat"
 export CAMPAIGN_INTERRUPT_ARGS_FILE="$TMP_DIR/campaign-interrupt-args"
+export CAMPAIGN_INTERRUPT_INPUTS_FILE="$TMP_DIR/campaign-interrupt-inputs"
 export CAMPAIGN_INTERRUPT_RELEASE_FILE="$TMP_DIR/campaign-interrupt-release"
-rm -f "$CAMPAIGN_INTERRUPT_ARGS_FILE" "$CAMPAIGN_INTERRUPT_RELEASE_FILE"
+export CAMPAIGN_INTERRUPT_POTFILE="$TMP_DIR/hash-cracker.pot"
+export CAMPAIGN_INTERRUPT_AT=2
+CAMPAIGN_INTERRUPT_PATH="$TMP_DIR/interrupted-campaign.json"
+export CAMPAIGN_INTERRUPT_WORKSPACE="$CAMPAIGN_INTERRUPT_PATH.state/workspace"
+rm -f "$CAMPAIGN_INTERRUPT_ARGS_FILE" "$CAMPAIGN_INTERRUPT_INPUTS_FILE" "$CAMPAIGN_INTERRUPT_RELEASE_FILE"
 cat >"$CAMPAIGN_INTERRUPT_HASHCAT" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$CAMPAIGN_INTERRUPT_ARGS_FILE"
+call_index=$(wc -l <"$CAMPAIGN_INTERRUPT_ARGS_FILE" | tr -d '[:space:]')
+candidate_paths=()
 for argument in "$@"; do
+    case "$argument" in
+        "$CAMPAIGN_INTERRUPT_WORKSPACE"/*)
+            candidate_seen=0
+            for candidate_path in "${candidate_paths[@]}"; do
+                if [ "$candidate_path" = "$argument" ]; then
+                    candidate_seen=1
+                    break
+                fi
+            done
+            if [ "$candidate_seen" -eq 0 ]; then
+                candidate_paths+=("$argument")
+                if [ -f "$argument" ]; then
+                    candidate_state='present'
+                    candidate_digest=$(cksum "$argument" | awk '{print $1 ":" $2}')
+                else
+                    candidate_state='missing'
+                    candidate_digest=''
+                fi
+                printf '%s|%s|%s|%s\n' \
+                    "$call_index" "$argument" "$candidate_state" "$candidate_digest" \
+                    >>"$CAMPAIGN_INTERRUPT_INPUTS_FILE"
+            fi
+            ;;
+    esac
     case "$argument" in
         --restore-file-path=*)
             : >"${argument#*=}"
@@ -1349,8 +1535,11 @@ done
 if [ -f "$CAMPAIGN_INTERRUPT_RELEASE_FILE" ]; then
     exit 0
 fi
-kill -INT "$PPID"
-sleep 0.1
+if [ "$call_index" -eq "$CAMPAIGN_INTERRUPT_AT" ]; then
+    printf 'newhash:newpassword\n' >>"$CAMPAIGN_INTERRUPT_POTFILE"
+    kill -INT "$PPID"
+    sleep 0.1
+fi
 exit 0
 EOF
 chmod +x "$CAMPAIGN_INTERRUPT_HASHCAT"
@@ -1364,9 +1553,9 @@ POTFILE=$TMP_DIR/hash-cracker.pot
 WORDLIST=$TMP_DIR/wordlist.txt
 WORDLIST2=$TMP_DIR/wordlist2.txt
 EOF
-CAMPAIGN_INTERRUPT_PATH="$TMP_DIR/interrupted-campaign.json"
 run_case campaign_interrupt_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' ./hash-cracker.sh --plan 9 --output '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 0
+printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
 run_case campaign_interrupt_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --execute '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 130
 assert_contains "Campaign '$CAMPAIGN_INTERRUPT_PATH' stopped at step-001-job-9 with rc=130."
@@ -1380,7 +1569,10 @@ assert manifest["status"] == "paused"
 assert manifest["steps"][0]["state"] == "interrupted"
 workspace = Path(manifest["campaign"]["workspace"])
 assert (workspace.stat().st_mode & 0o777) == 0o700
-command = manifest["steps"][0]["commands"][0]
+commands = manifest["steps"][0]["commands"]
+assert commands[0]["state"] == "completed"
+assert commands[0]["attempts"] == 1
+command = commands[1]
 assert command["state"] == "running"
 assert command["attempts"] == 1
 assert command["session"]
@@ -1393,6 +1585,30 @@ PY
     fail_with_log "interrupted campaign state was invalid" "$LAST_LOG"
 fi
 
+CAMPAIGN_INTERRUPT_PRESERVED_PATH=$(
+    python3 - "$CAMPAIGN_INTERRUPT_PATH" <<'PY'
+import json
+import sys
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+print(manifest["steps"][0]["commands"][1]["preserved_inputs"][0])
+PY
+)
+CAMPAIGN_INTERRUPT_PRESERVED_SNAPSHOT="$TMP_DIR/interrupted-candidate.snapshot"
+cp "$CAMPAIGN_INTERRUPT_PRESERVED_PATH" "$CAMPAIGN_INTERRUPT_PRESERVED_SNAPSHOT"
+if ! printf 'password\n' | cmp -s - "$CAMPAIGN_INTERRUPT_PRESERVED_PATH"; then
+    fail_with_log "interrupted candidate did not contain the pre-interruption potfile state" "$LAST_LOG"
+fi
+rm -f -- "$CAMPAIGN_INTERRUPT_PRESERVED_PATH"
+campaign_interrupt_calls=$(wc -l <"$CAMPAIGN_INTERRUPT_ARGS_FILE" | tr -d '[:space:]')
+run_case campaign_interrupt_missing_input_resume bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_INTERRUPT_PATH'"
+assert_rc_eq 1
+assert_contains "Interrupted campaign input is missing and cannot be restored: $CAMPAIGN_INTERRUPT_PRESERVED_PATH"
+campaign_interrupt_calls_after=$(wc -l <"$CAMPAIGN_INTERRUPT_ARGS_FILE" | tr -d '[:space:]')
+if [ "$campaign_interrupt_calls_after" -ne "$campaign_interrupt_calls" ]; then
+    fail_with_log "missing preserved campaign input was regenerated and executed" "$LAST_LOG"
+fi
+cp "$CAMPAIGN_INTERRUPT_PRESERVED_SNAPSHOT" "$CAMPAIGN_INTERRUPT_PRESERVED_PATH"
 : >"$CAMPAIGN_INTERRUPT_RELEASE_FILE"
 run_case campaign_interrupt_resume bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_INTERRUPT_CONFIG' SESSION_LOG_DIR='$TMP_DIR/interrupted-campaign-logs' ./hash-cracker.sh --resume '$CAMPAIGN_INTERRUPT_PATH'"
 assert_rc_eq 0
@@ -1407,32 +1623,181 @@ manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 workspace = Path(manifest["campaign"]["workspace"])
 assert manifest["status"] == "completed"
 assert manifest["steps"][0]["state"] == "completed"
-assert manifest["steps"][0]["attempts"] == 2
+assert manifest["steps"][0]["attempts"] == 3
 commands = manifest["steps"][0]["commands"]
 assert all(command["state"] == "completed" for command in commands)
 assert commands[0]["attempts"] == 1
-assert not Path(commands[0]["restore_file"]).exists()
-assert commands[0]["preserved_inputs"] == []
+assert commands[1]["attempts"] == 1
+assert not Path(commands[1]["restore_file"]).exists()
+assert all(command["preserved_inputs"] == [] for command in commands)
 logged = [
     shlex.split(line)
     for line in Path(os.environ["CAMPAIGN_INTERRUPT_ARGS_FILE"]).read_text().splitlines()
 ]
-assert len(logged) >= 2
-preserved_paths = [
-    Path(argument)
-    for argument in logged[0]
-    if str(workspace) in argument
+input_records = [
+    line.split("|", 3)
+    for line in Path(os.environ["CAMPAIGN_INTERRUPT_INPUTS_FILE"]).read_text().splitlines()
 ]
-assert preserved_paths
+assert len(logged) == len(commands) + 1
+assert len(input_records) == len(logged)
+assert [int(record[0]) for record in input_records] == list(range(1, len(logged) + 1))
+assert all(record[2] == "present" for record in input_records)
+assert len({record[1] for record in input_records}) == 1
+assert all(record[3] == input_records[0][3] for record in input_records)
+preserved_paths = {Path(record[1]) for record in input_records}
+assert all(workspace in path.parents for path in preserved_paths)
 assert all(not path.exists() for path in preserved_paths)
 assert "--restore" not in logged[0]
-assert "--restore" in logged[1]
-assert f"--session={commands[0]['session']}" in logged[0]
-assert f"--session={commands[0]['session']}" in logged[1]
-assert logged[1] == [argument for argument in logged[0] if argument != "--restore"] + ["--restore"]
+assert "--restore" not in logged[1]
+assert "--restore" in logged[2]
+assert sum(f"--session={commands[0]['session']}" in call for call in logged) == 1
+assert sum(f"--session={commands[1]['session']}" in call for call in logged) == 2
+assert f"--session={commands[1]['session']}" in logged[1]
+assert f"--session={commands[1]['session']}" in logged[2]
+assert logged[2] == [argument for argument in logged[1] if argument != "--restore"] + ["--restore"]
 PY
     fail_with_log "resumed interrupted campaign state was invalid" "$LAST_LOG"
 fi
+
+echo "[smoke] interrupted prefix/suffix, PACK, and fingerprint inputs are reused"
+CAMPAIGN_INTERRUPT_COMMON_SUBSTR="$TMP_DIR/campaign-interrupt-common-substr"
+cat >"$CAMPAIGN_INTERRUPT_COMMON_SUBSTR" <<'EOF'
+#!/usr/bin/env bash
+mode='candidate'
+input=''
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -p) mode='prefix' ;;
+        -s) mode='suffix' ;;
+        -f)
+            input="$2"
+            shift
+            ;;
+    esac
+    shift
+done
+while IFS= read -r candidate; do
+    printf '%s:%s\n' "$mode" "$candidate"
+done <"$input"
+EOF
+chmod +x "$CAMPAIGN_INTERRUPT_COMMON_SUBSTR"
+
+CAMPAIGN_PACK_PYTHON_BIN="$TMP_DIR/campaign-pack-python-bin"
+mkdir -p "$CAMPAIGN_PACK_PYTHON_BIN"
+cat >"$CAMPAIGN_PACK_PYTHON_BIN/python3" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = '-c' ]; then
+    exit 0
+fi
+case "${1:-}" in
+    scripts/campaign.py)
+        exec "$REAL_PYTHON3" "$@"
+        ;;
+    *rulegen.py)
+        printf 'generated-from:' >analysis.rule
+        tr '\n' ',' <"$2" >>analysis.rule
+        printf '\n' >>analysis.rule
+        ;;
+    *)
+        exec "$REAL_PYTHON3" "$@"
+        ;;
+esac
+EOF
+chmod +x "$CAMPAIGN_PACK_PYTHON_BIN/python3"
+
+run_preserved_processor_case() {
+    local case_name="$1"
+    local job_id="$2"
+    local inputs_per_call="$3"
+    local campaign_path="$TMP_DIR/$case_name-campaign.json"
+    local config_path="$TMP_DIR/$case_name.conf"
+    local extra_env=""
+    local env_prefix
+
+    CAMPAIGN_INTERRUPT_PATH="$campaign_path"
+    CAMPAIGN_INTERRUPT_WORKSPACE="$campaign_path.state/workspace"
+    CAMPAIGN_INTERRUPT_ARGS_FILE="$TMP_DIR/$case_name-args"
+    CAMPAIGN_INTERRUPT_INPUTS_FILE="$TMP_DIR/$case_name-inputs"
+    CAMPAIGN_INTERRUPT_RELEASE_FILE="$TMP_DIR/$case_name-release"
+    CAMPAIGN_INTERRUPT_AT=1
+    export CAMPAIGN_INTERRUPT_PATH CAMPAIGN_INTERRUPT_WORKSPACE
+    export CAMPAIGN_INTERRUPT_ARGS_FILE CAMPAIGN_INTERRUPT_INPUTS_FILE
+    export CAMPAIGN_INTERRUPT_RELEASE_FILE CAMPAIGN_INTERRUPT_AT
+    rm -f -- "$CAMPAIGN_INTERRUPT_ARGS_FILE" "$CAMPAIGN_INTERRUPT_INPUTS_FILE" "$CAMPAIGN_INTERRUPT_RELEASE_FILE"
+
+    cat >"$config_path" <<EOF
+HASHCAT=($CAMPAIGN_INTERRUPT_HASHCAT)
+DEVICE=1
+HASHTYPE=1000
+HASHLIST=$TMP_DIR/input
+POTFILE=$TMP_DIR/hash-cracker.pot
+WORDLIST=$TMP_DIR/wordlist.txt
+WORDLIST2=$TMP_DIR/wordlist2.txt
+EOF
+
+    case "$job_id" in
+        10) extra_env="COMMON_SUBSTR_BIN='$CAMPAIGN_INTERRUPT_COMMON_SUBSTR'" ;;
+        12) extra_env="PATH='$CAMPAIGN_PACK_PYTHON_BIN:$PATH'" ;;
+        14) extra_env='FINGERPRINT_SEGMENT_MAX=8' ;;
+    esac
+    env_prefix="HASH_CRACKER_CONFIG='$config_path' $extra_env"
+    run_case "${case_name}_plan" bash -lc "$env_prefix ./hash-cracker.sh --plan '$job_id' --output '$campaign_path'"
+    assert_rc_eq 0
+    printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
+    CAMPAIGN_INTERRUPT_POTFILE="$TMP_DIR/hash-cracker.pot"
+    export CAMPAIGN_INTERRUPT_POTFILE
+    run_case "${case_name}_execute" bash -lc "$env_prefix ./hash-cracker.sh --execute '$campaign_path'"
+    assert_rc_eq 130
+    assert_contains "Campaign '$campaign_path' stopped at step-001-job-$job_id with rc=130."
+    : >"$CAMPAIGN_INTERRUPT_RELEASE_FILE"
+    run_case "${case_name}_resume" bash -lc "$env_prefix ./hash-cracker.sh --resume '$campaign_path'"
+    assert_rc_eq 0
+    if ! python3 - "$campaign_path" "$CAMPAIGN_INTERRUPT_ARGS_FILE" "$CAMPAIGN_INTERRUPT_INPUTS_FILE" "$inputs_per_call" <<'PY'; then
+import json
+import shlex
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+commands = manifest["steps"][0]["commands"]
+workspace = Path(manifest["campaign"]["workspace"])
+logged = [
+    shlex.split(line)
+    for line in Path(sys.argv[2]).read_text(encoding="utf-8").splitlines()
+]
+records = [
+    line.split("|", 3)
+    for line in Path(sys.argv[3]).read_text(encoding="utf-8").splitlines()
+]
+expected_inputs_per_call = int(sys.argv[4])
+assert manifest["status"] == "completed"
+assert manifest["steps"][0]["state"] == "completed"
+assert all(command["state"] == "completed" for command in commands)
+assert all(command["preserved_inputs"] == [] for command in commands)
+assert len(logged) == len(commands) + 1
+assert sum("--restore" in call for call in logged) == 1
+assert all(record[2] == "present" for record in records)
+by_path = defaultdict(set)
+by_call = defaultdict(set)
+for call_index, path, state, digest in records:
+    by_path[path].add(digest)
+    by_call[int(call_index)].add(path)
+assert by_path and all(len(digests) == 1 for digests in by_path.values())
+assert set(by_call) == set(range(1, len(logged) + 1))
+assert all(len(paths) == expected_inputs_per_call for paths in by_call.values())
+assert all(not Path(path).exists() for path in by_path)
+assert not list(workspace.iterdir())
+PY
+        fail_with_log "$case_name did not reuse and clean up preserved inputs correctly" "$LAST_LOG"
+    fi
+    : >"$TMP_DIR/hash-cracker.pot"
+}
+
+run_preserved_processor_case campaign_interrupt_prefixsuffix 10 2
+run_preserved_processor_case campaign_interrupt_packrule 12 1
+run_preserved_processor_case campaign_interrupt_fingerprint 14 1
+: >"$TMP_DIR/hash-cracker.pot"
 
 echo "[smoke] preset deep-plus dry-run reaches extended jobs"
 FAKE_COMMON_SUBSTR="$TMP_DIR/fake-common-substr.sh"
@@ -1477,8 +1842,8 @@ run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-c
 assert_rc_eq 1
 assert_contains "Common-substring helper preprocessing failed."
 assert_not_contains "Substring processing done"
-if ! grep -Fq '"release": "v6.12.0 \"Real Integration\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.12.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.13.0 \"Execution Reliability\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.13.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
@@ -2104,7 +2469,7 @@ run_case processor_14_normal bash -lc "./hash-cracker.sh --job 14"
 assert_rc_eq 0
 assert_contains "Fingerprint attack done"
 
-run_case processor_17_normal bash -lc "printf '17\np\n1\n1\nn\n0\n' | ./hash-cracker.sh"
+run_case processor_17_normal bash -lc "printf '17\np\n1\n1\nn\n0\n' | MKPASS_BIN='$FAKE_MKPASS' ./hash-cracker.sh"
 assert_rc_eq 0
 assert_contains "Markov-chain processing done"
 

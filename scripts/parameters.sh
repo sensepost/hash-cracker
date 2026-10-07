@@ -308,6 +308,7 @@ run_hashcat() {
     local duration
     local rc
     local finish_rc
+    local checkpoint_failure=0
     local -a command_args=("$@")
 
     if [ "${CAMPAIGN_MODE:-}" = 'execute' ]; then
@@ -385,14 +386,19 @@ run_hashcat() {
     if [ "$command_index" -ge 0 ]; then
         campaign_command_finish "$command_index" "$rc" "$duration"
         finish_rc=$?
-        if [ "$finish_rc" -ne 0 ] && [ "$rc" -eq 0 ]; then
+        if [ "$finish_rc" -ne 0 ] && { [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; }; then
             rc=1
+            checkpoint_failure=1
         fi
         # shellcheck disable=SC2034
         CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
     fi
 
     if [ $rc -ne 0 ]; then
+        if [ "$rc" -eq 1 ] && [ "$checkpoint_failure" -eq 0 ]; then
+            status_heading "Hashcat attack exhausted its candidates."
+            return 0
+        fi
         # shellcheck disable=SC2034
         HASHCAT_FAILURE="$rc"
         echo "[hash-cracker] hashcat command failed with exit code $rc" >&2

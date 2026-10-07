@@ -16,6 +16,10 @@ trap 'processor_cleanup "$tmp"' EXIT
 # Logic
 if dry_run_enabled; then
     dryrun_note "would extract usernames from $HASHLIST into $tmp"
+elif campaign_reuse_preserved_inputs "$tmp"; then
+    :
+elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
+    exit 1
 else
     if ! cat "$HASHLIST" | cut -d '\' -f2 | awk -F: '{print $1}' >"$tmp"; then
         status_error "Username extraction failed."
@@ -27,7 +31,4 @@ hashcat_base "$tmp"
 for RULE in "${RULELIST[@]}"; do
     hashcat_base "$tmp" -r "$RULE" "$LOOPBACK"
 done
-if ! dry_run_enabled; then
-    rm -f -- "$tmp"
-fi
 echo -e "\nUsername as Password processing with rules done\n"
