@@ -391,11 +391,11 @@ assert_rc_eq 0
 
 WORKSPACE_PARENT_BLOCKER="$TMP_DIR/workspace-parent-blocker"
 printf 'not a directory\n' >"$WORKSPACE_PARENT_BLOCKER"
-run_case helper_workspace_manifest_mkdir_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if campaign_workspace_for_manifest '$WORKSPACE_PARENT_BLOCKER/manifest.json'; then exit 1; else exit 0; fi"
+run_case helper_workspace_manifest_mkdir_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; if init_campaign_workspace '$WORKSPACE_PARENT_BLOCKER/manifest.json'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
 WORKSPACE_CD_FAILURE="$TMP_DIR/workspace-cd-failure/manifest.json"
-run_case helper_workspace_manifest_cd_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; cd() { return 1; }; if campaign_workspace_for_manifest '$WORKSPACE_CD_FAILURE'; then exit 1; else exit 0; fi"
+run_case helper_workspace_manifest_resolution_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; python3() { return 1; }; if campaign_workspace_for_manifest '$WORKSPACE_CD_FAILURE'; then exit 1; else exit 0; fi"
 assert_rc_eq 0
 
 run_case helper_campaign_workspace_resolution_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; campaign_workspace_for_manifest() { return 1; }; if init_campaign_workspace fixture; then exit 1; else exit 0; fi"
@@ -1412,7 +1412,7 @@ CAMPAIGN_NEXT_FAILURE_BIN="$TMP_DIR/campaign-next-failure-bin"
 mkdir -p "$CAMPAIGN_NEXT_FAILURE_BIN"
 cat >"$CAMPAIGN_NEXT_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
-if [ "${2:-}" = 'lock-hold' ]; then
+if [ "${2:-}" = 'lock-hold' ] || [ "${2:-}" = 'state-path' ]; then
     exec "$REAL_PYTHON3" "$@"
 fi
 case "${2:-}" in
@@ -1431,7 +1431,7 @@ CAMPAIGN_MARK_RUNNING_FAILURE_BIN="$TMP_DIR/campaign-mark-running-failure-bin"
 mkdir -p "$CAMPAIGN_MARK_RUNNING_FAILURE_BIN"
 cat >"$CAMPAIGN_MARK_RUNNING_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
-if [ "${2:-}" = 'lock-hold' ]; then
+if [ "${2:-}" = 'lock-hold' ] || [ "${2:-}" = 'state-path' ]; then
     exec "$REAL_PYTHON3" "$@"
 fi
 case "${2:-}" in
@@ -1450,7 +1450,7 @@ CAMPAIGN_DEPENDENCY_FAILURE_BIN="$TMP_DIR/campaign-dependency-failure-bin"
 mkdir -p "$CAMPAIGN_DEPENDENCY_FAILURE_BIN"
 cat >"$CAMPAIGN_DEPENDENCY_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
-if [ "${2:-}" = 'lock-hold' ]; then
+if [ "${2:-}" = 'lock-hold' ] || [ "${2:-}" = 'state-path' ]; then
     exec "$REAL_PYTHON3" "$@"
 fi
 if [ "${1:-}" = '-c' ]; then
@@ -1472,7 +1472,7 @@ CAMPAIGN_UPDATE_FAILURE_BIN="$TMP_DIR/campaign-update-failure-bin"
 mkdir -p "$CAMPAIGN_UPDATE_FAILURE_BIN"
 cat >"$CAMPAIGN_UPDATE_FAILURE_BIN/python3" <<'EOF'
 #!/usr/bin/env bash
-if [ "${2:-}" = 'lock-hold' ]; then
+if [ "${2:-}" = 'lock-hold' ] || [ "${2:-}" = 'state-path' ]; then
     exec "$REAL_PYTHON3" "$@"
 fi
 case "${2:-}" in
@@ -1501,7 +1501,23 @@ cat >"$CAMPAIGN_INTERRUPT_HASHCAT" <<'EOF'
 printf '%s\n' "$*" >>"$CAMPAIGN_INTERRUPT_ARGS_FILE"
 call_index=$(wc -l <"$CAMPAIGN_INTERRUPT_ARGS_FILE" | tr -d '[:space:]')
 candidate_paths=()
-for argument in "$@"; do
+candidate_arguments=("$@")
+if [[ " $* " == *" --restore "* ]]; then
+    candidate_arguments=()
+    while IFS= read -r -d '' argument; do
+        candidate_arguments+=("$argument")
+    done < <("$REAL_PYTHON3" - "$CAMPAIGN_INTERRUPT_PATH" "$@" <<'PYRESTORE'
+import json
+import sys
+session = next(value.split("=", 1)[1] for value in sys.argv[2:] if value.startswith("--session="))
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+command = next(command for step in manifest["steps"] for command in step["commands"] if command["session"] == session)
+for value in command["executed_argv"][1:]:
+    sys.stdout.buffer.write(value.encode() + b"\0")
+PYRESTORE
+    )
+fi
+for argument in "${candidate_arguments[@]}"; do
     case "$argument" in
         "$CAMPAIGN_INTERRUPT_WORKSPACE"/*)
             candidate_seen=0
@@ -1654,7 +1670,13 @@ assert sum(f"--session={commands[0]['session']}" in call for call in logged) == 
 assert sum(f"--session={commands[1]['session']}" in call for call in logged) == 2
 assert f"--session={commands[1]['session']}" in logged[1]
 assert f"--session={commands[1]['session']}" in logged[2]
-assert logged[2] == [argument for argument in logged[1] if argument != "--restore"] + ["--restore"]
+assert logged[2] == [
+    f"--session={commands[1]['session']}",
+    f"--restore-file-path={commands[1]['restore_file']}",
+    "--restore",
+]
+assert commands[1]["executed_argv"][1:] == logged[1]
+assert commands[1]["restore_argv"][1:] == logged[2]
 PY
     fail_with_log "resumed interrupted campaign state was invalid" "$LAST_LOG"
 fi
@@ -1842,8 +1864,8 @@ run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-c
 assert_rc_eq 1
 assert_contains "Common-substring helper preprocessing failed."
 assert_not_contains "Substring processing done"
-if ! grep -Fq '"release": "v6.13.0 \"Execution Reliability\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.13.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.14.0 \"Durable Recovery\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.14.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"

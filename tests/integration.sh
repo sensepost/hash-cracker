@@ -173,3 +173,5 @@ run_hash_cracker combinator '' "$COMBINATOR_COMMAND"
 assert_cracked combinator "$COMBINATOR_HASH" passwordword
 
 echo "[integration] real Hashcat mask, wordlist/rules, hybrid, and combinator executions passed"
+
+python3 tests/integration_campaign.py "$HASHCAT_BIN"

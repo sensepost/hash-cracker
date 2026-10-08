@@ -22,10 +22,12 @@ while true; do
         exit 1
     fi
     if [ "$LIST" = 'p' ]; then
+        plaintext_source=potfile
         LIST=$POTFILE
         break
     elif [ "$LIST" = 'w' ]; then
         source scripts/selectors/wordlist.sh
+        plaintext_source=wordlist
         LIST=$WORDLIST
         break
     fi
@@ -43,7 +45,7 @@ if dry_run_enabled; then
         dryrun_note "would run mkpass-linux with ngram=$NGRAM amount=$AMOUNT into $tmp2"
     fi
 else
-    if ! cat "$LIST" | awk -F: '{print $NF}' | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
+    if ! processor_extract_plaintexts "$LIST" "$plaintext_source" | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
         status_error "Markov source extraction failed."
         exit 1
     fi

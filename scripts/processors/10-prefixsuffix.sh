@@ -26,12 +26,12 @@ elif campaign_reuse_preserved_inputs "$tmp3" "$tmp4"; then
 elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
     exit 1
 else
-    if ! cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null; then
+    if ! processor_extract_plaintexts "$POTFILE" | tee "$tmp" &>/dev/null; then
         status_error "Prefix/suffix plaintext extraction failed."
         exit 1
     fi
     if ! {
-        cat "$tmp" | awk -F: '{print $NF}' | sort | tee "$tmp2" &>/dev/null \
+        sort "$tmp" | tee "$tmp2" &>/dev/null \
             && "$common_substr_bin" -n -p -f "$tmp2" >"$tmp3" \
             && "$common_substr_bin" -n -s -f "$tmp2" >"$tmp4" \
             && rm -f -- "$tmp2" "$tmp"
@@ -42,6 +42,8 @@ else
     processor_require_file "$tmp3" "Prefix output" || exit 1
     processor_require_file "$tmp4" "Suffix output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp3" "$tmp4" || exit 1
 
 hashcat_base -a1 "$tmp3" "$tmp4"
 hashcat_base -a1 "$tmp4" "$tmp3"
