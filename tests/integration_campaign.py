@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Opt-in real Hashcat runtime checkpoint and restore contract."""
+import base64
 import hashlib
 import json
 import os
@@ -18,7 +19,10 @@ def main():
         root = Path(directory)
         rng = random.Random(20261008)
         seed = ''.join(rng.choice('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') for _ in range(50000))
-        (root / 'hashes').write_text(hashlib.md5(b'outside-the-candidate-space-123456789').hexdigest() + '\n')
+        salt = b'checkpoint'
+        digest = hashlib.pbkdf2_hmac('sha256', b'outside-the-candidate-space-123456789', salt, 10000, dklen=24)
+        encoded = lambda value: base64.b64encode(value).decode('ascii')
+        (root / 'hashes').write_text(f'sha256:10000:{encoded(salt)}:{encoded(digest)}\n')
         (root / 'pot').write_text('seed:' + seed + '\n')
         for name in ('words', 'words2'):
             (root / name).write_text('password\n')
@@ -36,7 +40,7 @@ sys.exit(subprocess.run([os.environ['CHECKPOINT_HASHCAT'], *args]).returncode)
         config.write_text('\n'.join([
             f'HASHCAT=({shlex.quote(str(shim))})',
             'DEVICE=' + shlex.quote(os.environ.get('HASHCAT_INTEGRATION_DEVICE', '1')),
-            'HASHTYPE=0',
+            'HASHTYPE=10900',
             *[key + '=' + shlex.quote(str(root / value)) for key, value in
               [('HASHLIST', 'hashes'), ('POTFILE', 'pot'), ('WORDLIST', 'words'), ('WORDLIST2', 'words2')]]]))
         env = dict(os.environ, HASH_CRACKER_CONFIG=str(config),

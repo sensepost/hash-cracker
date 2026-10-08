@@ -2740,7 +2740,8 @@ printf 'hash:$HEX[zz]\n' >"$TMP_DIR/hash-cracker.pot"
 restore_config
 run_case processor_19_malformed_hex bash -lc "./hash-cracker.sh --job 19"
 assert_rc_eq 1
-assert_contains "Unable to decode hexadecimal potfile candidates."
+assert_contains 'plaintext reader: line 1: malformed $HEX record'
+assert_contains "Unable to decode potfile candidates for digit removal."
 
 restore_config
 printf 'hash:password\n' >"$TMP_DIR/hash-cracker.pot"
@@ -2761,7 +2762,7 @@ DIGIT_OUTPUT_BLOCKER="$TMP_DIR/digit-output-blocker"
 printf 'not a directory\n' >"$DIGIT_OUTPUT_BLOCKER"
 run_case processor_19_generation_failure bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; dryrun_tempfile() { printf '$DIGIT_OUTPUT_BLOCKER/output'; }; source scripts/processors/19-digitremover.sh"
 assert_rc_eq 1
-assert_contains "Unable to generate digit-removal candidates from the potfile."
+assert_contains "Unable to decode potfile candidates for digit removal."
 
 WRITE_FAILURE_DIR="$TMP_DIR/write-failure"
 mkdir -p "$WRITE_FAILURE_DIR"
