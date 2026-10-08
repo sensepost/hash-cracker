@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## v6.14.0 - Durable Recovery
+
+### Added
+
+- Introduced a shared byte-oriented plaintext reader for potfile-derived
+  processors, decoding valid `$HEX[...]` before transformations and rejecting
+  malformed or unrepresentable text records with line-numbered diagnostics.
+  Markov wordlist input preserves complete records, including colons. (#104)
+- Added real Hashcat runtime checkpoint/restore integration coverage, plus
+  regressions for native stops, crashes, interruption between commands,
+  generated-input integrity, aliases, and decimal retention.
+
+### Fixed
+
+- Protected the entire active campaign sidecar from stats exports, including
+  symlink and hardlink aliases of its state files. (#99)
+- Resumed native Hashcat checkpoint/runtime stops with the same session and
+  attempt using restore-only arguments, retaining raw exit-code history and
+  stopping subsequent commands until explicit resume. (#100)
+- Registered generated campaign inputs with SHA-256 digests before their first
+  consumer and retained them through step completion, rejecting missing or
+  changed files instead of regenerating from a growing potfile. (#101)
+- Normalized session-log retention as decimal and bounded values before log
+  creation or pruning, preventing invalid JSON, octal arithmetic, and overflow.
+  (#102)
+- Used one canonical manifest identity for symlink locking, workspace paths,
+  and atomic writes while preserving the alias itself. (#103)
+
 ## v6.13.0 - Execution Reliability
 
 ### Fixed
