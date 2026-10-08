@@ -28,7 +28,7 @@ elif campaign_reuse_preserved_inputs "$tmp2"; then
 elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
     exit 1
 else
-    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
+    if ! processor_extract_plaintexts "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
         status_error "Fingerprint plaintext extraction failed."
         exit 1
     fi
@@ -61,6 +61,8 @@ else
     fi
     processor_require_file "$tmp2" "Fingerprint output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp2" || exit 1
 
 hashcat_base -a 1 "$tmp2" "$tmp2"
 echo -e "\nFingerprint attack done\n"

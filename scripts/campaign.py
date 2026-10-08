@@ -40,6 +40,22 @@ def campaign_state_dir(manifest_path: str) -> Path:
     return Path(f"{Path(manifest_path).expanduser().resolve(strict=False)}.state")
 
 
+def print_state_path(args: argparse.Namespace) -> None:
+    print(campaign_state_dir(args.manifest))
+
+
+def validate_export(args: argparse.Namespace) -> None:
+    """Reserve the whole sidecar, including external aliases of existing files."""
+    state = campaign_state_dir(args.manifest)
+    output = Path(args.output).expanduser().resolve(strict=False)
+    if path_within(output, state):
+        raise CampaignError("stats export conflicts with campaign state")
+    if output.exists() and state.exists():
+        for entry in state.rglob("*"):
+            if entry.is_file() and output.samefile(entry):
+                raise CampaignError("stats export aliases protected campaign state")
+
+
 def path_within(path: Path, root: Path) -> bool:
     try:
         path.resolve(strict=False).relative_to(root.resolve(strict=False))
@@ -110,6 +126,23 @@ def validate_manifest_state(manifest_path: str, manifest: dict) -> None:
 
     for step in manifest["steps"]:
         validate_component(step["id"], "step id")
+        generated = step.get("generated_inputs", [])
+        if not isinstance(generated, list):
+            raise CampaignError("campaign step has invalid generated inputs")
+        seen = set()
+        for item in generated:
+            if not isinstance(item, dict) or not re.fullmatch(
+                r"[0-9a-f]{64}", str(item.get("sha256", ""))
+            ):
+                raise CampaignError("campaign step has invalid generated input digest")
+            value = item.get("path")
+            if workspace_root is not None:
+                validate_state_path(value, "generated input", workspace_root)
+            else:
+                validate_legacy_temp_path(value, "generated input")
+            if value in seen:
+                raise CampaignError("campaign step has duplicate generated inputs")
+            seen.add(value)
         for command in step["commands"]:
             for field in ("argv", "executed_argv"):
                 value = command.get(field)
@@ -252,7 +285,7 @@ def load_manifest(path: str) -> dict:
 
 
 def write_manifest(path: str, manifest: dict) -> None:
-    destination = Path(path).expanduser()
+    destination = Path(path).expanduser().resolve(strict=False)
     destination.parent.mkdir(parents=True, exist_ok=True)
     manifest["schema_version"] = SCHEMA_VERSION
     manifest["updated_at"] = timestamp()
@@ -621,7 +654,7 @@ def command_start(args: argparse.Namespace) -> None:
         print("completed\t\t\t0\t")
         return
 
-    was_running = command.get("state") == "running" and bool(
+    was_running = command.get("state") in ("running", "interrupted") and bool(
         command.get("session")
     )
     if not was_running:
@@ -656,6 +689,7 @@ def command_start(args: argparse.Namespace) -> None:
                 stream.write(argument.encode() + b"\0")
         Path(argv_file).chmod(0o600)
     step["current_command"] = args.command_index
+    command["state"] = "running"
     manifest["status"] = "running"
     write_manifest(args.manifest, manifest)
     print(f"running\t{command['session']}\t{restore_file}\t{restore}\t{argv_file}")
@@ -695,13 +729,23 @@ def record_command(args: argparse.Namespace) -> None:
         and not value.startswith("--session=")
         and not value.startswith("--restore-file-path=")
     ]
-    if stable_executed_argv != stable_planned_argv:
+    restore_argv = [
+        planned_argv[0] if planned_argv else "",
+        f"--session={command['session']}",
+        f"--restore-file-path={command['restore_file']}",
+        "--restore",
+    ]
+    restoring = argv == restore_argv and Path(command['restore_file'] or "").is_file()
+    if not restoring and stable_executed_argv != stable_planned_argv:
         raise CampaignError(
             f"campaign command changed at step {args.step_id}, command {args.command_index}; "
             "create a new plan"
         )
     command["executed_preview"] = args.preview
-    command["executed_argv"] = argv
+    if restoring:
+        command["restore_argv"] = argv
+    else:
+        command["executed_argv"] = argv
     write_manifest(args.manifest, manifest)
 
 
@@ -713,6 +757,56 @@ def preserve_command_inputs(args: argparse.Namespace) -> None:
     for value in args.path:
         if Path(value).is_file() and value not in preserved:
             preserved.append(value)
+    write_manifest(args.manifest, manifest)
+
+
+def checked_generated_inputs(manifest: dict, step: dict, paths: list[str]) -> bool:
+    """Check a complete, immutable set; never regenerate after consuming it."""
+    records = step.get("generated_inputs", [])
+    if records:
+        if {item["path"] for item in records} != set(paths):
+            raise CampaignError("campaign generated input set changed; create a new plan")
+        for item in records:
+            digest = file_fingerprint(item["path"])
+            if digest == "missing":
+                raise CampaignError(f"Interrupted campaign input is missing and cannot be restored: {item['path']}")
+            if digest != item["sha256"]:
+                raise CampaignError(f"campaign generated input changed: {item['path']}")
+        return True
+    legacy = {
+        value for command in step["commands"]
+        for value in command.get("preserved_inputs", [])
+    }
+    if legacy:
+        if not set(paths).issubset(legacy):
+            raise CampaignError("Interrupted campaign has only some of the generated inputs")
+        for path in paths:
+            if not Path(path).is_file():
+                raise CampaignError(f"Interrupted campaign input is missing and cannot be restored: {path}")
+        return True
+    if any(command.get("attempts", 0) for command in step["commands"]):
+        raise CampaignError("campaign has consumed unregistered inputs; create a new plan")
+    return False
+
+
+def generated_inputs_state(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    print("reuse" if checked_generated_inputs(manifest, step, args.path) else "fresh")
+
+
+def register_generated_inputs(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.manifest)
+    step = get_step(manifest, args.index, args.step_id)
+    checked_generated_inputs(manifest, step, args.path)
+    records = []
+    for value in args.path:
+        digest = file_fingerprint(value)
+        if digest == "missing":
+            raise CampaignError(f"campaign generated input is missing: {value}")
+        records.append({"path": value, "sha256": digest})
+    step["generated_inputs"] = records
+    validate_manifest_state(args.manifest, manifest)
     write_manifest(args.manifest, manifest)
 
 
@@ -728,6 +822,12 @@ def command_finish(args: argparse.Namespace) -> None:
     command["exit_code"] = args.exit_code
     command["duration_seconds"] = args.duration
     command["finished_at"] = timestamp()
+    if args.state == "interrupted":
+        command.setdefault("interruptions", []).append({
+            "exit_code": args.exit_code,
+            "duration_seconds": args.duration,
+            "finished_at": command["finished_at"],
+        })
     if args.state == "completed" and command.get("restore_file"):
         Path(command["restore_file"]).unlink(missing_ok=True)
     if args.state == "completed" and command.get("session"):
@@ -761,6 +861,8 @@ def update_step(args: argparse.Namespace) -> None:
             for command in step.get("commands", [])
             for value in command.get("preserved_inputs", [])
         }
+        preserved_inputs.update(item["path"] for item in step.get("generated_inputs", []))
+        step["generated_inputs"] = []
         workspace_value = manifest.get("campaign", {}).get("workspace")
         workspace_root = (
             Path(workspace_value).resolve(strict=False)
@@ -801,6 +903,8 @@ def update_step(args: argparse.Namespace) -> None:
 def path_is_preserved(args: argparse.Namespace) -> int:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
+    if any(args.path == item["path"] for item in step.get("generated_inputs", [])):
+        return 0
     if any(
         args.path in command.get("preserved_inputs", [])
         for command in step.get("commands", [])
@@ -865,6 +969,24 @@ def parser() -> argparse.ArgumentParser:
         description="Manage hash-cracker campaign manifests."
     )
     commands = command_parser.add_subparsers(dest="command", required=True)
+
+    state_path = commands.add_parser("state-path")
+    state_path.add_argument("--manifest", required=True)
+    state_path.set_defaults(handler=print_state_path)
+
+    export = commands.add_parser("validate-export")
+    export.add_argument("--manifest", required=True)
+    export.add_argument("--output", required=True)
+    export.set_defaults(handler=validate_export)
+
+    for name, handler in (("inputs-state", generated_inputs_state),
+                          ("inputs-register", register_generated_inputs)):
+        generated = commands.add_parser(name)
+        generated.add_argument("--manifest", required=True)
+        generated.add_argument("--index", type=int, required=True)
+        generated.add_argument("--step-id", required=True)
+        generated.add_argument("--path", action="append", required=True)
+        generated.set_defaults(handler=handler)
 
     create = commands.add_parser("create")
     create.add_argument("--output", required=True)
@@ -946,7 +1068,7 @@ def parser() -> argparse.ArgumentParser:
     command_finish_parser.add_argument("--step-id", required=True)
     command_finish_parser.add_argument("--command-index", type=int, required=True)
     command_finish_parser.add_argument(
-        "--state", choices=("completed", "failed"), required=True
+        "--state", choices=("completed", "failed", "interrupted"), required=True
     )
     command_finish_parser.add_argument("--exit-code", type=int, required=True)
     command_finish_parser.add_argument("--duration", type=int, required=True)

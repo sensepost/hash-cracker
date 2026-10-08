@@ -33,7 +33,7 @@ elif campaign_reuse_preserved_inputs "$tmp" "$pack_rule_path"; then
 elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
     exit 1
 else
-    if ! cat "$POTFILE" | awk -F: '{print $NF}' | tee "$tmp" &>/dev/null; then
+    if ! processor_extract_plaintexts "$POTFILE" | tee "$tmp" &>/dev/null; then
         status_error "PACK rule plaintext extraction failed."
         exit 1
     fi
@@ -47,6 +47,8 @@ else
     fi
     processor_require_file "$pack_rule_path" "PACK rule output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp" "$pack_rule_path" || exit 1
 
 source scripts/selectors/wordlist.sh
 

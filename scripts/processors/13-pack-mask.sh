@@ -20,7 +20,7 @@ elif campaign_reuse_preserved_inputs "$tmp3"; then
 elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
     exit 1
 else
-    if ! cat "$POTFILE" | awk -F: '{print $NF}' | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
+    if ! processor_extract_plaintexts "$POTFILE" | LC_ALL=C sort -u | tee "$tmp" &>/dev/null; then
         status_error "PACK mask plaintext extraction failed."
         exit 1
     fi
@@ -45,6 +45,8 @@ else
     fi
     processor_require_file "$tmp3" "PACK mask output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp3" || exit 1
 
 hashcat_base -a 3 "$tmp3"
 echo -e "\nPACK mask processing done\n"

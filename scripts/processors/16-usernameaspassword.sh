@@ -27,6 +27,8 @@ else
     fi
     processor_require_file "$tmp" "Username output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp" || exit 1
 hashcat_base "$tmp"
 for RULE in "${RULELIST[@]}"; do
     hashcat_base "$tmp" -r "$RULE" "$LOOPBACK"

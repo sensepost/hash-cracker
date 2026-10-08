@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.13.0 "Execution Reliability"'
+    printf '%s' 'v6.14.0 "Durable Recovery"'
 }
 
 function release_label_text() {
@@ -590,11 +590,15 @@ function campaign_command_finish() {
     local duration="$3"
     local state='failed'
 
+    CAMPAIGN_NATIVE_PAUSED=0
     if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
         return 0
     fi
     if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then
         state='completed'
+    elif { [ "$rc" -eq 3 ] || [ "$rc" -eq 4 ]; } && [ -f "${CAMPAIGN_RESTORE_FILE:-}" ]; then
+        state='interrupted'
+        CAMPAIGN_NATIVE_PAUSED=1
     fi
     if ! python3 scripts/campaign.py command-finish \
         --manifest "$CAMPAIGN_MANIFEST" \
@@ -638,6 +642,7 @@ function campaign_artifact_paths() {
         hash-cracker.sh \
         scripts/parameters.sh \
         scripts/campaign.py \
+        scripts/plaintexts.awk \
         scripts/linux.sh \
         scripts/mac.sh \
         scripts/runtime-overrides.sh \
@@ -981,43 +986,56 @@ function processor_require_file() {
 
 function campaign_reuse_preserved_inputs() {
     local path
-    local any_preserved=0
-    local all_preserved=1
+    local state
+    local -a input_args=()
 
     CAMPAIGN_INPUT_REUSE_ERROR=0
     if [ "${CAMPAIGN_MODE:-}" != 'execute' ]; then
         return 1
     fi
     for path in "$@"; do
-        if python3 scripts/campaign.py input-preserved \
-            --manifest "$CAMPAIGN_MANIFEST" \
-            --index "$CAMPAIGN_STEP_INDEX" \
-            --step-id "$CAMPAIGN_STEP_ID" \
-            --path "$path"; then
-            any_preserved=1
-        else
-            all_preserved=0
-        fi
+        input_args+=(--path "$path")
     done
-    if [ "$any_preserved" -eq 0 ]; then
-        return 1
-    fi
-    if [ "$all_preserved" -ne 1 ]; then
-        status_error "Interrupted campaign has only some of the generated inputs required by its command."
+    if ! state=$(python3 scripts/campaign.py inputs-state \
+        --manifest "$CAMPAIGN_MANIFEST" --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" "${input_args[@]}"); then
+        status_error "Unable to verify preserved campaign inputs."
         # shellcheck disable=SC2034
         CAMPAIGN_INPUT_REUSE_ERROR=1
         return 2
     fi
-    for path in "$@"; do
-        if [ ! -f "$path" ]; then
-            status_error "Interrupted campaign input is missing and cannot be restored: $path"
-            # shellcheck disable=SC2034
-            CAMPAIGN_INPUT_REUSE_ERROR=1
-            return 2
-        fi
-    done
+    if [ "$state" = 'fresh' ]; then
+        return 1
+    fi
+    if [ "$state" != 'reuse' ]; then
+        status_error "Invalid campaign input state."
+        # shellcheck disable=SC2034
+        CAMPAIGN_INPUT_REUSE_ERROR=1
+        return 2
+    fi
     status_heading "Reusing preserved campaign input(s) for the interrupted command."
     return 0
+}
+
+function campaign_register_generated_inputs() {
+    local path
+    local -a input_args=()
+    if [ "${CAMPAIGN_MODE:-}" != 'execute' ] || dry_run_enabled; then
+        return 0
+    fi
+    for path in "$@"; do
+        input_args+=(--path "$path")
+    done
+    if ! python3 scripts/campaign.py inputs-register \
+        --manifest "$CAMPAIGN_MANIFEST" --index "$CAMPAIGN_STEP_INDEX" \
+        --step-id "$CAMPAIGN_STEP_ID" "${input_args[@]}"; then
+        status_error "Unable to register generated campaign inputs."
+        return 1
+    fi
+}
+
+function processor_extract_plaintexts() {
+    LC_ALL=C awk -v input_kind="${2:-potfile}" -f scripts/plaintexts.awk "$1"
 }
 
 function processor_bootstrap() {
@@ -1354,35 +1372,13 @@ function ensure_private_directory() {
 }
 
 function campaign_workspace_for_manifest() {
-    local manifest="$1"
-    local manifest_dir
-    local manifest_name
-
-    manifest_dir=$(dirname "$manifest")
-    if ! mkdir -p "$manifest_dir"; then
-        return 1
-    fi
-    if ! manifest_dir=$(cd -P "$manifest_dir" 2>/dev/null && pwd -P); then
-        return 1
-    fi
-    manifest_name=$(basename "$manifest")
-    printf '%s/%s.state/workspace' "$manifest_dir" "$manifest_name"
+    local state_dir
+    state_dir=$(campaign_state_path "$1") || return 1
+    printf '%s/workspace' "$state_dir"
 }
 
 function campaign_state_path() {
-    local manifest="$1"
-    local manifest_dir
-    local manifest_name
-
-    manifest_dir=$(dirname "$manifest")
-    if ! mkdir -p "$manifest_dir"; then
-        return 1
-    fi
-    if ! manifest_dir=$(cd -P "$manifest_dir" 2>/dev/null && pwd -P); then
-        return 1
-    fi
-    manifest_name=$(basename "$manifest")
-    printf '%s/%s.state' "$manifest_dir" "$manifest_name"
+    python3 scripts/campaign.py state-path --manifest "$1"
 }
 
 function campaign_acquire_lock() {
@@ -1526,10 +1522,17 @@ function validate_stats_export_path() {
         "${CAMPAIGN_OUTPUT:-}"
         "${CAMPAIGN_EXECUTE:-}"
         "${CAMPAIGN_RESUME:-}"
+        "${CAMPAIGN_MANIFEST:-}"
     )
     for path in "${protected_paths[@]}"; do
         if [ -n "$path" ] && stats_paths_alias "$STATSEXPORT" "$path"; then
             status_error "Stats export path conflicts with protected input or campaign state: $path"
+            return 1
+        fi
+    done
+    for path in "${CAMPAIGN_OUTPUT:-}" "${CAMPAIGN_EXECUTE:-}" "${CAMPAIGN_RESUME:-}" "${CAMPAIGN_MANIFEST:-}"; do
+        if [ -n "$path" ] && ! python3 scripts/campaign.py validate-export --manifest "$path" --output "$STATSEXPORT"; then
+            status_error "Stats export path conflicts with protected campaign state."
             return 1
         fi
     done
@@ -1700,11 +1703,29 @@ EOF
     return 0
 }
 
-function session_log_keep_count() {
-    case "${SESSION_LOG_KEEP:-}" in
-        '' | *[!0-9]*) echo 0 ;;
-        *) echo "$SESSION_LOG_KEEP" ;;
+function normalize_session_log_keep() {
+    local value="${1-0}"
+    local LC_ALL=C
+    case "$value" in
+        '' | *[!0-9]*)
+            status_error "Session log retention must be a decimal integer from 0 to 2147483647." >&2
+            return 1
+            ;;
     esac
+    while [ "${#value}" -gt 1 ] && [ "${value:0:1}" = 0 ]; do
+        value="${value:1}"
+    done
+    # Compare equal-length decimal strings before any shell arithmetic.
+    # shellcheck disable=SC2071
+    if [ "${#value}" -gt 10 ] || { [ "${#value}" -eq 10 ] && [[ "$value" > '2147483647' ]]; }; then
+        status_error "Session log retention exceeds 2147483647." >&2
+        return 1
+    fi
+    printf '%s\n' "$value"
+}
+
+function session_log_keep_count() {
+    normalize_session_log_keep "${SESSION_LOG_KEEP:-0}"
 }
 
 function prune_session_logs() {
@@ -1714,9 +1735,7 @@ function prune_session_logs() {
     local total
     local prune_count
 
-    case "$keep_count" in
-        '' | *[!0-9]*) keep_count=0 ;;
-    esac
+    keep_count=$(normalize_session_log_keep "$keep_count") || return 1
 
     if [ "$keep_count" -eq 0 ]; then
         return 0

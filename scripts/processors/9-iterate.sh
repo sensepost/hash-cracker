@@ -21,12 +21,14 @@ elif campaign_reuse_preserved_inputs "$tmp"; then
 elif [ "${CAMPAIGN_INPUT_REUSE_ERROR:-0}" -ne 0 ]; then
     exit 1
 else
-    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
+    if ! processor_extract_plaintexts "$POTFILE" | LC_ALL=C sort -u >"$tmp"; then
         status_error "Iteration plaintext extraction failed."
         exit 1
     fi
     processor_require_file "$tmp" "Iteration output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp" || exit 1
 
 for RULE in "${RULELIST[@]}"; do
     hashcat_base "$tmp" -r "$RULE" "$LOOPBACK"

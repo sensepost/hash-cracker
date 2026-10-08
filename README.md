@@ -7,7 +7,7 @@ Useful wordlist sources:
 - <https://weakpass.com/>
 - <https://hashmob.net/>
 
-If `hashcat` outputs values as `$HEX[...]`, see [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
+Potfile-based processors decode valid `$HEX[...]` records automatically before generating candidates. To inspect these values yourself, see [hex-to-readable](https://github.com/crypt0rr/hex-to-readable) or use [CyberChef](https://cyberchef.offsec.nl/).
 
 ## Installation
 
@@ -211,6 +211,14 @@ Create and run a reproducible campaign plan (requires `python3`):
 
 Campaign manifests record the ordered jobs, resolved Hashcat commands, immutable input fingerprints, optional execution-artifact fingerprints, per-step exit codes, and command-level execution state. Plans never execute Hashcat. During execution, every Hashcat command receives a deterministic session name and restore-file path. If a run is interrupted, `--resume` skips completed commands and re-enters the interrupted command with the same session and `--restore`; failed commands are retried with a new session. Generated processor inputs used by an interrupted command are retained unchanged until that campaign step completes. New manifests include a private artifact workspace under `<manifest>.state/workspace`; generated processor inputs and interrupted-command state are kept there with restrictive permissions. Manifest-controlled workspace, restore-file, session, and preserved-input paths are rejected if they escape that private state. Older manifests without a workspace retain compatibility only for user-owned generated temporary inputs whose names begin with `hash-cracker-campaign-`; other external preserved-input paths are rejected. Campaign sidecar state is stored beside the manifest under `<manifest>.state`. Planning or executing the same campaign uses an exclusive lock; another owner fails fast. New manifests reject changed configuration, runtime flags (including `FINGERPRINT_SEGMENT_MAX`), hashlist, wordlist, Hashcat, processor, selector, rule-file contents, or referenced helper artifacts when those fingerprints are present; older manifests continue to use their recorded input and runtime checks. These content fingerprints do not record native-binary source commits or toolchain provenance. The potfile is mutable campaign state and is expected to grow append-only during normal Hashcat execution; reductions trigger a safe statistics recount. Campaign sources are built-in presets or non-interactive job IDs: `1`, `9`, `10`, `11`, `12`, `13`, `14`, `16`, and `19`.
 
+Generated inputs are registered with SHA-256 digests before their first command and retained until the entire step completes. Recovery after a crash, a failed command, or an interruption between commands reuses the registered bytes even if the potfile has grown. Missing, changed, or incomplete registered inputs stop recovery with an error. Older interrupted manifests can adopt their recorded preserved files; an already-started step without recorded inputs must be replanned rather than silently regenerated.
+
+Hashcat checkpoint stops (exit `3`) and runtime stops (exit `4`) pause a campaign when a restore file exists. The wrapper returns `130`, stores Hashcat's raw exit code and interruption history, and stops remaining commands. `--resume` loads the restore file with the same session and attempt. Exit `2`, or a checkpoint/runtime stop without a restore file, fails the step; a later explicit resume retries that command with a new session using the same registered inputs. Exhaustion (exit `1`) completes a search normally.
+
+Manifest symlinks use the canonical target for sidecar state, locking, and atomic writes; writing through an alias preserves the symlink. Stats exports cannot target the active manifest or anything in its `.state` directory, including symlink and hardlink aliases of state files.
+
+Potfile-derived iteration, prefix/suffix, common-substring, PACK, fingerprint, Markov, and digit-removal preprocessing share a byte-oriented plaintext reader implemented with the existing AWK dependency. Potfile records use the last colon-delimited field; Markov wordlist records retain their entire contents, including colons. Valid `$HEX[...]` values decode before transformations, preserving encoded colons and non-ASCII bytes. Empty encodings are valid. Malformed or odd-length encodings, NUL bytes, and encoded LF/CR bytes fail preprocessing with a line-numbered diagnostic, because these text processors cannot represent embedded record separators. Ordinary LF and CRLF record endings are accepted. This reader does not interpret bytes as Unicode characters or change helper input formats.
+
 Run the smoke suite with Bash coverage (requires `python3`):
 
 ```bash
@@ -344,7 +352,7 @@ When the tool starts successfully, it opens an interactive menu with these optio
   - Default per-session file: `logs/session-YYYYmmdd-HHMMSS-PID.log`
   - Convenience pointer: `logs/latest.log` points to the current session file
   - Retention for auto-created logs defaults to `0` (no pruning)
-  - Set `--session-log-keep [N]` to tune retention
+  - Set `--session-log-keep [N]` to tune retention. Values are decimal integers from `0` to `2147483647`; leading zeros are normalized (`08` means `8`). Out-of-range values fail before logs are created or pruned
   - Override path with `SESSION_STATS_LOGFILE`
   - Set `--no-session-log` to disable file logging
 - With `--stats-debug`, the tool prints which refresh path was used (`incremental` or `full recount`).

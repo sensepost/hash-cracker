@@ -290,6 +290,10 @@ fi
 # shellcheck source=/dev/null
 source "$CONFIGFILE"
 
+if [ -n "${SESSION_LOG_KEEP+x}" ]; then
+    SESSION_LOG_KEEP=$(normalize_session_log_keep "$SESSION_LOG_KEEP") || exit 1
+fi
+
 REQUIRED_CONFIG_VARS=(HASHCAT DEVICE HASHTYPE HASHLIST POTFILE WORDLIST WORDLIST2)
 for REQUIRED_CONFIG_VAR in "${REQUIRED_CONFIG_VARS[@]}"; do
     if [ -z "${!REQUIRED_CONFIG_VAR}" ]; then
@@ -336,25 +340,13 @@ run_hashcat() {
                 return 1
             fi
             command_args=("${command_args[@]:1}")
-            if [ "$CAMPAIGN_RESTORE" -eq 1 ]; then
-                local has_restore=0
-                local restored_arg
-                for restored_arg in "${command_args[@]}"; do
-                    if [ "$restored_arg" = '--restore' ]; then
-                        has_restore=1
-                        break
-                    fi
-                done
-                if [ "$has_restore" -eq 0 ]; then
-                    command_args+=("--restore")
-                fi
-            fi
+
         else
             command_args+=("--session=$CAMPAIGN_SESSION_NAME")
             command_args+=("--restore-file-path=$CAMPAIGN_RESTORE_FILE")
-            if [ "$CAMPAIGN_RESTORE" -eq 1 ]; then
-                command_args+=("--restore")
-            fi
+        fi
+        if [ "$CAMPAIGN_RESTORE" -eq 1 ]; then
+            command_args=("--session=$CAMPAIGN_SESSION_NAME" "--restore-file-path=$CAMPAIGN_RESTORE_FILE" --restore)
         fi
     fi
 
@@ -392,6 +384,14 @@ run_hashcat() {
         fi
         # shellcheck disable=SC2034
         CAMPAIGN_ACTIVE_COMMAND_INDEX=-1
+        if [ "$finish_rc" -eq 0 ] && [ "${CAMPAIGN_NATIVE_PAUSED:-0}" -eq 1 ]; then
+            status_heading "Hashcat paused with a saved checkpoint (exit code $rc). Resume this campaign to continue."
+            exit 130
+        fi
+        if [ "$rc" -eq 2 ] || [ "$rc" -eq 3 ] || [ "$rc" -eq 4 ]; then
+            status_error "Hashcat stopped without a resumable checkpoint (exit code $rc)."
+            exit "$rc"
+        fi
     fi
 
     if [ $rc -ne 0 ]; then

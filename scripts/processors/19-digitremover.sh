@@ -25,38 +25,14 @@ else
         status_error "Digit-removal source potfile is missing: $POTFILE"
         exit 1
     fi
-    if ! awk -F: '{print $NF}' "$POTFILE" | awk '!/^\$HEX\[/' | sed 's/[0-9]//g' >"$tmp"; then
-        status_error "Unable to generate digit-removal candidates from the potfile."
-        exit 1
-    fi
-    if ! awk -F: '{print $NF}' "$POTFILE" | LC_ALL=C awk '
-        function hex_digit(value) {
-            return index("0123456789abcdef", tolower(value)) - 1
-        }
-        /^\$HEX\[/ {
-            encoded = $0
-            sub(/^\$HEX\[/, "", encoded)
-            sub(/\]$/, "", encoded)
-            if (length(encoded) % 2 != 0 || encoded !~ /^[[:xdigit:]]*$/) {
-                exit 1
-            }
-            decoded = ""
-            for (position = 1; position <= length(encoded); position += 2) {
-                high = hex_digit(substr(encoded, position, 1))
-                low = hex_digit(substr(encoded, position + 1, 1))
-                if (high < 0 || low < 0) {
-                    exit 1
-                }
-                decoded = decoded sprintf("%c", high * 16 + low)
-            }
-            print decoded
-        }
-    ' | LC_ALL=C sed 's/[0-9]//g' >>"$tmp"; then
-        status_error "Unable to decode hexadecimal potfile candidates."
+    if ! processor_extract_plaintexts "$POTFILE" | LC_ALL=C sed 's/[0-9]//g' >"$tmp"; then
+        status_error "Unable to decode potfile candidates for digit removal."
         exit 1
     fi
     processor_require_file "$tmp" "Digit-removal output" || exit 1
 fi
+
+campaign_register_generated_inputs "$tmp" || exit 1
 
 # Logic
 hashcat_base -a6 "$tmp" -j c '?s?d?d?d?d' --increment
