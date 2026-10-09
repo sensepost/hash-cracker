@@ -21,6 +21,7 @@ from pathlib import Path
 SCHEMA_VERSION = "2"
 LEGACY_SCHEMA_VERSION = "1"
 SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+FINGERPRINT_SEGMENT_MAX = 64
 LEGACY_TEMPFILE_PREFIX = "hash-cracker-campaign-"
 
 
@@ -187,6 +188,64 @@ def validate_manifest_state(manifest_path: str, manifest: dict) -> None:
                 else:
                     validate_legacy_temp_path(value, "preserved input")
 
+            attempt_outcomes = command.get("attempt_outcomes", [])
+            if not isinstance(attempt_outcomes, list):
+                raise CampaignError(
+                    f"campaign command has invalid attempt outcomes: {step['id']}"
+                )
+            seen_attempts = set()
+            for outcome in attempt_outcomes:
+                if not isinstance(outcome, dict):
+                    raise CampaignError(
+                        f"campaign command has invalid attempt outcome: {step['id']}"
+                    )
+                attempt = outcome.get("attempt")
+                session_id = outcome.get("session")
+                if (
+                    not isinstance(attempt, int)
+                    or isinstance(attempt, bool)
+                    or attempt < 1
+                    or not isinstance(session_id, str)
+                ):
+                    raise CampaignError(
+                        f"campaign command has invalid attempt identity: {step['id']}"
+                    )
+                validate_component(session_id, "attempt session")
+                identity = (attempt, session_id)
+                if identity in seen_attempts:
+                    raise CampaignError(
+                        f"campaign command has duplicate attempt outcomes: {step['id']}"
+                    )
+                seen_attempts.add(identity)
+                if outcome.get("outcome") not in (
+                    "running",
+                    "completed",
+                    "failed",
+                    "unknown",
+                ):
+                    raise CampaignError(
+                        f"campaign command has invalid attempt outcome state: {step['id']}"
+                    )
+                for field in ("started_at", "finished_at", "detected_at"):
+                    value = outcome.get(field)
+                    if value is not None and not isinstance(value, str):
+                        raise CampaignError(
+                            f"campaign command has invalid attempt timestamp: {step['id']}"
+                        )
+                for field in ("exit_code", "duration_seconds"):
+                    value = outcome.get(field)
+                    if value is not None and (
+                        not isinstance(value, int) or isinstance(value, bool)
+                    ):
+                        raise CampaignError(
+                            f"campaign command has invalid attempt {field}: {step['id']}"
+                        )
+                digest = outcome.get("argv_sha256")
+                if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", str(digest)):
+                    raise CampaignError(
+                        f"campaign command has invalid attempt argv fingerprint: {step['id']}"
+                    )
+
 
 def ensure_private_directory(path: Path) -> None:
     """Create or tighten a directory used for private campaign state."""
@@ -222,6 +281,28 @@ def file_fingerprint(value: str) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def normalize_fingerprint_segment_max(value: object, label: str) -> str:
+    """Return a bounded positive decimal value without interpreting octal."""
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]+", value):
+        raise CampaignError(
+            f"{label} must be a decimal integer from 1 to {FINGERPRINT_SEGMENT_MAX}"
+        )
+    normalized = value.lstrip("0") or "0"
+    maximum = str(FINGERPRINT_SEGMENT_MAX)
+    if normalized == "0" or len(normalized) > len(maximum) or (
+        len(normalized) == len(maximum) and normalized > maximum
+    ):
+        raise CampaignError(
+            f"{label} must be a decimal integer from 1 to {FINGERPRINT_SEGMENT_MAX}"
+        )
+    return normalized
+
+
+def argv_fingerprint(argv: list[str]) -> str:
+    """Fingerprint an argv vector without copying its values into attempt history."""
+    return hashlib.sha256(b"\0".join(value.encode("utf-8") for value in argv)).hexdigest()
 
 
 def load_manifest(path: str) -> dict:
@@ -280,6 +361,7 @@ def load_manifest(path: str) -> dict:
             command.setdefault("executed_preview", None)
             command.setdefault("executed_argv", None)
             command.setdefault("preserved_inputs", [])
+            command.setdefault("attempt_outcomes", [])
     validate_manifest_state(path, manifest)
     return manifest
 
@@ -362,6 +444,7 @@ def command_record(preview: str, argv: list[str] | None = None) -> dict:
         "executed_preview": None,
         "executed_argv": None,
         "preserved_inputs": [],
+        "attempt_outcomes": [],
     }
 
 
@@ -440,7 +523,9 @@ def runtime_metadata(args: argparse.Namespace) -> dict:
     }
     fingerprint_segment_max = getattr(args, "fingerprint_segment_max", None)
     if fingerprint_segment_max is not None:
-        runtime["fingerprint_segment_max"] = fingerprint_segment_max
+        runtime["fingerprint_segment_max"] = normalize_fingerprint_segment_max(
+            fingerprint_segment_max, "fingerprint_segment_max"
+        )
     return runtime
 
 
@@ -583,10 +668,36 @@ def validate_manifest(args: argparse.Namespace) -> None:
     for name, current_value in runtime_metadata(args).items():
         if name == "fingerprint_segment_max" and name not in expected_runtime:
             continue
-        if expected_runtime.get(name) != current_value:
+        expected_value = expected_runtime.get(name)
+        if name == "fingerprint_segment_max":
+            expected_value = normalize_fingerprint_segment_max(
+                expected_value, "campaign manifest fingerprint_segment_max"
+            )
+        if expected_value != current_value:
             raise CampaignError(
                 f"campaign runtime changed for {name}: "
-                f"expected {expected_runtime.get(name)!r}, got {current_value!r}"
+                f"expected {expected_value!r}, got {current_value!r}"
+            )
+
+    expected_potfile = manifest["inputs"].get("potfile")
+    if "potfile" in manifest["inputs"]:
+        if (
+            not isinstance(expected_potfile, dict)
+            or not isinstance(expected_potfile.get("path"), str)
+            or not expected_potfile.get("path")
+            or expected_potfile.get("mutable") is not True
+            or not Path(expected_potfile["path"]).is_absolute()
+            or resolved_path(expected_potfile["path"]) != expected_potfile["path"]
+        ):
+            raise CampaignError("campaign manifest has invalid potfile identity")
+        current_potfile = getattr(args, "potfile", None)
+        if not isinstance(current_potfile, str) or not current_potfile:
+            raise CampaignError("current campaign potfile path is missing")
+        current_potfile_path = resolved_path(current_potfile)
+        if expected_potfile["path"] != current_potfile_path:
+            raise CampaignError(
+                "campaign potfile path changed: "
+                f"expected {expected_potfile['path']}, got {current_potfile_path}"
             )
     print(f"Campaign validated: {args.manifest}")
 
@@ -625,9 +736,118 @@ def get_command(step: dict, command_index: int) -> dict:
     return commands[command_index]
 
 
+def ensure_current_attempt_outcome(command: dict) -> dict:
+    """Find or add the outcome record for the command's current logical attempt."""
+    attempt_number = command.get("attempts")
+    session_id = command.get("session")
+    if not isinstance(attempt_number, int) or attempt_number < 1 or not session_id:
+        raise CampaignError("campaign command has no current attempt identity")
+    outcomes = command.setdefault("attempt_outcomes", [])
+    for outcome in reversed(outcomes):
+        if outcome.get("attempt") == attempt_number and outcome.get("session") == session_id:
+            return outcome
+    outcome = {
+        "attempt": attempt_number,
+        "session": session_id,
+        "started_at": command.get("started_at") or timestamp(),
+        "finished_at": None,
+        "detected_at": None,
+        "outcome": "running",
+        "exit_code": None,
+        "duration_seconds": None,
+        "argv_sha256": None,
+    }
+    outcomes.append(outcome)
+    return outcome
+
+
+def close_unknown_attempt(command: dict, detected_at: str) -> None:
+    """Record an unclean running command with no recoverable checkpoint."""
+    outcome = ensure_current_attempt_outcome(command)
+    outcome.update(
+        {
+            "finished_at": None,
+            "detected_at": detected_at,
+            "outcome": "unknown",
+            "exit_code": None,
+            "duration_seconds": None,
+        }
+    )
+
+
+def attempt_interruption_duration(command: dict, attempt: int, session_id: str) -> int:
+    """Sum recorded native-stop durations for one logical attempt."""
+    return sum(
+        event["duration_seconds"]
+        for event in command.get("interruptions", [])
+        if event.get("attempt") == attempt
+        and event.get("session") == session_id
+        and isinstance(event.get("duration_seconds"), int)
+        and not isinstance(event.get("duration_seconds"), bool)
+    )
+
+
+def require_accepted_checkpoint(command: dict, step_id: str, command_index: int) -> None:
+    """Fail before changing state when an acknowledged native checkpoint vanished."""
+    if command.get("state") != "interrupted":
+        return
+    if command.get("exit_code") not in (3, 4) or not command.get("session") or not command.get("restore_file"):
+        raise CampaignError(
+            "campaign has invalid paused-command checkpoint metadata "
+            f"for {step_id} command {command_index}"
+        )
+    if not Path(command["restore_file"]).is_file():
+        raise CampaignError(
+            "campaign checkpoint is missing for explicitly paused command "
+            f"{step_id} command {command_index}; restore the checkpoint or create a new plan"
+        )
+
+
+def require_running_attempt_metadata(
+    command: dict, step_id: str, command_index: int
+) -> None:
+    """Reject malformed running records before replacing their recovery identity."""
+    if command.get("state") != "running":
+        return
+    attempts = command.get("attempts")
+    if (
+        not command.get("session")
+        or not command.get("restore_file")
+        or not isinstance(attempts, int)
+        or isinstance(attempts, bool)
+        or attempts < 1
+    ):
+        raise CampaignError(
+            "campaign has invalid running-command attempt metadata "
+            f"for {step_id} command {command_index}"
+        )
+
+
+def cleanup_completed_command_artifacts(manifest_path: str, command: dict) -> None:
+    """Remove recovery files after completion, leaving failed cleanup retryable."""
+    ensure_private_directory(campaign_state_dir(manifest_path))
+    paths = []
+    restore_file = command.get("restore_file")
+    if restore_file:
+        paths.append(Path(restore_file))
+    session_id = command.get("session")
+    if session_id:
+        paths.append(campaign_state_dir(manifest_path) / f"{session_id}.argv")
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            raise CampaignError(
+                f"campaign command is completed but recovery cleanup failed for {path}: {error}"
+            ) from error
+
+
 def mark_running(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
+    for index, command in enumerate(step["commands"]):
+        require_running_attempt_metadata(command, step["id"], index)
+        require_accepted_checkpoint(command, step["id"], index)
     step["state"] = "running"
     step["attempts"] = int(step.get("attempts", 0)) + 1
     step["started_at"] = timestamp()
@@ -641,7 +861,6 @@ def command_start(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
     state_dir = campaign_state_dir(args.manifest)
-    ensure_private_directory(state_dir)
     command = get_command(step, args.command_index)
 
     for previous in step["commands"][: args.command_index]:
@@ -650,13 +869,21 @@ def command_start(args: argparse.Namespace) -> None:
                 f"campaign command order is blocked before index {args.command_index}"
             )
 
+    require_running_attempt_metadata(command, step["id"], args.command_index)
+    require_accepted_checkpoint(command, step["id"], args.command_index)
     if command.get("state") == "completed":
+        cleanup_completed_command_artifacts(args.manifest, command)
         print("completed\t\t\t0\t")
         return
 
-    was_running = command.get("state") in ("running", "interrupted") and bool(
-        command.get("session")
-    )
+    ensure_private_directory(state_dir)
+    was_running = command.get("state") in ("running", "interrupted") and bool(command.get("session"))
+    restore_file = command.get("restore_file") or ""
+    restore_exists = bool(restore_file) and Path(restore_file).is_file()
+    if command.get("state") == "running" and was_running and not restore_exists:
+        close_unknown_attempt(command, timestamp())
+        was_running = False
+
     if not was_running:
         if command.get("restore_file"):
             Path(command["restore_file"]).unlink(missing_ok=True)
@@ -675,6 +902,12 @@ def command_start(args: argparse.Namespace) -> None:
         )
         command["state"] = "running"
         command["started_at"] = timestamp()
+        command["finished_at"] = None
+        command["exit_code"] = None
+        command["duration_seconds"] = None
+        ensure_current_attempt_outcome(command)
+    else:
+        ensure_current_attempt_outcome(command)
         command["finished_at"] = None
         command["exit_code"] = None
         command["duration_seconds"] = None
@@ -742,10 +975,14 @@ def record_command(args: argparse.Namespace) -> None:
             "create a new plan"
         )
     command["executed_preview"] = args.preview
+    outcome = ensure_current_attempt_outcome(command)
     if restoring:
         command["restore_argv"] = argv
+        if outcome.get("argv_sha256") is None and command.get("executed_argv"):
+            outcome["argv_sha256"] = argv_fingerprint(command["executed_argv"])
     else:
         command["executed_argv"] = argv
+        outcome["argv_sha256"] = argv_fingerprint(argv)
     write_manifest(args.manifest, manifest)
 
 
@@ -813,28 +1050,44 @@ def register_generated_inputs(args: argparse.Namespace) -> None:
 def command_finish(args: argparse.Namespace) -> None:
     manifest = load_manifest(args.manifest)
     step = get_step(manifest, args.index, args.step_id)
-    state_dir = campaign_state_dir(args.manifest)
-    ensure_private_directory(state_dir)
     command = get_command(step, args.command_index)
     if command.get("state") == "completed":
+        cleanup_completed_command_artifacts(args.manifest, command)
         return
     command["state"] = args.state
     command["exit_code"] = args.exit_code
     command["duration_seconds"] = args.duration
     command["finished_at"] = timestamp()
+    attempt_outcome = ensure_current_attempt_outcome(command)
     if args.state == "interrupted":
         command.setdefault("interruptions", []).append({
+            "attempt": command.get("attempts"),
+            "session": command.get("session"),
             "exit_code": args.exit_code,
             "duration_seconds": args.duration,
             "finished_at": command["finished_at"],
         })
-    if args.state == "completed" and command.get("restore_file"):
-        Path(command["restore_file"]).unlink(missing_ok=True)
-    if args.state == "completed" and command.get("session"):
-        Path(state_dir / f"{command['session']}.argv").unlink(missing_ok=True)
+        attempt_outcome["duration_seconds"] = attempt_interruption_duration(
+            command, command["attempts"], command["session"]
+        )
+    else:
+        attempt_outcome.update(
+            {
+                "finished_at": command["finished_at"],
+                "detected_at": None,
+                "outcome": args.state,
+                "exit_code": args.exit_code,
+                "duration_seconds": args.duration
+                + attempt_interruption_duration(
+                    command, command["attempts"], command["session"]
+                ),
+            }
+        )
     if args.state == "completed":
         step["current_command"] = None
     write_manifest(args.manifest, manifest)
+    if args.state == "completed":
+        cleanup_completed_command_artifacts(args.manifest, command)
 
 
 def update_step(args: argparse.Namespace) -> None:
@@ -1016,6 +1269,7 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("--manifest", required=True)
     validate.add_argument("--config", required=True)
     validate.add_argument("--hashlist", required=True)
+    validate.add_argument("--potfile", required=True)
     validate.add_argument("--wordlist", required=True)
     validate.add_argument("--wordlist2", required=True)
     validate.add_argument("--hashcat", required=True)

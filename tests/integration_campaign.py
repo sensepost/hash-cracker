@@ -65,6 +65,24 @@ sys.exit(subprocess.run([os.environ['CHECKPOINT_HASHCAT'], *args]).returncode)
         inputs = stopped['generated_inputs']
         assert inputs
         before = {item['path']: Path(item['path']).read_bytes() for item in inputs}
+        checkpoint = restore.read_bytes()
+        restore.unlink()
+        missing = run('--resume', str(manifest))
+        assert missing.returncode == 1, missing.stdout + missing.stderr
+        assert 'campaign checkpoint is missing' in missing.stdout + missing.stderr
+        missing_state = json.loads(manifest.read_text())
+        missing_command = missing_state['steps'][0]['commands'][0]
+        assert missing_state['status'] == 'paused'
+        assert missing_state['steps'][0]['state'] == 'interrupted'
+        assert missing_command['state'] == 'interrupted'
+        assert missing_command['attempts'] == 1
+        assert missing_command['session'] == command['session']
+        assert not restore.exists()
+        assert before == {path: Path(path).read_bytes() for path in before}
+        calls = [json.loads(line) for line in (root / 'calls').read_text().splitlines()]
+        assert len(calls) == 1, calls
+
+        restore.write_bytes(checkpoint)
         result = run('--resume', str(manifest))
         assert result.returncode == 130, result.stdout + result.stderr
         resumed = json.loads(manifest.read_text())['steps'][0]['commands'][0]
@@ -74,7 +92,7 @@ sys.exit(subprocess.run([os.environ['CHECKPOINT_HASHCAT'], *args]).returncode)
         assert before == {path: Path(path).read_bytes() for path in before}
         calls = [json.loads(line) for line in (root / 'calls').read_text().splitlines()]
         assert len(calls) == 2 and '--restore' in calls[1], calls
-        print('[integration] real Hashcat saved and loaded a runtime checkpoint with the same session and candidate bytes')
+        print('[integration] real Hashcat checkpoint loss failed closed, then restore reused the same session and candidate bytes')
 
 
 if __name__ == '__main__':

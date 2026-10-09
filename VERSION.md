@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## v6.15.0 - Campaign Integrity
+
+### Added
+
+- Recorded command outcome history with logical attempt/session identity,
+  timestamps, raw exit codes, durations, and argv fingerprints. Native
+  interruptions remain attached to their attempt; unclean attempts are recorded
+  as unknown without guessing an exit code or duration. (#111)
+
+### Fixed
+
+- Failed closed when a checkpoint disappears after an exit-3/4 pause was saved,
+  without changing the paused manifest or invoking Hashcat. Unclean running
+  commands without a checkpoint now receive an unknown outcome and a new
+  attempt/session while reusing registered inputs. (#107)
+- Persisted command completion before removing restore and argv recovery files,
+  then retried leftover cleanup for completed commands without rerunning
+  Hashcat. (#108)
+- Normalized positive decimal fingerprint and custom brute-force lengths before
+  arithmetic, bounded them to 1–64 and 1–99 respectively, and stored
+  fingerprint settings in canonical decimal form. (#109)
+- Validated the canonical potfile target when resuming while allowing its
+  contents to change at that same path. (#110)
+
 ## v6.14.0 - Durable Recovery
 
 ### Added

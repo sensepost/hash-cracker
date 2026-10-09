@@ -135,6 +135,72 @@ class CampaignContractTests(unittest.TestCase):
         with self.assertRaisesRegex(campaign.CampaignError, "fingerprint_segment_max"):
             campaign.validate_manifest(args)
 
+    def test_fingerprint_runtime_is_canonical_decimal_and_bounded(self) -> None:
+        args = self.create_args()
+        args.fingerprint_segment_max = "010"
+        campaign.create_manifest(args)
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["runtime"]["fingerprint_segment_max"], "10")
+
+        args.manifest = str(self.manifest)
+        args.fingerprint_segment_max = "00010"
+        campaign.validate_manifest(args)
+
+        manifest["runtime"]["fingerprint_segment_max"] = "00010"
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        args.fingerprint_segment_max = "10"
+        campaign.validate_manifest(args)
+
+        for value in ("1", "64", "064"):
+            with self.subTest(valid_boundary=value):
+                args.fingerprint_segment_max = value
+                self.assertEqual(
+                    campaign.runtime_metadata(args)["fingerprint_segment_max"],
+                    str(int(value)),
+                )
+
+        for value in ("", "00", "65", "9223372036854775808", "８", "8x"):
+            with self.subTest(value=value):
+                args.fingerprint_segment_max = value
+                with self.assertRaisesRegex(campaign.CampaignError, "decimal integer from 1 to 64"):
+                    campaign.runtime_metadata(args)
+
+    def test_potfile_identity_allows_content_changes_but_rejects_target_changes(self) -> None:
+        first = self.root / "pot-a"
+        second = self.root / "pot-b"
+        alias = self.root / "potfile"
+        first.write_text("hash:one\n", encoding="utf-8")
+        second.write_text("hash:two\n", encoding="utf-8")
+        alias.symlink_to(first)
+        args = self.create_args()
+        args.potfile = str(alias)
+        campaign.create_manifest(args)
+        args.manifest = str(self.manifest)
+
+        first.write_text("hash:one\nhash:another\n", encoding="utf-8")
+        campaign.validate_manifest(args)
+
+        alias.unlink()
+        alias.symlink_to(second)
+        with self.assertRaisesRegex(campaign.CampaignError, "campaign potfile path changed"):
+            campaign.validate_manifest(args)
+
+    def test_potfile_identity_allows_legacy_absence_and_rejects_malformed_presence(self) -> None:
+        args = self.create_args()
+        campaign.create_manifest(args)
+        manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        del manifest["inputs"]["potfile"]
+        args.manifest = str(self.manifest)
+        args.potfile = str(self.root / "different-potfile")
+        Path(args.potfile).write_text("", encoding="utf-8")
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        campaign.validate_manifest(args)
+
+        manifest["inputs"]["potfile"] = None
+        self.manifest.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(campaign.CampaignError, "invalid potfile identity"):
+            campaign.validate_manifest(args)
+
     def test_validation_allows_legacy_missing_fingerprint_setting(self) -> None:
         args = self.create_args()
         campaign.create_manifest(args)
@@ -488,6 +554,11 @@ class CampaignContractTests(unittest.TestCase):
     def test_command_record_allows_only_campaign_generated_flags_to_differ(self) -> None:
         args = self.create_args()
         campaign.create_manifest(args)
+        start_args = argparse.Namespace(
+            manifest=str(self.manifest), index=0, step_id="step-001", command_index=0
+        )
+        campaign.command_start(start_args)
+        command = campaign.load_manifest(str(self.manifest))["steps"][0]["commands"][0]
         record_args = argparse.Namespace(
             manifest=str(self.manifest),
             index=0,
@@ -496,14 +567,17 @@ class CampaignContractTests(unittest.TestCase):
             preview=(
                 f"{self.hashcat} --bitmap-max=24 -d 1 "
                 f"--potfile-path={self.potfile} -m1000 {self.hashlist} "
-                "--session=fixture --restore-file-path=/tmp/fixture.restore --restore"
+                f"--session={command['session']} "
+                f"--restore-file-path={command['restore_file']}"
             ),
         )
 
         campaign.record_command(record_args)
         manifest = json.loads(self.manifest.read_text(encoding="utf-8"))
+        executed_argv = manifest["steps"][0]["commands"][0]["executed_argv"]
         self.assertEqual(
-            manifest["steps"][0]["commands"][0]["executed_argv"][-1], "--restore"
+            executed_argv[-2:],
+            [f"--session={command['session']}", f"--restore-file-path={command['restore_file']}"]
         )
 
     def test_command_record_rejects_processor_argument_drift(self) -> None:

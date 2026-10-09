@@ -1224,12 +1224,12 @@ assert_rc_eq 1
 assert_contains "campaign artifact changed:"
 
 CAMPAIGN_TUNING_PATH="$TMP_DIR/fingerprint-tuning-campaign.json"
-run_case campaign_fingerprint_tuning_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' ./hash-cracker.sh --plan 14 --output '$CAMPAIGN_TUNING_PATH'"
+run_case campaign_fingerprint_tuning_plan bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=08 ./hash-cracker.sh --plan 14 --output '$CAMPAIGN_TUNING_PATH'"
 assert_rc_eq 0
 run_case campaign_fingerprint_tuning_drift bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=1 ./hash-cracker.sh --execute '$CAMPAIGN_TUNING_PATH'"
 assert_rc_eq 1
 assert_contains "campaign runtime changed for fingerprint_segment_max"
-run_case campaign_fingerprint_tuning_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=8 ./hash-cracker.sh --execute '$CAMPAIGN_TUNING_PATH'"
+run_case campaign_fingerprint_tuning_execute bash -lc "HASH_CRACKER_CONFIG='$CAMPAIGN_ARTIFACT_CONFIG' FINGERPRINT_SEGMENT_MAX=008 ./hash-cracker.sh --execute '$CAMPAIGN_TUNING_PATH'"
 assert_rc_eq 0
 if ! python3 - "$CAMPAIGN_TUNING_PATH" <<'PY'; then
 import json
@@ -1864,8 +1864,8 @@ run_case common_substring_helper_failure bash -lc "COMMON_SUBSTR_FAIL=1 ./hash-c
 assert_rc_eq 1
 assert_contains "Common-substring helper preprocessing failed."
 assert_not_contains "Substring processing done"
-if ! grep -Fq '"release": "v6.14.0 \"Durable Recovery\""' "$PRESET_STATS_EXPORT_PATH"; then
-    fail_with_log "preset stats export missing v6.14.0 release marker" "$PRESET_STATS_EXPORT_PATH"
+if ! grep -Fq '"release": "v6.15.0 \"Campaign Integrity\""' "$PRESET_STATS_EXPORT_PATH"; then
+    fail_with_log "preset stats export missing v6.15.0 release marker" "$PRESET_STATS_EXPORT_PATH"
 fi
 
 echo "[smoke] invalid --job selection fails clearly"
@@ -1965,6 +1965,23 @@ assert_contains "producing combinator candidates up to 16 chars"
 assert_contains "-a 1"
 assert_contains "Fingerprint attack done"
 
+run_case fingerprint_decimal_normalized bash -lc "printf '14\n0\n' | FINGERPRINT_SEGMENT_MAX=010 ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "would generate fingerprint fragments up to 10 chars"
+assert_contains "producing combinator candidates up to 20 chars"
+
+run_case fingerprint_decimal_empty bash -lc "printf '14\n0\n' | FINGERPRINT_SEGMENT_MAX='' ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid FINGERPRINT_SEGMENT_MAX:"
+
+run_case fingerprint_decimal_zero bash -lc "printf '14\n0\n' | FINGERPRINT_SEGMENT_MAX=00 ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "Invalid FINGERPRINT_SEGMENT_MAX: 00"
+
+run_case fingerprint_decimal_over_max bash -lc "printf '14\n0\n' | FINGERPRINT_SEGMENT_MAX=65 ./hash-cracker.sh --dry-run"
+assert_rc_eq 0
+assert_contains "FINGERPRINT_SEGMENT_MAX must be a decimal integer from 1 to 64"
+
 echo "[smoke] fingerprint generator emits longer fragments"
 FINGERPRINT_FAKE_HASHCAT="$TMP_DIR/fingerprint-fake-hashcat.sh"
 FINGERPRINT_MAX_FILE="$TMP_DIR/fingerprint-max-len.txt"
@@ -1990,14 +2007,14 @@ HASHLIST=$FINGERPRINT_HASHLIST
 POTFILE=$FINGERPRINT_POTFILE
 WORDLIST=wordlists/ignis-1M.txt
 WORDLIST2=wordlists/ignis-1K.txt
-FINGERPRINT_SEGMENT_MAX=8
+FINGERPRINT_SEGMENT_MAX=010
 EOF
 
 run_case fingerprint_generator bash -lc "printf '14\n0\n' | ./hash-cracker.sh"
 assert_rc_eq 0
 assert_contains "Fingerprint attack done"
-if [ "$(cat "$FINGERPRINT_MAX_FILE")" -ne 8 ]; then
-    fail_with_log "fingerprint generator did not emit 8-character fragments" "$LAST_LOG"
+if [ "$(cat "$FINGERPRINT_MAX_FILE")" -ne 10 ]; then
+    fail_with_log "fingerprint generator did not emit 10-character fragments" "$LAST_LOG"
 fi
 if ! grep -Fq -- "-a 1" "$FINGERPRINT_ARGS_FILE"; then
     fail_with_log "fingerprint hashcat command did not use combinator mode" "$FINGERPRINT_ARGS_FILE"
@@ -2188,6 +2205,18 @@ run_case processor_21_zero_length bash -lc "printf '21\n0\n2\nn\nn\n0\n' | ./has
 assert_rc_eq 0
 assert_contains "NO!"
 assert_contains "Custom Brute Force Processing Done"
+
+MASK_ARGS_FILE="$TMP_DIR/custom-mask-args.txt"
+run_case processor_21_leading_zero_length bash -lc "source '$REPO_ROOT/hash-cracker.sh'; CONFIGFILE='$CONFIG_PATH'; STATICCONFIG=true; DRYRUN=''; hashcat_base() { printf '%s\\n' \"\$@\" >'$MASK_ARGS_FILE'; }; printf '08\\nn\\n' | source scripts/processors/21-custom-brute-force.sh"
+assert_rc_eq 0
+if ! python3 - "$MASK_ARGS_FILE" <<'PY'; then
+import sys
+
+args = open(sys.argv[1], encoding="utf-8").read().splitlines()
+assert args == ["-a3", "?a" * 8, ""]
+PY
+    fail_with_log "leading-zero brute-force length did not produce exactly eight mask tokens" "$LAST_LOG"
+fi
 
 run_case processor_21_increment bash -lc "printf '21\n2\ny\n0\n' | ./hash-cracker.sh --dry-run"
 assert_rc_eq 0
