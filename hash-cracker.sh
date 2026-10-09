@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.14.0 "Durable Recovery"'
+    printf '%s' 'v6.15.0 "Campaign Integrity"'
 }
 
 function release_label_text() {
@@ -767,7 +767,7 @@ function run_campaign_plan() {
         --loopback="$LOOPBACK"
         --hwmon="$HWMON"
         --showcracked="$SHOWCRACKED"
-        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX:-8}"
+        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX-8}"
     )
     campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
     "${campaign_args[@]}"
@@ -815,6 +815,7 @@ function run_campaign_execute() {
         --manifest "$manifest"
         --config "$CONFIGFILE"
         --hashlist "$HASHLIST"
+        --potfile "$POTFILE"
         --wordlist "$WORDLIST"
         --wordlist2 "$WORDLIST2"
         --hashcat "$HASHCAT_BIN"
@@ -824,7 +825,7 @@ function run_campaign_execute() {
         --loopback="$LOOPBACK"
         --hwmon="$HWMON"
         --showcracked="$SHOWCRACKED"
-        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX:-8}"
+        --fingerprint-segment-max "${FINGERPRINT_SEGMENT_MAX-8}"
     )
     campaign_args+=("${CAMPAIGN_ARTIFACT_ARGS[@]}")
     if ! "${campaign_args[@]}"; then
@@ -1719,6 +1720,32 @@ function normalize_session_log_keep() {
     # shellcheck disable=SC2071
     if [ "${#value}" -gt 10 ] || { [ "${#value}" -eq 10 ] && [[ "$value" > '2147483647' ]]; }; then
         status_error "Session log retention exceeds 2147483647." >&2
+        return 1
+    fi
+    printf '%s\n' "$value"
+}
+
+function normalize_bounded_positive_decimal() {
+    local value="${1-}"
+    local maximum="${2-}"
+    local label="${3:-Value}"
+    local LC_ALL=C
+
+    case "$value" in
+        '' | *[!0123456789]*)
+            status_error "$label must be a decimal integer from 1 to $maximum." >&2
+            return 1
+            ;;
+    esac
+    while [ "${#value}" -gt 1 ] && [ "${value:0:1}" = 0 ]; do
+        value="${value:1}"
+    done
+    # Compare decimal strings before any arithmetic, so leading zeros and large input are safe.
+    # shellcheck disable=SC2071
+    if [ "$value" = 0 ] || [ "${#value}" -gt "${#maximum}" ] || {
+        [ "${#value}" -eq "${#maximum}" ] && [[ "$value" > "$maximum" ]]
+    }; then
+        status_error "$label must be a decimal integer from 1 to $maximum." >&2
         return 1
     fi
     printf '%s\n' "$value"

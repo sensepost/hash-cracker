@@ -14,20 +14,20 @@ while true; do
         status_error "Unable to read the brute-force length."
         exit 1
     fi
-    if [[ "$CHARS" =~ ^[0-9]+$ ]] && [ "$CHARS" -ge 1 ]; then
-        COUNT="$CHARS"
-        while [ "$COUNT" -gt 0 ]; do
-            TARGET+="?a"
-            COUNT=$((COUNT - 1))
-        done
-        break
-    fi
-    if [[ "$CHARS" =~ ^[0-9]+$ ]]; then
+    if [[ "$CHARS" =~ ^[0123456789]+$ ]]; then
+        if COUNT="$(normalize_bounded_positive_decimal "$CHARS" 99 "Brute-force length")"; then
+            CHARS="$COUNT"
+            while [ "$COUNT" -gt 0 ]; do
+                TARGET+="?a"
+                COUNT=$((COUNT - 1))
+            done
+            break
+        fi
         echo "NO!"
     else
         printf '%s is not a number.\n' "$CHARS"
     fi
-    status_error "Enter a positive numeric brute-force length."
+    status_error "Enter a decimal brute-force length from 1 to 99."
 done
 
 while true; do

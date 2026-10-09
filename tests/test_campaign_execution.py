@@ -16,6 +16,7 @@ root = pathlib.Path(os.environ['FIXTURE_ROOT'])
 log = root / 'calls'
 prior = log.read_text().splitlines() if log.exists() else []
 arguments = sys.argv[1:]
+stop = os.environ.get('FIXTURE_STOP', '')
 if '--restore' in arguments:
     manifest = json.loads((root / 'campaign.json').read_text())
     session = next(arg.split('=', 1)[1] for arg in arguments if arg.startswith('--session='))
@@ -27,10 +28,13 @@ with log.open('a') as stream:
     stream.write(json.dumps({'args': sys.argv[1:], 'inputs': inputs}) + '\\n')
 if not prior:
     with (root / 'pot').open('a') as stream: stream.write('new:newpassword\\n')
+if stop == 'kill-resume' and '--restore' in sys.argv:
+    restore = next(arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('--restore-file-path='))
+    pathlib.Path(restore).unlink(missing_ok=True)
+    os.kill(os.getppid(), signal.SIGKILL)
 if len(prior) == 1:
-    stop = os.environ.get('FIXTURE_STOP', '')
     if stop == 'kill': os.kill(os.getppid(), signal.SIGKILL)
-    if stop in ('3', '4', '2', 'no-restore'):
+    if stop in ('3', '4', '2', '7', 'no-restore'):
         if stop in ('3', '4'):
             restore = next(arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('--restore-file-path='))
             pathlib.Path(restore).write_text('checkpoint')
@@ -89,10 +93,35 @@ class CampaignExecutionTests(unittest.TestCase):
         self.assertEqual(calls[1]['inputs'], calls[2]['inputs'])
         self.assertEqual('--restore' in calls[2]['args'], resumable)
         completed = json.loads(self.manifest.read_text())['steps'][0]
-        self.assertEqual(completed['commands'][1]['attempts'], 1 if resumable or stop == 'kill' else 2)
+        self.assertEqual(completed['commands'][1]['attempts'], 1 if resumable else 2)
         if resumable:
             self.assertEqual(command['session'], completed['commands'][1]['session'])
             self.assertEqual(completed['commands'][1]['interruptions'][0]['exit_code'], int(stop))
+            outcomes = completed['commands'][1]['attempt_outcomes']
+            self.assertEqual(len(outcomes), 1)
+            self.assertEqual(outcomes[0]['outcome'], 'completed')
+            self.assertEqual(outcomes[0]['exit_code'], 1)
+            self.assertEqual(
+                {event['attempt'] for event in completed['commands'][1]['interruptions']},
+                {1},
+            )
+        elif stop == 'kill':
+            outcomes = completed['commands'][1]['attempt_outcomes']
+            self.assertEqual(len(outcomes), 2)
+            self.assertEqual(outcomes[0]['outcome'], 'unknown')
+            self.assertIsNone(outcomes[0]['exit_code'])
+            self.assertIsNone(outcomes[0]['duration_seconds'])
+            self.assertIsNotNone(outcomes[0]['detected_at'])
+            self.assertEqual(outcomes[0]['session'], command['session'])
+            self.assertNotEqual(outcomes[1]['session'], command['session'])
+        else:
+            outcomes = completed['commands'][1]['attempt_outcomes']
+            self.assertEqual(len(outcomes), 2)
+            self.assertEqual(outcomes[0]['outcome'], 'failed')
+            self.assertEqual(outcomes[0]['exit_code'], int(stop if stop != 'no-restore' else '3'))
+            self.assertEqual(outcomes[1]['outcome'], 'completed')
+            self.assertEqual(outcomes[1]['exit_code'], 1)
+            self.assertNotEqual(outcomes[0]['session'], outcomes[1]['session'])
         self.assertEqual(completed['state'], 'completed')
         self.assertEqual(completed['generated_inputs'], [])
         self.assertFalse(list((Path(str(self.manifest) + '.state') / 'workspace').rglob('*')))
@@ -108,6 +137,112 @@ class CampaignExecutionTests(unittest.TestCase):
 
     def test_checkpoint_without_restore_fails_and_retries(self):
         self.check_stop_resume('no-restore', 3, False)
+
+    def test_missing_accepted_checkpoint_fails_before_resume_mutates_campaign(self):
+        for stop in ('3', '4'):
+            with self.subTest(stop=stop):
+                (self.root / 'calls').unlink(missing_ok=True)
+                self.env['FIXTURE_STOP'] = stop
+                path = self.root / f'campaign-{stop}.json'
+                self.plan(path=path)
+                result = self.run_cli('--execute', path)
+                self.assertEqual(result.returncode, 130, result.stdout + result.stderr)
+                manifest = json.loads(path.read_text())
+                command = manifest['steps'][0]['commands'][1]
+                restore = Path(command['restore_file'])
+                self.assertTrue(restore.is_file())
+                restore.unlink()
+                snapshot = path.read_bytes()
+                calls_before = self.calls()
+                generated_before = {
+                    item['path']: Path(item['path']).read_bytes()
+                    for item in manifest['steps'][0]['generated_inputs']
+                }
+
+                resumed = self.run_cli('--resume', path)
+                self.assertNotEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
+                self.assertIn('campaign checkpoint is missing', resumed.stdout + resumed.stderr)
+                self.assertEqual(path.read_bytes(), snapshot)
+                self.assertEqual(self.calls(), calls_before)
+                self.assertEqual(
+                    generated_before,
+                    {path: Path(path).read_bytes() for path in generated_before},
+                )
+
+    def test_failed_attempt_history_survives_retry(self):
+        self.env['FIXTURE_STOP'] = '7'
+        self.plan()
+        result = self.run_cli('--execute', self.manifest)
+        self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+        first = json.loads(self.manifest.read_text())['steps'][0]['commands'][1]
+        self.assertEqual(first['attempt_outcomes'][0]['outcome'], 'failed')
+        self.assertEqual(first['attempt_outcomes'][0]['exit_code'], 7)
+
+        result = self.run_cli('--resume', self.manifest)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        command = json.loads(self.manifest.read_text())['steps'][0]['commands'][1]
+        self.assertEqual(len(command['attempt_outcomes']), 2)
+        self.assertEqual([item['exit_code'] for item in command['attempt_outcomes']], [7, 1])
+        self.assertEqual([item['attempt'] for item in command['attempt_outcomes']], [1, 2])
+        self.assertNotEqual(
+            command['attempt_outcomes'][0]['session'],
+            command['attempt_outcomes'][1]['session'],
+        )
+
+    def test_pause_then_crash_without_checkpoint_starts_new_unknown_attempt(self):
+        self.env['FIXTURE_STOP'] = '4'
+        self.plan()
+        paused = self.run_cli('--execute', self.manifest)
+        self.assertEqual(paused.returncode, 130, paused.stdout + paused.stderr)
+        before = json.loads(self.manifest.read_text())['steps'][0]['commands'][1]
+        first_session = before['session']
+        first_restore = Path(before['restore_file'])
+        self.assertTrue(first_restore.is_file())
+        self.assertEqual(before['attempts'], 1)
+        self.assertEqual(before['interruptions'][0]['exit_code'], 4)
+
+        self.env['FIXTURE_STOP'] = 'kill-resume'
+        crashed = self.run_cli('--resume', self.manifest)
+        self.assertEqual(crashed.returncode, 137, crashed.stdout + crashed.stderr)
+        after_crash = json.loads(self.manifest.read_text())['steps'][0]['commands'][1]
+        calls_after_crash = self.calls()
+        self.assertEqual(len(calls_after_crash), 3)
+        self.assertIn('--restore', calls_after_crash[2]['args'])
+        self.assertEqual(after_crash['state'], 'running')
+        self.assertEqual(after_crash['session'], first_session)
+        self.assertEqual(after_crash['attempts'], 1)
+        self.assertFalse(first_restore.exists())
+
+        self.env['FIXTURE_STOP'] = ''
+        recovered = self.run_cli('--resume', self.manifest)
+        self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
+        calls = self.calls()
+        self.assertGreaterEqual(len(calls), 4)
+        self.assertIn('--restore', calls[2]['args'])
+        self.assertNotIn('--restore', calls[3]['args'])
+        self.assertEqual(calls[1]['inputs'], calls[2]['inputs'])
+        self.assertEqual(calls[1]['inputs'], calls[3]['inputs'])
+
+        final_step = json.loads(self.manifest.read_text())['steps'][0]
+        self.assertEqual(final_step['state'], 'completed')
+        self.assertTrue(all(command['state'] == 'completed' for command in final_step['commands']))
+        command = final_step['commands'][1]
+        self.assertEqual(command['attempts'], 2)
+        self.assertEqual(
+            [(event['attempt'], event['session'], event['exit_code'])
+             for event in command['interruptions']],
+            [(1, first_session, 4)],
+        )
+        outcomes = command['attempt_outcomes']
+        self.assertEqual(len(outcomes), 2)
+        self.assertEqual(outcomes[0]['outcome'], 'unknown')
+        self.assertEqual(outcomes[0]['session'], first_session)
+        self.assertIsNone(outcomes[0]['exit_code'])
+        self.assertIsNone(outcomes[0]['duration_seconds'])
+        self.assertIsNotNone(outcomes[0]['detected_at'])
+        self.assertEqual(outcomes[1]['outcome'], 'completed')
+        self.assertEqual(outcomes[1]['attempt'], 2)
+        self.assertNotEqual(outcomes[1]['session'], first_session)
 
     def test_sigkill_reuses_frozen_inputs(self):
         self.check_stop_resume('kill', 137, False)

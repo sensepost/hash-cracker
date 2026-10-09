@@ -4,13 +4,11 @@
 # Requirements
 processor_bootstrap
 
-fingerprint_segment_max="${FINGERPRINT_SEGMENT_MAX:-8}"
-case "$fingerprint_segment_max" in
-    '' | *[!0-9]* | 0)
-        echo "Invalid FINGERPRINT_SEGMENT_MAX: $fingerprint_segment_max"
-        exit 1
-        ;;
-esac
+fingerprint_segment_raw="${FINGERPRINT_SEGMENT_MAX-8}"
+if ! fingerprint_segment_max="$(normalize_bounded_positive_decimal "$fingerprint_segment_raw" 64 "FINGERPRINT_SEGMENT_MAX")"; then
+    echo "Invalid FINGERPRINT_SEGMENT_MAX: $fingerprint_segment_raw" >&2
+    exit 1
+fi
 fingerprint_candidate_max=$((fingerprint_segment_max * 2))
 
 # Temporary Files
