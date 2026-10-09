@@ -200,6 +200,9 @@ class CampaignExecutionTests(unittest.TestCase):
         self.assertTrue(first_restore.is_file())
         self.assertEqual(before['attempts'], 1)
         self.assertEqual(before['interruptions'][0]['exit_code'], 4)
+        first_outcome = before['attempt_outcomes'][0]
+        first_argv_sha256 = first_outcome['argv_sha256']
+        self.assertIsNotNone(first_argv_sha256)
 
         self.env['FIXTURE_STOP'] = 'kill-resume'
         crashed = self.run_cli('--resume', self.manifest)
@@ -211,21 +214,32 @@ class CampaignExecutionTests(unittest.TestCase):
         self.assertEqual(after_crash['state'], 'running')
         self.assertEqual(after_crash['session'], first_session)
         self.assertEqual(after_crash['attempts'], 1)
+        self.assertEqual(after_crash['attempt_outcomes'][0]['argv_sha256'], first_argv_sha256)
         self.assertFalse(first_restore.exists())
 
         self.env['FIXTURE_STOP'] = ''
         recovered = self.run_cli('--resume', self.manifest)
         self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
         calls = self.calls()
-        self.assertGreaterEqual(len(calls), 4)
+        self.assertGreater(len(calls), len(calls_after_crash))
         self.assertIn('--restore', calls[2]['args'])
         self.assertNotIn('--restore', calls[3]['args'])
+        retry_session = next(
+            arg.split('=', 1)[1] for arg in calls[3]['args'] if arg.startswith('--session=')
+        )
         self.assertEqual(calls[1]['inputs'], calls[2]['inputs'])
         self.assertEqual(calls[1]['inputs'], calls[3]['inputs'])
 
         final_step = json.loads(self.manifest.read_text())['steps'][0]
         self.assertEqual(final_step['state'], 'completed')
         self.assertTrue(all(command['state'] == 'completed' for command in final_step['commands']))
+        first_command_session = final_step['commands'][0]['session']
+        final_resume_sessions = [
+            next(arg.split('=', 1)[1] for arg in call['args'] if arg.startswith('--session='))
+            for call in calls[len(calls_after_crash):]
+        ]
+        self.assertNotIn(first_command_session, final_resume_sessions,
+                         'final resume must skip the already-completed first command')
         command = final_step['commands'][1]
         self.assertEqual(command['attempts'], 2)
         self.assertEqual(
@@ -242,6 +256,7 @@ class CampaignExecutionTests(unittest.TestCase):
         self.assertIsNotNone(outcomes[0]['detected_at'])
         self.assertEqual(outcomes[1]['outcome'], 'completed')
         self.assertEqual(outcomes[1]['attempt'], 2)
+        self.assertEqual(outcomes[1]['session'], retry_session)
         self.assertNotEqual(outcomes[1]['session'], first_session)
 
     def test_sigkill_reuses_frozen_inputs(self):
