@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Processor jobs skip valid `$HEX[...]` candidates that decode to NUL, LF, or
+  CR, report the line and byte category, and continue with representable
+  records. Extraction fails before Hashcat if skipping leaves no records;
+  malformed HEX records and raw embedded NUL/CR remain fatal. The standalone
+  reader stays strict (follow-up to #113).
+
 ## v6.15.1 - Portable Plaintext Extraction
 
 ### Fixed
