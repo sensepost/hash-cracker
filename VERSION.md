@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v6.15.1 - Portable Plaintext Extraction
+
 ### Fixed
 
 - Replaced the AWK plaintext decoder with a byte-oriented Python reader so

@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.15.0 "Campaign Integrity"'
+    printf '%s' 'v6.15.1 "Portable Plaintext Extraction"'
 }
 
 function release_label_text() {
