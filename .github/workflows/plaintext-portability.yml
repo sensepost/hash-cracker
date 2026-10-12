@@ -1,0 +1,46 @@
+name: Plaintext Portability
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plaintext-portability:
+    name: Plaintext tests (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Linux
+            runner: ubuntu-24.04
+            architecture: x86_64
+          - platform: macOS arm64
+            runner: macos-15
+            architecture: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Verify native shell and Python
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          actual_architecture="$(uname -m)"
+          test "$actual_architecture" = "$EXPECTED_ARCHITECTURE"
+          printf 'Architecture: %s\n' "$actual_architecture"
+          /bin/bash --version | head -n 1
+          python3 --version
+
+      - name: Run plaintext and processor regressions
+        run: make test-plaintext

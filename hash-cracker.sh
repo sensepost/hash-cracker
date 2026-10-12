@@ -238,7 +238,7 @@ function temporary_path() {
 function temporary_file_template() {
     local tag="${1:-tmp}"
 
-    temporary_path "hash-cracker-${tag}.XXXX"
+    temporary_path "hash-cracker-${tag}.XXXXXX"
 }
 
 function format_duration() {
@@ -337,10 +337,20 @@ function markov_helper_path() {
 function check_job_dependencies() {
     local selected="$1"
     local common_substr_bin
-    local python_bin
     local statsgen
     local maskgen
     local markov_bin
+
+    case "$selected" in
+        9 | 10 | 11 | 12 | 13 | 14 | 17 | 19)
+            if [ "$DRYRUN" != ' ' ] && ! command -v python3 >/dev/null 2>&1; then
+                dependency_fail \
+                    "Option $selected requires 'python3'." \
+                    "install python3 and ensure 'python3' is in PATH."
+                return 1
+            fi
+            ;;
+    esac
 
     case "$selected" in
         10 | 11)
@@ -362,12 +372,6 @@ function check_job_dependencies() {
             else
                 statsgen="scripts/extensions/pack-linux/rulegen.py"
             fi
-            if [ "$DRYRUN" != ' ' ] && ! command -v python3 >/dev/null 2>&1; then
-                dependency_fail \
-                    "Option 12 requires 'python3'." \
-                    "install python3 and ensure 'python3' is in PATH."
-                return 1
-            fi
             if [ ! -f "$statsgen" ]; then
                 dependency_fail \
                     "Option 12 requires '$statsgen'." \
@@ -383,19 +387,11 @@ function check_job_dependencies() {
             ;;
         13)
             if [ "$MACHINE" == "Mac" ]; then
-                python_bin="python3"
                 statsgen="scripts/extensions/pack-mac/statsgen.py"
                 maskgen="scripts/extensions/pack-mac/maskgen.py"
             else
-                python_bin="python3"
                 statsgen="scripts/extensions/pack-linux/statsgen.py"
                 maskgen="scripts/extensions/pack-linux/maskgen.py"
-            fi
-            if [ "$DRYRUN" != ' ' ] && ! command -v "$python_bin" >/dev/null 2>&1; then
-                dependency_fail \
-                    "Option 13 requires '$python_bin'." \
-                    "install $python_bin and ensure it is in PATH."
-                return 1
             fi
             if [ ! -f "$statsgen" ] || [ ! -f "$maskgen" ]; then
                 dependency_fail \
@@ -642,7 +638,7 @@ function campaign_artifact_paths() {
         hash-cracker.sh \
         scripts/parameters.sh \
         scripts/campaign.py \
-        scripts/plaintexts.awk \
+        scripts/plaintexts.py \
         scripts/linux.sh \
         scripts/mac.sh \
         scripts/runtime-overrides.sh \
@@ -1036,7 +1032,7 @@ function campaign_register_generated_inputs() {
 }
 
 function processor_extract_plaintexts() {
-    LC_ALL=C awk -v input_kind="${2:-potfile}" -f scripts/plaintexts.awk "$1"
+    python3 scripts/plaintexts.py --input-kind "${2:-potfile}" "$1"
 }
 
 function processor_bootstrap() {
@@ -1130,7 +1126,7 @@ function dryrun_tempfile() {
                     "$CAMPAIGN_WORKSPACE" "$CAMPAIGN_CURRENT_STEP" "$tag" "$temp_index"
             else
                 campaign_id=$(printf '%s' "$campaign_key" | cksum | awk '{print $1}')
-                mktemp "$(temporary_path "hash-cracker-campaign-${campaign_id}-${CAMPAIGN_CURRENT_STEP}-${tag}-${temp_index}.XXXX")"
+                mktemp "$(temporary_path "hash-cracker-campaign-${campaign_id}-${CAMPAIGN_CURRENT_STEP}-${tag}-${temp_index}.XXXXXX")"
             fi
             return 0
         fi

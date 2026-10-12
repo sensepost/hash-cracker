@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Replaced the AWK plaintext decoder with a byte-oriented Python reader so
+  potfile and wordlist extraction behaves consistently across Linux and macOS.
+  Added native macOS and Linux regression coverage for jobs 10 and 19. (#113)
+- Use six-character `mktemp` templates so temporary files also work with BSD
+  `mktemp` on supported macOS systems. (#113)
+
 ## v6.15.0 - Campaign Integrity
 
 ### Added

@@ -41,7 +41,7 @@ These are only needed for specific menu options.
 #### Linux
 
 - `python3`
-  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - Needed for options `9`–`14`, `17`, and `19` (plaintext extraction and processing)
   - Option `12` requires `pyenchant`:
   - `python3 -m pip install pyenchant==3.3.0`
 - `cewl`
@@ -55,7 +55,7 @@ These are only needed for specific menu options.
 
 - Bundled native helpers support Apple Silicon (`arm64`) only; Intel macOS is not supported for those workflows.
 - `python3`
-  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - Needed for options `9`–`14`, `17`, and `19` (plaintext extraction and processing)
   - Option `12` requires `pyenchant`:
   - `python3 -m pip install pyenchant==3.3.0`
 - `cewl` command in PATH, or `scripts/extensions/cewl/cewl.rb`
