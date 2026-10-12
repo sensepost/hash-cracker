@@ -1032,7 +1032,8 @@ function campaign_register_generated_inputs() {
 }
 
 function processor_extract_plaintexts() {
-    python3 scripts/plaintexts.py --input-kind "${2:-potfile}" "$1"
+    python3 scripts/plaintexts.py --skip-unrepresentable-hex \
+        --input-kind "${2:-potfile}" "$1"
 }
 
 function processor_bootstrap() {

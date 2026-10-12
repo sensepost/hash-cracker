@@ -10,9 +10,13 @@ READER = REPO / "scripts" / "plaintexts.py"
 
 
 class PlaintextTests(unittest.TestCase):
-    def decode(self, data, kind="potfile"):
+    def decode(self, data, kind="potfile", skip_unrepresentable_hex=False):
+        command = [sys.executable, str(READER)]
+        if skip_unrepresentable_hex:
+            command.append("--skip-unrepresentable-hex")
+        command.extend(("--input-kind", kind))
         return subprocess.run(
-            [sys.executable, str(READER), "--input-kind", kind],
+            command,
             input=data,
             capture_output=True,
             cwd=REPO,
@@ -86,6 +90,75 @@ class PlaintextTests(unittest.TestCase):
             b"plaintext reader: line 2: "
             b"NUL and CR bytes cannot be transformed as text lines\n",
         )
+
+    def test_processor_mode_skips_valid_hex_controls_and_preserves_safe_records(self):
+        result = self.decode(
+            b"h:first\n"
+            b"h:$HEX[610062]\n"
+            b"h:$HEX[610a62]\n"
+            b"h:$HEX[610d62]\n"
+            b"h:$HEX[]\n"
+            b"h:last",
+            skip_unrepresentable_hex=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, b"first\n\nlast\n")
+        self.assertEqual(
+            result.stderr,
+            b"plaintext reader: line 2: skipping valid $HEX candidate with decoded "
+            b"NUL byte(s); it cannot be transformed as a text line\n"
+            b"plaintext reader: line 3: skipping valid $HEX candidate with decoded "
+            b"LF byte(s); it cannot be transformed as a text line\n"
+            b"plaintext reader: line 4: skipping valid $HEX candidate with decoded "
+            b"CR byte(s); it cannot be transformed as a text line\n"
+            b"plaintext reader: skipped 3 valid $HEX candidate(s) with "
+            b"unrepresentable decoded bytes\n",
+        )
+
+    def test_processor_mode_keeps_wordlist_binary_skip_and_fatal_checks(self):
+        wordlist = self.decode(
+            b"a:b\n$HEX[410a42]\nlast\n",
+            "wordlist",
+            skip_unrepresentable_hex=True,
+        )
+        self.assertEqual(wordlist.returncode, 0, wordlist.stderr)
+        self.assertEqual(wordlist.stdout, b"a:b\nlast\n")
+        self.assertIn(b"line 2: skipping valid $HEX candidate", wordlist.stderr)
+
+        malformed = self.decode(
+            b"h:before\nh:$HEX[00]\nh:$HEX[610]\nh:after\n",
+            skip_unrepresentable_hex=True,
+        )
+        self.assertEqual(malformed.returncode, 1)
+        self.assertEqual(malformed.stdout, b"before\n")
+        self.assertEqual(
+            malformed.stderr,
+            b"plaintext reader: line 2: skipping valid $HEX candidate with decoded "
+            b"NUL byte(s); it cannot be transformed as a text line\n"
+            b"plaintext reader: line 3: odd-length $HEX record\n"
+            b"plaintext reader: skipped 1 valid $HEX candidate(s) with "
+            b"unrepresentable decoded bytes\n",
+        )
+
+        for data, diagnostic in (
+            (b"h:raw\x00word\n", b"NUL and CR bytes cannot be transformed"),
+            (b"h:raw\rword\n", b"NUL and CR bytes cannot be transformed"),
+        ):
+            with self.subTest(data=data):
+                raw = self.decode(data, skip_unrepresentable_hex=True)
+                self.assertEqual(raw.returncode, 1)
+                self.assertEqual(raw.stdout, b"")
+                self.assertIn(diagnostic, raw.stderr)
+
+    def test_processor_mode_fails_when_every_record_is_unrepresentable(self):
+        result = self.decode(
+            b"h:$HEX[00]\nh:$HEX[0a]\nh:$HEX[0d]\n",
+            skip_unrepresentable_hex=True,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, b"")
+        self.assertIn(b"skipped 3 valid $HEX candidate(s)", result.stderr)
+        self.assertIn(b"no transformable plaintext records remain", result.stderr)
 
 
 class PlaintextProcessorTests(unittest.TestCase):
@@ -167,11 +240,12 @@ class PlaintextProcessorTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def run_job(self, job):
+    def run_job(self, job, input_data=None):
         return subprocess.run(
             ["/bin/bash", "./hash-cracker.sh", "--no-session-log", "--job", str(job)],
             cwd=REPO,
             env=self.env,
+            input=input_data,
             capture_output=True,
             text=True,
             timeout=60,
@@ -219,6 +293,62 @@ class PlaintextProcessorTests(unittest.TestCase):
                 self.assertFalse(self.hashcat_calls.exists())
                 self.assertFalse(self.preprocess_capture.exists())
                 self.assertEqual(list(self.tmp_dir.iterdir()), [])
+
+    def test_job_9_skips_binary_candidates_and_processes_safe_records(self):
+        self.potfile.write_bytes(
+            b"hash:ordinary\n"
+            b"hash:$HEX[610062]\n"
+            b"hash:later\n"
+        )
+
+        result = self.run_job(9)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "plaintext reader: line 2: skipping valid $HEX candidate with decoded NUL",
+            result.stderr,
+        )
+        self.assertIn("skipped 1 valid $HEX candidate(s)", result.stderr)
+        self.assertTrue(self.hashcat_calls.exists())
+        self.assertEqual(
+            (self.capture_dir / "input-1").read_bytes(), b"later\nordinary\n"
+        )
+        self.assertEqual(list(self.tmp_dir.iterdir()), [])
+
+    def test_jobs_9_10_and_19_all_binary_candidates_skip_hashcat_and_clean(self):
+        for job in (9, 10, 19):
+            with self.subTest(job=job):
+                self.potfile.write_bytes(b"hash:$HEX[610062]\n")
+                result = self.run_job(job)
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("no transformable plaintext records remain", result.stderr)
+                self.assertFalse(self.hashcat_calls.exists())
+                self.assertFalse(self.preprocess_capture.exists())
+                self.assertEqual(list(self.tmp_dir.iterdir()), [])
+
+    def test_job_9_later_malformed_hex_after_skip_still_blocks_hashcat(self):
+        self.potfile.write_bytes(
+            b"hash:ordinary\n"
+            b"hash:$HEX[610062]\n"
+            b"hash:$HEX[610]\n"
+            b"hash:later\n"
+        )
+
+        result = self.run_job(9)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(
+            "plaintext reader: line 3: odd-length $HEX record", result.stderr
+        )
+        self.assertEqual(
+            result.stderr.count("plaintext reader: skipped 1 valid $HEX candidate(s)"),
+            1,
+        )
+        self.assertNotIn("610062", result.stderr)
+        self.assertNotIn("ordinary", result.stderr)
+        self.assertFalse(self.hashcat_calls.exists())
+        self.assertEqual(list(self.tmp_dir.iterdir()), [])
 
 
 if __name__ == "__main__":
