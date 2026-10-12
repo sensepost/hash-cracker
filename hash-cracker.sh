@@ -67,7 +67,7 @@ function banner_center_line() {
 }
 
 function release_version_text() {
-    printf '%s' 'v6.15.1 "Portable Plaintext Extraction"'
+    printf '%s' 'v6.15.2 "Binary Plaintext Handling"'
 }
 
 function release_label_text() {
