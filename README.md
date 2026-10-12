@@ -41,7 +41,7 @@ These are only needed for specific menu options.
 #### Linux
 
 - `python3`
-  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - Needed for options `9`–`14`, `17`, and `19` (plaintext extraction and processing)
   - Option `12` requires `pyenchant`:
   - `python3 -m pip install pyenchant==3.3.0`
 - `cewl`
@@ -55,7 +55,7 @@ These are only needed for specific menu options.
 
 - Bundled native helpers support Apple Silicon (`arm64`) only; Intel macOS is not supported for those workflows.
 - `python3`
-  - Needed for option `12` (PACK rulegen) and option `13` (PACK mask)
+  - Needed for options `9`–`14`, `17`, and `19` (plaintext extraction and processing)
   - Option `12` requires `pyenchant`:
   - `python3 -m pip install pyenchant==3.3.0`
 - `cewl` command in PATH, or `scripts/extensions/cewl/cewl.rb`
@@ -221,7 +221,7 @@ Hashcat checkpoint stops (exit `3`) and runtime stops (exit `4`) pause a campaig
 
 Manifest symlinks use the canonical target for sidecar state, locking, and atomic writes; writing through an alias preserves the symlink. Stats exports cannot target the active manifest or anything in its `.state` directory, including symlink and hardlink aliases of state files.
 
-Potfile-derived iteration, prefix/suffix, common-substring, PACK, fingerprint, Markov, and digit-removal preprocessing share a byte-oriented plaintext reader implemented with the existing AWK dependency. Potfile records use the last colon-delimited field; Markov wordlist records retain their entire contents, including colons. Valid `$HEX[...]` values decode before transformations, preserving encoded colons and non-ASCII bytes. Empty encodings are valid. Malformed or odd-length encodings, NUL bytes, and encoded LF/CR bytes fail preprocessing with a line-numbered diagnostic, because these text processors cannot represent embedded record separators. Ordinary LF and CRLF record endings are accepted. This reader does not interpret bytes as Unicode characters or change helper input formats.
+Potfile-derived iteration, prefix/suffix, common-substring, PACK, fingerprint, Markov, and digit-removal preprocessing share a byte-oriented Python plaintext reader. Potfile records use the last colon-delimited field; Markov wordlist records retain their entire contents, including colons. Valid `$HEX[...]` values decode before transformations, preserving encoded colons and non-ASCII bytes. Empty encodings are valid. Malformed or odd-length encodings, NUL bytes, and encoded LF/CR bytes fail preprocessing with a line-numbered diagnostic, because these text processors cannot represent embedded record separators. Ordinary LF and CRLF record endings are accepted. This reader does not interpret bytes as Unicode characters or change helper input formats.
 
 Run the smoke suite with Bash coverage (requires `python3`):
 
